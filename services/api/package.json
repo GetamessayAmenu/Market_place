@@ -1,0 +1,24 @@
+{
+  "name": "@marketplace/api",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "echo 'NestJS API — implemented in Phase 3'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@marketplace/config": "*",
+    "@marketplace/types": "*",
+    "@marketplace/utils": "*"
+  },
+  "devDependencies": {
+    "@marketplace/eslint-config": "*",
+    "@marketplace/typescript-config": "*",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  }
+}

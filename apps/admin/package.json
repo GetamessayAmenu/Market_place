@@ -1,0 +1,25 @@
+{
+  "name": "@marketplace/admin",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "echo 'Admin app — implemented in Phase 10'",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist .next"
+  },
+  "dependencies": {
+    "@marketplace/config": "*",
+    "@marketplace/types": "*",
+    "@marketplace/ui": "*",
+    "@marketplace/utils": "*"
+  },
+  "devDependencies": {
+    "@marketplace/eslint-config": "*",
+    "@marketplace/typescript-config": "*",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  }
+}

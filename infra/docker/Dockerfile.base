@@ -1,0 +1,11 @@
+# Shared base image for Node services (api, realtime, future workers)
+FROM node:20-alpine AS base
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
+
+# Turborepo prune stage added in Phase 12 production Dockerfiles

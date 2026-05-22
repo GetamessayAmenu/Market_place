@@ -1,0 +1,37 @@
+{
+  "name": "@marketplace/utils",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./slug": {
+      "types": "./dist/slug/index.d.ts",
+      "import": "./dist/slug/index.js"
+    },
+    "./format": {
+      "types": "./dist/format/index.d.ts",
+      "import": "./dist/format/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@marketplace/eslint-config": "*",
+    "@marketplace/typescript-config": "*",
+    "@types/node": "^22.10.7",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.3"
+  }
+}
