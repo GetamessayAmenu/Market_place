@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 6 (2026-05-25)
+**Last updated:** Phase 7 (2026-05-25)
 
 ---
 
@@ -13,12 +13,11 @@ Living record of implementation progress. Updated after each phase.
 | Monorepo / shared packages | Ready |
 | Database (PostgreSQL + Prisma) | Schema migrated, seeded |
 | API (`services/api`) | NestJS + auth + listings + Meilisearch search |
+| Realtime (`services/realtime`) | Socket.IO chat + Redis adapter |
 | Meilisearch | Integrated (index `listings`) |
-| Realtime (`services/realtime`) | Stub only |
 | Web / Admin apps | Stub only |
-| Chat | Not started (Phase 7) |
 
-**Next:** Phase 7 — (awaiting confirmation)
+**Next:** Phase 8 — (awaiting confirmation)
 
 ---
 
@@ -269,3 +268,59 @@ Living record of implementation progress. Updated after each phase.
 - **Category filter:** matches parent `categorySlug` or `subcategorySlug`
 - **Env:** `MEILISEARCH_HOST`, `MEILISEARCH_API_KEY` (optional in Zod; required at runtime for search routes)
 - **Subcategory mapping:** child category → `subcategory*` fields; parent → `category*` fields
+
+---
+
+## Phase 7 — Realtime Chat System
+
+### Implemented
+- **Standalone `services/realtime`** NestJS app (port **3002**) — decoupled from `services/api`, shares DB + JWT/Redis session keys
+- **Socket.IO + Redis adapter** (`RedisIoAdapter`) for multi-instance pub/sub
+- **JWT socket auth** — handshake `auth.token` / Bearer / query; validates Redis session + access-token blacklist (same keys as API)
+- **Chat module:** create conversation (buyer → listing seller), list conversations, message history, mark read
+- **Chat gateway:** `chat:join`, `chat:send`, `chat:typing`, `chat:read` with DTO validation
+- **Presence:** Redis-backed online/offline, per-user socket sets, typing TTL, unread counters
+- **Rate limits:** Redis hooks on send/typing (60/min send, 120/min typing per user)
+- **Moderation hooks:** `ChatModerationListener` + domain events (`chat.message_sent`, `chat.spam_suspected`, `chat.report_ready`)
+
+### Schema changes
+- None (uses `conversations`, `messages`, `users`, `listings`)
+
+### Modules (`services/realtime/src`)
+- `chat/` — controller, service, repository, DTOs, moderation listener
+- `gateway/` — `ChatGateway`, `ChatRateLimitService`
+- `websocket/` — `SocketAuthService`, `SocketAuthMiddleware`, `HttpAuthGuard`, `RedisIoAdapter`
+- `presence/` — `PresenceService`
+- `infrastructure/` — config (Zod `parseRealtimeEnv`), Prisma, Redis
+- `health/` — `GET /api/v1/health`
+
+### HTTP endpoints (`/api/v1`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | Public | Postgres + Redis liveness |
+| POST | `/conversations` | JWT | Create/get conversation for listing |
+| GET | `/conversations` | JWT | Paginated conversation list + unread |
+| GET | `/conversations/:id/messages` | JWT | Paginated message history |
+| POST | `/conversations/:id/read` | JWT | Mark messages read |
+
+### Socket events
+| Direction | Event | Purpose |
+|-----------|-------|---------|
+| Client | `chat:join` | Join `conversation:{id}` room |
+| Client | `chat:send` | Send message (persisted) |
+| Client | `chat:typing` | Typing indicator |
+| Client | `chat:read` | Read receipts |
+| Server | `chat:new_message` | Broadcast new message |
+| Server | `chat:user_typing` | Typing broadcast |
+| Server | `chat:message_read` | Read receipt broadcast |
+| Server | `chat:user_online` / `chat:user_offline` | Global presence |
+| Server | `chat:joined` | Join acknowledgment |
+
+### Architecture decisions
+- **Conversation uniqueness:** `(listing_id, buyer_id, seller_id)` per Prisma schema
+- **Buyer-initiated only:** sellers cannot open a chat on their own listing
+- **Suspended/banned users** blocked on HTTP and socket send
+- **Rooms:** `conversation:{uuid}` for thread broadcasts; `user:{uuid}` for direct user delivery
+- **Read status:** `messages.read_at` (null = unread)
+- **Env:** `packages/config` → `parseRealtimeEnv()` (`DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `CORS_ORIGINS`)
+- **Notifications:** `CHAT_DOMAIN_EVENTS.MESSAGE_SENT` ready for BullMQ/notifications worker

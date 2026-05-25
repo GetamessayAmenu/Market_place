@@ -29,10 +29,6 @@ export const SEARCH_SUGGESTIONS_MAX_LIMIT = 10 as const;
 
 export const LISTINGS_SEARCH_INDEX_UID = 'listings' as const;
 
-export const JWT_ACCESS_EXPIRY = '15m' as const;
+export const MAX_CHAT_MESSAGE_LENGTH = 4000 as const;
 
-export const JWT_REFRESH_EXPIRY = '7d' as const;
-
-export const RATE_LIMIT_WINDOW_MS = 60_000 as const;
-
-export const RATE_LIMIT_MAX_REQUESTS = 100 as const;
+export const CHAT_TYPING_TTL_MS = 5000 as const;

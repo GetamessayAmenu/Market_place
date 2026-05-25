@@ -15,3 +15,9 @@ export {
   parseWebEnv,
   type WebEnv,
 } from './web.env.js';
+
+export {
+  realtimeEnvSchema,
+  parseRealtimeEnv,
+  type RealtimeEnv,
+} from './realtime.env.js';
