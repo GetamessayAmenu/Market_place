@@ -38,8 +38,5 @@ npm-debug.log*
 # Testing
 coverage
 
-# Prisma
-prisma/migrations/**/migration_lock.toml
-
 # Docker
 *.pid

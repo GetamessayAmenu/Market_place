@@ -1,5 +1,8 @@
 # Base infrastructure — extended in Phase 12
 # Usage: docker compose -f infra/docker/docker-compose.base.yml up -d
+#
+# PostgreSQL host port 5433 avoids conflict with a local Postgres on 5432.
+# DATABASE_URL: postgresql://marketplace:marketplace@localhost:5433/marketplace
 
 services:
   postgres:
@@ -11,7 +14,7 @@ services:
       POSTGRES_PASSWORD: marketplace
       POSTGRES_DB: marketplace
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

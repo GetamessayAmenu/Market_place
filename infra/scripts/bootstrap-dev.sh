@@ -14,8 +14,12 @@ npm run build --workspace=@marketplace/types
 npm run build --workspace=@marketplace/utils
 npm run build --workspace=@marketplace/ui
 
-echo "==> Starting infrastructure (postgres, redis, meilisearch)..."
+echo "==> Starting infrastructure (postgres on :5433, redis, meilisearch)..."
 docker compose -f infra/docker/docker-compose.base.yml up -d
+
+if [ ! -f prisma/.env ]; then
+  cp prisma/.env.example prisma/.env
+fi
 
 echo "==> Dev bootstrap complete."
 echo "    API: Phase 3 | Web: Phase 9 | Realtime: Phase 7"

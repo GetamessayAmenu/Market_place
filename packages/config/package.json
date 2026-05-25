@@ -3,17 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./env": {
       "types": "./dist/env/index.d.ts",
-      "import": "./dist/env/index.js"
+      "import": "./dist/env/index.js",
+      "require": "./dist/env/index.js",
+      "default": "./dist/env/index.js"
     }
   },
   "scripts": {

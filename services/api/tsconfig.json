@@ -4,6 +4,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
+    "esModuleInterop": true,
     "paths": {
       "@api/*": ["./src/*"]
     }
