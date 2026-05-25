@@ -10,6 +10,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HealthModule } from './modules/health/health.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { SearchModule } from './modules/search/search.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     UploadsModule,
     ListingsModule,
     FavoritesModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [

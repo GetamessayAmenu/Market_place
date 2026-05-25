@@ -65,6 +65,10 @@ export class ApiConfigService {
     return this.env.MEILISEARCH_API_KEY;
   }
 
+  get isMeilisearchConfigured(): boolean {
+    return Boolean(this.meilisearchHost && this.meilisearchApiKey);
+  }
+
   get cloudinaryCloudName(): string | undefined {
     return this.env.CLOUDINARY_CLOUD_NAME;
   }

@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 5 (2026-05-25)
+**Last updated:** Phase 6 (2026-05-25)
 
 ---
 
@@ -12,12 +12,13 @@ Living record of implementation progress. Updated after each phase.
 |-------|--------|
 | Monorepo / shared packages | Ready |
 | Database (PostgreSQL + Prisma) | Schema migrated, seeded |
-| API (`services/api`) | NestJS + auth + listings/catalog/uploads |
+| API (`services/api`) | NestJS + auth + listings + Meilisearch search |
+| Meilisearch | Integrated (index `listings`) |
 | Realtime (`services/realtime`) | Stub only |
 | Web / Admin apps | Stub only |
-| Search, chat | Not started (Phases 6–7) |
+| Chat | Not started (Phase 7) |
 
-**Next:** Phase 6 — (awaiting confirmation)
+**Next:** Phase 7 — (awaiting confirmation)
 
 ---
 
@@ -222,3 +223,49 @@ Living record of implementation progress. Updated after each phase.
 - **Contact options** JSON: `{ showPhone?, whatsapp?, telegram?, inAppMessaging? }`
 - **Event names** under `listing.*` for future BullMQ/analytics workers
 - **Global `JwtAuthGuard`** now uses Passport `jwt-access` strategy
+
+---
+
+## Phase 6 — Search System (Meilisearch)
+
+### Implemented
+- **Search module:** `MeilisearchService` (client + index settings), `SearchService` (query abstraction), `ListingSearchIndexerService` (DB → index mapper)
+- **Queue-based indexing:** BullMQ `search-index` queue + `ListingSearchIndexProcessor`
+- **Event-driven sync:** `ListingSearchIndexListener` on `listing.created`, `listing.updated`, `listing.deleted`, `listing.sold`, `listing.renewed`
+- **Public search API:** full-text + typo tolerance (Meilisearch defaults), filters, sort, offset pagination
+- **Suggestions API:** lightweight title/category/city suggestions
+- **Security:** DTO validation, query sanitization (200 char cap), rate limits (`120/min` search, `180/min` suggestions), active-only filter by default
+
+### Index: `listings` (Meilisearch)
+| Setting | Fields |
+|---------|--------|
+| **Searchable** | `title`, `description`, `city`, `location`, `categoryName`, `subcategoryName`, `categorySlug`, `subcategorySlug` |
+| **Filterable** | `categoryId`, `categorySlug`, `subcategoryId`, `subcategorySlug`, `city`, `condition`, `price`, `verified`, `featured`, `status` |
+| **Sortable** | `createdAt`, `price`, `featured` |
+
+**Indexed document fields:** `id`, `title`, `slug`, `description`, `categoryId`, `categorySlug`, `categoryName`, `subcategoryId`, `subcategorySlug`, `subcategoryName`, `city`, `location`, `condition`, `price`, `verified`, `featured`, `status`, `createdAt`, `primaryImageUrl`
+
+**Indexability rule:** only `active`, non-deleted, non-expired listings are upserted; others are removed from the index.
+
+### Modules added (services/api)
+- `modules/search/` — controller, services, indexer, listener, processor, DTOs, mapper, utils
+
+### API endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/search` | Public | Search listings (Meilisearch) |
+| GET | `/api/v1/search/suggestions` | Public | Typeahead suggestions |
+
+### Search query params (`GET /search`)
+- `q` — full-text query (max 200 chars)
+- `categoryId`, `categorySlug`, `city`, `condition`, `verified`, `featured`, `minPrice`, `maxPrice`
+- `sortBy` — `relevance` (default) \| `newest` \| `oldest` \| `price_asc` \| `price_desc`
+- `page`, `limit` — pagination (reuse `PaginationQueryDto` limits)
+
+### Architecture decisions
+- **No Postgres fallback** for search reads — Meilisearch required (`SEARCH_UNAVAILABLE` if env missing)
+- **Indexing is async** via BullMQ for horizontal scaling (workers can run separately later)
+- **Featured prioritization:** `sortBy=newest` uses `featured:desc, createdAt:desc`
+- **Category filter:** matches parent `categorySlug` or `subcategorySlug`
+- **Env:** `MEILISEARCH_HOST`, `MEILISEARCH_API_KEY` (optional in Zod; required at runtime for search routes)
+- **Subcategory mapping:** child category → `subcategory*` fields; parent → `category*` fields

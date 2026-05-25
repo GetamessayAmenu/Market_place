@@ -23,6 +23,12 @@ export const LISTING_DEFAULT_TTL_DAYS = 30 as const;
 
 export const LISTING_SLUG_MAX_LENGTH = 220 as const;
 
+export const SEARCH_MAX_QUERY_LENGTH = 200 as const;
+
+export const SEARCH_SUGGESTIONS_MAX_LIMIT = 10 as const;
+
+export const LISTINGS_SEARCH_INDEX_UID = 'listings' as const;
+
 export const JWT_ACCESS_EXPIRY = '15m' as const;
 
 export const JWT_REFRESH_EXPIRY = '7d' as const;
