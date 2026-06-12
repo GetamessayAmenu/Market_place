@@ -1,17 +1,24 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { AdminAuditInterceptor } from './common/interceptors/admin-audit.interceptor';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
+import { AdminLogsController } from './modules/admin-logs/admin-logs.controller';
+import { AdminLogsService } from './modules/admin-logs/admin-logs.service';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HealthModule } from './modules/health/health.module';
 import { ListingsModule } from './modules/listings/listings.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { SearchModule } from './modules/search/search.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { VerificationModule } from './modules/verification/verification.module';
 
 @Module({
   imports: [
@@ -23,13 +30,22 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ListingsModule,
     FavoritesModule,
     SearchModule,
+    NotificationsModule,
+    ReportsModule,
+    AnalyticsModule,
+    VerificationModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AdminLogsController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    AdminLogsService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AdminAuditInterceptor,
     },
   ],
 })

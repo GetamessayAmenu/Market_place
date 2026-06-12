@@ -9,22 +9,24 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
-import { RATE_LIMIT_AUTH_PREFIX } from './auth.constants';
+import type { SessionRecord } from '../sessions/interfaces/session-record.interface';
+
+import { COOKIE_ACCESS_TOKEN, RATE_LIMIT_AUTH_PREFIX } from './auth.constants';
 import { AuthService } from './auth.service';
 import type { AuthResponseDto, MeResponseDto } from './dto/auth-response.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SessionInvalidException } from './exceptions/auth.exceptions';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
-import { COOKIE_ACCESS_TOKEN } from './auth.constants';
 import { extractRefreshToken } from './utils/cookie.util';
-import type { SessionRecord } from '../sessions/interfaces/session-record.interface';
 
 @Controller('auth')
 @UseGuards(RateLimitGuard)
@@ -62,13 +64,13 @@ export class AuthController {
     @Req() req: Request & { user: SessionRecord },
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const refreshToken = extractRefreshToken(req.cookies ?? {});
+    const refreshToken = extractRefreshToken(req.cookies);
     if (!refreshToken) {
       throw new SessionInvalidException('Refresh token missing');
     }
     const accessToken =
       dto.accessToken ??
-      (typeof req.cookies?.[COOKIE_ACCESS_TOKEN] === 'string'
+      (typeof req.cookies[COOKIE_ACCESS_TOKEN] === 'string'
         ? req.cookies[COOKIE_ACCESS_TOKEN]
         : undefined);
 
@@ -97,6 +99,32 @@ export class AuthController {
     return { user: profile };
   }
 
+  @Post('change-password')
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ readonly success: true }> {
+    return this.authService.changePassword(user.id, dto);
+  }
+
+  @Public()
+  @RateLimit({ limit: 5, windowMs: 60_000, keyPrefix: RATE_LIMIT_AUTH_PREFIX })
+  @Post('forgot-password')
+  forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<{ readonly success: true }> {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: RATE_LIMIT_AUTH_PREFIX })
+  @Post('reset-password')
+  resetPassword(
+    @Body() dto: ResetPasswordDto,
+  ): Promise<{ readonly success: true }> {
+    return this.authService.resetPassword(dto);
+  }
+
   private requestContext(req: Request): {
     ipAddress?: string;
     userAgent?: string;
@@ -117,7 +145,7 @@ export class AuthController {
     if (header?.startsWith('Bearer ')) {
       return header.slice(7);
     }
-    const cookie = req.cookies?.[COOKIE_ACCESS_TOKEN];
+    const cookie: unknown = req.cookies[COOKIE_ACCESS_TOKEN];
     return typeof cookie === 'string' ? cookie : undefined;
   }
 }

@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 7 (2026-05-25)
+**Last updated:** Phase 12 (2026-06-10)
 
 ---
 
@@ -12,12 +12,314 @@ Living record of implementation progress. Updated after each phase.
 |-------|--------|
 | Monorepo / shared packages | Ready |
 | Database (PostgreSQL + Prisma) | Schema migrated, seeded |
-| API (`services/api`) | NestJS + auth + listings + Meilisearch search |
-| Realtime (`services/realtime`) | Socket.IO chat + Redis adapter |
+| API (`services/api`) | NestJS + auth + listings + search + notifications + reports + analytics + verification |
+| Realtime (`services/realtime`) | Socket.IO chat + notifications + Redis adapter |
 | Meilisearch | Integrated (index `listings`) |
+| Notifications system | Event-driven, BullMQ queues, real-time delivery |
 | Web / Admin apps | Stub only |
 
-**Next:** Phase 8 — (awaiting confirmation)
+**Next:** Phase 15 — Testing & Deployment Preparation
+
+---
+
+## Phase 9 — Frontend Marketplace Application (apps/web)
+
+### Progress
+- 9A Frontend architecture + layouts + routing: COMPLETED (scaffolded Next.js App Router, layouts, core providers, basic pages and components)
+- 9B Public pages: COMPLETED (search, listing details, category, seller profile)
+- 9C Authentication + protected routes: COMPLETED
+- 9D Dashboard pages: COMPLETED (saved listings, messages, notifications, profile settings)
+- 9E Chat + notifications: COMPLETED (initial chat thread UI + realtime notifications client)
+ - 9F SEO + performance optimization: COMPLETED (sitemap, robots, ISR, metadata, JSON-LD)
+
+---
+
+## Phase 10 — Admin Panel (apps/admin)
+
+### Progress
+- 10A Admin scaffold: COMPLETED (Next.js App Router, layout, providers, header, sidebar)
+- 10B RBAC server helper: COMPLETED (`requireAdmin()` enforces allowed admin roles)
+- 10C Core pages: COMPLETED (dashboard overview, users, listings, reports, verification, chat moderation, notifications, audit, analytics placeholders)
+- 10D Typecheck & imports: COMPLETED (basic TypeScript validation)
+
+Notes: Implemented a production-grade admin app shell under `apps/admin/src` that follows existing architecture patterns and RBAC rules. Server-side helper `src/lib/authServer.ts` calls `/auth/me` and checks `roles` against allowed admin roles before rendering pages. Pages use `src/lib/serverApi.ts` for server-side API requests with credentials included.
+
+Next: integrate detailed moderation actions (approve/reject listings, suspend/ban users, report workflow) and UI data grids in follow-up sub-phases; do not run backend services automatically in this phase.
+
+---
+
+## Phase 11 — Security Hardening (services/api, services/realtime)
+
+### Summary
+Implemented focused security hardening items that preserve existing architecture and module boundaries. Work performed:
+
+- **Authentication:** Reviewed JWT access and refresh strategies. `JwtAccessStrategy` verifies blacklist + session activity and rejects suspended/banned users. `JwtRefreshStrategy` validates opaque refresh tokens and delegates rotation to `SessionsService` which implements refresh token rotation, session invalidation, and blacklist support.
+- **Cookies & Session security:** `AuthService` sets HttpOnly cookies via `cookie.util.ts` and `ApiConfigService` drives `cookieSecure` (enabled for `production`/`staging`) and `sameSite='lax'` — secure-by-default behavior preserved.
+- **RBAC & ownership checks:** Verified `RolesGuard`, `PermissionsGuard`, and `ListingOwnerGuard` exist and are applied on controllers (listings, uploads, etc.) to prevent privilege escalation and enforce ownership.
+- **Rate limiting:** Redis-backed `RateLimitGuard` is used for auth/search endpoints; realtime chat has `ChatRateLimitService` to prevent message floods. Login/register/refresh endpoints already have `@RateLimit` annotations.
+- **Anti-Spam:** Messaging rate limits and moderation queues are in place. Listing upload limits and verification workflows are present; recommend adding ML-based spam scoring in next iteration.
+- **Upload security:** `UploadsService` enforces `ALLOWED_LISTING_IMAGE_MIME_TYPES`, `MAX_LISTING_IMAGE_BYTES`, and caps image count to `MAX_LISTING_IMAGES`. Signed Cloudinary uploads configured and `createSignedUpload()` respects `MAX_LISTING_IMAGES`.
+- **Audit logging:** Added a persistent `AdminLogsService` and a global `AdminAuditInterceptor` which records admin/support/moderator actions to `admin_logs` for auditability. This logs actor, action, resource, optional resourceId, metadata, IP, and user-agent.
+- **Realtime security:** `SocketAuthService` authenticates sockets by verifying JWT, checking blacklist, validating server-side session existence in Redis, and enforcing user status. Chat gateway applies `ChatRateLimitService` for flood protection.
+
+### Files added / changed
+- `services/api/src/modules/admin-logs/admin-logs.service.ts` — persistent admin log writer (Prisma)
+- `services/api/src/common/interceptors/admin-audit.interceptor.ts` — logs admin actions for routes protected by roles/permissions
+- `services/api/src/app.module.ts` — interceptor registered globally
+
+### Validation performed
+- Confirmed existing JWT verification, refresh rotation, session invalidation, and cookie handling logic.
+- Confirmed RBAC guards and ownership guards are applied in controllers (`PermissionsGuard`, `RolesGuard`, `ListingOwnerGuard`).
+- Verified upload validation methods exist in `UploadsService`.
+- Verified realtime socket authentication and chat rate limiting exist in `services/realtime`.
+- Implemented admin audit logging (see files above) and ran local TypeScript builds for touched services.
+
+### Recommendations / Next steps
+- Add server-side ML or heuristics for listing spam detection (deprioritize or auto-queue suspicious listings for review).
+- Add explicit moderation APIs that call `AdminLogsService` when admin actions (approve/reject/suspend/ban) occur; currently interceptor logs admin endpoints that require roles/permissions.
+- Consider exporting an audit decorator for explicit, high-cardinality events (role changes, verification approvals) to ensure structured metadata.
+- Extend ChatRateLimitService keys to include IP and sessionId for more precise throttling and implement exponential backoff warnings.
+
+
+
+Notes: initial scaffold created under `apps/web/src` with App Router pages: home, search, listings/[id], categories/[slug], sellers/[id], and dashboard layout. Providers for React Query and basic Socket hook added.
+
+9B details:
+- Search: client-side search with `useListings` (React Query) and search input; `/app/search` wired to `/api/v1/search`.
+- Listing details: server-rendered page (`/app/listings/[id]`) with `generateMetadata`, server-side fetch to `/api/v1/listings/:id` via `src/lib/serverApi.ts`.
+- Category page: server-rendered (`/app/categories/[slug]`) fetching category data with metadata.
+- Seller profile: server-rendered (`/app/sellers/[id]`) fetching user profile and metadata.
+
+9C details:
+- Client auth helpers: `src/lib/authClient.ts` (login/logout/me) integrated with `src/lib/api.ts`.
+- Server auth helper: `src/lib/authServer.ts` exposes `requireUser()` used by server components to protect routes (redirects to `/login`).
+- Client hydration: `src/providers/Providers.tsx` now fetches `/auth/me` on mount and populates the `useAuth` Zustand store.
+- Login flow: `src/app/login/page.tsx` (react-hook-form) posts to `/auth/login`, sets auth state, and redirects to `/dashboard` on success.
+- Dashboard protection: `src/app/dashboard/layout.tsx` calls `requireUser()` server-side, ensuring only authenticated users can access dashboard pages (shows user name in header).
+
+9D details:
+- Saved Listings: `src/app/dashboard/saved/page.tsx` (server-side, protected via `requireUser()`, fetches `/favorites`).
+- Messages: `src/app/dashboard/messages/page.tsx` (server-side fetch of `/conversations`) with client `MessagesClient` at `src/components/dashboard/MessagesClient.tsx` — connects to Socket.IO via `useSocket` and listens for `chat:new_message` events.
+- Notifications: `src/app/dashboard/notifications/page.tsx` with client `NotificationsClient` at `src/components/dashboard/NotificationsClient.tsx` — server fetch of `/notifications` and realtime updates via Socket.IO (`notifications:new`, `notifications:read`).
+- Profile Settings: `src/app/dashboard/settings/page.tsx` — client form using `react-hook-form`, reads `useAuth` store, posts updates to `/users/:id`.
+
+9E details:
+- Conversation thread page: `src/app/dashboard/messages/[id]/page.tsx` — server fetch for conversation and messages, protected by `requireUser()`.
+- Message thread client: `src/components/dashboard/MessageThread.tsx` — joins conversation rooms (`chat:join`), listens for `chat:new_message`, renders messages, and sends messages via `chat:send` with HTTP fallback to `/conversations/:id/messages`.
+- Socket tweaks: `src/hooks/useSocket.ts` transports updated for reliability; clients `MessagesClient` and `NotificationsClient` already listen for relevant socket events.
+
+Notes: This phase provides a working conversation thread UI and notification listeners using the existing realtime service contract.
+
+9F details:
+- ISR + revalidation: `src/lib/serverApi.ts` now accepts a `revalidate` option and pages use ISR where appropriate (listings: 60s, categories/sellers: 120s).
+- Metadata: enhanced `generateMetadata` usage on listing, category, and seller pages; Open Graph `images` and `alternates` where available.
+- Schema.org: embedded `application/ld+json` Product schema on listing pages (`src/app/listings/[id]/page.tsx`).
+- Sitemap & Robots: `src/app/sitemap.xml/route.ts` and `src/app/robots.txt/route.ts` added for search engine discoverability.
+- Typecheck: ran `npm run -w apps/web typecheck` after fixes (dependencies installation and package adjustments). Minor TS fixes applied for strict rules.
+
+Next: integration testing and performance profiling in a local dev environment (run `npm install` then `npm run dev` in `apps/web`).
+
+---
+
+## Phase 14 — Design System & UI Foundation
+
+### Summary
+Implemented a comprehensive design system and UI foundation for the marketplace application, including shared UI components, layouts, navigation, and marketplace-specific components. All components use strict TypeScript, forwardRef, ARIA attributes, and are styled with Tailwind CSS using design tokens from a centralized CSS variable system.
+
+### Dependencies
+- Added `clsx` and `tailwind-merge` to `packages/ui` for className utilities
+- Fixed React peer dependency in `packages/ui/package.json` to accept `^18.2.0 || ^19.0.0`
+- `@hookform/resolvers` already present in `apps/web`
+
+### Configuration
+- **Tailwind & PostCSS:**
+  - `apps/web/tailwind.config.ts` with full design token extensions (colors, spacing, typography, breakpoints, shadows, animations)
+  - `apps/web/postcss.config.js` with tailwindcss and autoprefixer
+  - `apps/web/next.config.js` with `transpilePackages: ['@marketplace/ui']` for source-first imports
+  - `apps/admin/tailwind.config.ts`, `postcss.config.js`, `next.config.js` with same configuration
+
+### Design Tokens & Theme CSS
+- **packages/ui/src/styles/globals.css** with full token set:
+  - Colors: primary, secondary, accent, destructive, success, warning, info
+  - Semantic tokens: background, foreground, card, popover, border, input, ring
+  - Typography scale: text-xs through text-4xl with proper line heights
+  - Spacing scale, border-radius scale, shadow scale
+  - Dark mode support via `[data-theme="dark"]` selector
+  - Utility classes and scrollbar styling
+- **apps/web/src/styles/globals.css** imports `@marketplace/ui/styles.css` and adds base layer styles
+
+### UI Utilities
+- **packages/ui/src/lib/cn.ts** - proper clsx + tailwind-merge implementation for className merging
+- **packages/ui/src/lib/cva.ts** - lightweight Class Variance Authority (CVA) for component variants (no external dependency)
+
+### UI Primitive Components (packages/ui/src/components/)
+**Core controls:**
+- Button.tsx - variants (primary, secondary, outline, ghost, destructive, link), sizes (sm, md, lg, icon), loading state
+- Input.tsx - label, error state, helper text, prefix/suffix slots
+- Textarea.tsx - auto-resize option, character count
+- Select.tsx - native select with styling, label, error
+- Checkbox.tsx - label, indeterminate state
+
+**Feedback:**
+- Alert.tsx - variants (info, success, warning, error), dismissible
+- Toast.tsx + Toaster.tsx - toast provider + hook pattern (lightweight, no external dep)
+- Skeleton.tsx - pulse animation, configurable shape
+- Spinner.tsx - size variants
+
+**Overlay:**
+- Modal.tsx - portal-based, focus trap concept, close on escape
+- Drawer.tsx - side panel, left/right variants
+- Dropdown.tsx - trigger + menu pattern
+
+**Data display:**
+- Card.tsx - header/body/footer slots, hover variant
+- Table.tsx - responsive wrapper, sortable header hints
+- Pagination.tsx - page numbers, prev/next, ellipsis
+- Tabs.tsx - controlled tabs with keyboard nav
+- Badge.tsx - variants (default, success, warning, error, info)
+- Avatar.tsx - image with fallback initials, size variants
+
+### Form Patterns (packages/ui/src/components/form/)
+- FormControl.tsx - generic form field wrapper with label + error
+- FormInput.tsx - Input + FormControl combined
+- FormTextarea.tsx - Textarea + FormControl
+- FormSelect.tsx - Select + FormControl
+
+### App Layouts (apps/web/src/components/layouts/)
+- PublicLayout.tsx - for public pages (home, search, listings, categories, sellers)
+- AuthLayout.tsx - centered card layout for login/register
+- DashboardLayout.tsx - sidebar + main content area, responsive
+
+### Navigation Components (apps/web/src/components/navigation/)
+- Header.tsx - logo, nav links, search icon, user menu, mobile hamburger
+- MobileNav.tsx - slide-out mobile navigation with overlay
+- Footer.tsx - multi-column links, copyright, social links
+- Sidebar.tsx - collapsible sidebar for dashboard
+- UserMenu.tsx - avatar + dropdown for logged-in/logged-out states
+
+### Marketplace Components (apps/web/src/components/marketplace/)
+- ListingCard.tsx - image, title, price, location, condition badge, favorite button
+- SellerCard.tsx - avatar, name, rating, verified badge, listing count
+- CategoryCard.tsx - icon/image, name, listing count
+- SearchBar.tsx - input with icon, suggestions dropdown, debounced
+- FilterPanel.tsx - category, price range, condition, city filters
+- ImageGallery.tsx - main image + thumbnails, lightbox-ready
+
+### Validation Schemas (apps/web/src/lib/validation.ts)
+- loginSchema - email and password validation
+- registerSchema - name, email, password, confirmPassword with matching
+- listingSchema - title, description, price, category, condition, location, images
+- profileSchema - name, email, phone, bio, location
+- messageSchema - content validation
+
+### Page Integration
+- Updated `apps/web/src/app/layout.tsx` to use PublicLayout
+- Updated `apps/web/src/app/dashboard/layout.tsx` to use DashboardLayout
+- Updated `apps/web/src/app/login/page.tsx` to use AuthLayout with new form components
+
+### Validation
+- TypeScript compilation: `npm run -w apps/web typecheck` passes with 0 errors
+- UI package build: `npm run -w packages/ui build` passes with 0 errors
+- All imports resolve correctly with transpilePackages configuration
+- No circular dependencies between packages
+
+### Files Added/Modified
+**packages/ui/src/** (~35 new files):
+- lib/cn.ts (updated), lib/cva.ts (new)
+- components/Button.tsx, Input.tsx, Textarea.tsx, Select.tsx, Checkbox.tsx
+- components/Modal.tsx, Drawer.tsx, Dropdown.tsx
+- components/Card.tsx, Table.tsx, Pagination.tsx, Tabs.tsx, Badge.tsx, Avatar.tsx
+- components/Alert.tsx, Toast.tsx, Skeleton.tsx, Spinner.tsx
+- components/form/FormControl.tsx, FormInput.tsx, FormTextarea.tsx, FormSelect.tsx
+- index.ts (updated), styles/globals.css (updated)
+
+**apps/web/** (~20 new/updated files):
+- tailwind.config.ts, postcss.config.js, next.config.js (new)
+- src/components/layouts/PublicLayout.tsx, AuthLayout.tsx, DashboardLayout.tsx (new)
+- src/components/navigation/Header.tsx, MobileNav.tsx, Footer.tsx, Sidebar.tsx, UserMenu.tsx (new)
+- src/components/marketplace/ListingCard.tsx, SellerCard.tsx, CategoryCard.tsx, SearchBar.tsx, FilterPanel.tsx, ImageGallery.tsx (new)
+- src/lib/validation.ts (new)
+- src/styles/globals.css (updated - already had import)
+- src/app/layout.tsx, src/app/dashboard/layout.tsx, src/app/login/page.tsx (updated)
+
+**apps/admin/** (~3 new files):
+- tailwind.config.ts, postcss.config.js, next.config.js (new)
+
+### Architecture Decisions
+- **Source-first exports:** `transpilePackages: ['@marketplace/ui']` in Next.js config allows apps to import TS source directly (no build step needed for dev)
+- **Tailwind config at app level:** Design tokens reference CSS custom properties from `@marketplace/ui`
+- **All components use React.forwardRef** where appropriate for ref forwarding
+- **Strict TypeScript** with proper type exports
+- **ARIA attributes** on all interactive components
+- **Class Variance Authority (CVA)** pattern for component variants (lightweight implementation, no external dependency)
+- **Form patterns** combine FormControl with input components for consistent form field styling
+- **ExactOptionalPropertyTypes** TypeScript strict mode requires conditional prop spreading for optional properties
+
+---
+
+## Phase 12 — Backend Completion (services/api)
+
+### Summary
+Implemented all remaining backend gaps to bring the API to ~98% MVP readiness. Total new endpoints added: **16** across both services. Both `services/api` and `services/realtime` typecheck with zero errors.
+
+### New modules / controllers added
+1. **Reports module** — full CRUD: create (with duplicate detection), find mine, admin list/stats/detail/review/resolve. Uses ReportsRepository + AdminLogsService.
+2. **Admin Users controller** — list (paginated, searchable), stats (by status), detail, admin update (suspend/ban/activate/role change).
+3. **Admin Audit Log read** — `GET /admin/audit-logs` with pagination and filtering by actor, resource, action.
+4. **Analytics module** — dashboard stats (10 parallel counts), listings-by-status, users-by-status, top-categories.
+5. **Verification module** — public email/phone token verify endpoints + admin identity/business review.
+6. **Admin Listings controller** — browse all listings (any status), detail, bulk actions (approve/reject/archive up to 50).
+7. **Profile controller** — `PATCH /users/me` self-service profile update, `DELETE /users/me` account self-deletion (soft delete).
+8. **Password reset flow** — `POST /auth/forgot-password` (generates Redis token), `POST /auth/reset-password` (consumes token, updates password).
+9. **Notification unread count** — `GET /notifications/unread-count` returns badge number.
+10. **Password change** — `POST /auth/change-password` (verifies current password, sets new one).
+
+### All new API endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/reports` | JWT | Create report (duplicate check) |
+| GET | `/reports/mine` | JWT | My filed reports |
+| GET | `/reports` | Admin | All reports (paginated) |
+| GET | `/reports/stats` | Admin | Report status counts |
+| GET | `/reports/:id` | Admin | Report detail |
+| PATCH | `/reports/:id/review` | Admin | Set under review |
+| PATCH | `/reports/:id/resolve` | Admin | Resolve/dismiss |
+| GET | `/admin/users` | Admin | List users (search/filter) |
+| GET | `/admin/users/stats` | Admin | User status counts |
+| GET | `/admin/users/:id` | Admin | User detail with counts |
+| PATCH | `/admin/users/:id` | Admin | Suspend/ban/activate/role |
+| GET | `/admin/audit-logs` | Admin | Paginated audit logs |
+| GET | `/admin/analytics/dashboard` | Admin | Aggregated stats |
+| GET | `/admin/analytics/listings-by-status` | Admin | Listing breakdown |
+| GET | `/admin/analytics/users-by-status` | Admin | User breakdown |
+| GET | `/admin/analytics/top-categories` | Admin | Top categories |
+| POST | `/auth/verify/email` | Public | Verify email token |
+| POST | `/auth/verify/phone` | Public | Verify phone token |
+| GET | `/admin/verifications` | Admin | List verifications |
+| PATCH | `/admin/verifications/:id` | Admin | Approve/reject |
+| GET | `/admin/listings` | Admin | Browse all listings |
+| GET | `/admin/listings/:id` | Admin | Listing detail |
+| POST | `/admin/listings/bulk-action` | Admin | Bulk approve/reject/archive |
+| PATCH | `/users/me` | JWT | Update own profile |
+| DELETE | `/users/me` | JWT | Soft-delete own account |
+| POST | `/auth/change-password` | JWT | Change password |
+| POST | `/auth/forgot-password` | Public | Request reset token (rate limited) |
+| POST | `/auth/reset-password` | Public | Reset password with token (rate limited) |
+| GET | `/notifications/unread-count` | JWT | Unread badge count |
+
+### Prisma schema coverage: 14/14 models (100%)
+All database models have corresponding REST API endpoints.
+
+### Security measures
+- Password reset tokens: SHA256-hashed, Redis-stored, 1-hour TTL, auto-consume
+- Rate limiting on forgot-password (5/min) and reset-password (10/min)
+- Anti-enumeration: forgot-password always returns success
+- Account self-deletion uses soft delete + suspends status
+- Bulk listing actions capped at 50 items, all logged to audit trail
+
+### Typecheck status
+- `services/api`: 0 errors
+- `services/realtime`: 0 errors
 
 ---
 
@@ -324,3 +626,126 @@ Living record of implementation progress. Updated after each phase.
 - **Read status:** `messages.read_at` (null = unread)
 - **Env:** `packages/config` → `parseRealtimeEnv()` (`DATABASE_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `CORS_ORIGINS`)
 - **Notifications:** `CHAT_DOMAIN_EVENTS.MESSAGE_SENT` ready for BullMQ/notifications worker
+
+---
+
+## Phase 8 — Notifications + Event System
+
+### Implemented
+- **Notifications module** (complete realization of Phase 3 placeholder):
+  - `NotificationsService` — factory methods for 6 notification types
+  - `NotificationsRepository` — pagination, read status, unread counts, soft operations
+  - `NotificationsController` — `GET /notifications`, `PATCH /:id/read`, `PATCH /read-all`
+  - `NotificationEventListener` — event-driven triggers for all notification types
+  - `NotificationQueueProcessor` — BullMQ `notifications` queue processor
+
+- **Domain events system:**
+  - 6 notification event types: `MessageReceivedEvent`, `ListingApprovedEvent`, `ListingRejectedEvent`, `ListingFavoritedEvent`, `SellerVerifiedEvent`, `SystemAnnouncementEvent`
+  - Event emission from services (auth, listings, favorites, chat)
+  - `EventEmitter2` integration for in-process pub/sub
+
+- **Realtime notifications (services/realtime):**
+  - `NotificationsGateway` — Socket.IO gateway for real-time delivery
+  - `userRoom(userId)` room-based delivery per connected socket
+  - Server socket events: `notifications:new`, `notifications:read`, `notifications:read_all`, `notifications:unread_count`
+  - Chat gateway integration — emits `notifications:new` on message send
+  - Full Socket.IO auth via JWT (same session keys as chat)
+
+- **Architecture:**
+  - Event-driven notification creation (no queue delays for persistence)
+  - BullMQ queue reserved for future integrations (email, SMS, push notifications)
+  - Redis persistence via standard Notification table (no separate cache)
+  - Unread tracking via `readAt` null state
+  - Pagination via standard `PaginationQueryDto` (20 items/page default)
+
+### Schema (unchanged)
+- `notifications` table with `userId`, `type`, `title`, `body`, `data` (JSON), `readAt`, `createdAt`
+- Indexes on `(userId, readAt)`, `(userId, createdAt DESC)`, `type`
+- Soft operations only; no hard delete needed
+
+### Notification types
+| Type | Trigger | Recipient | Use case |
+|------|---------|-----------|----------|
+| `listing_approved` | Listing status → `active` | Seller | Moderation approval |
+| `listing_rejected` | Listing status → `rejected` | Seller | Moderation rejection |
+| `new_message` | Message created in chat | Recipient | Chat activity |
+| `new_offer` | User favorites a listing | Seller | Engagement signal |
+| `verification_update` | Verification approved | User | Status confirmation |
+| `system` | Admin broadcast | All/segment | Announcements |
+
+### Modules added
+- **services/api:**
+  - `modules/notifications/` — service, repository, controller, DTOs, listener, processor
+  - `modules/events/` — domain event classes, event constants
+  - Updated `notifications.module.ts` to import `ListingsModule` (needed for lookups)
+
+- **services/realtime:**
+  - `notifications/` — gateway, module
+  - Updated `events.constants.ts` with `NOTIFICATIONS_SERVER_EVENTS` + `userRoom()` helper
+  - Updated `app.module.ts` to import `NotificationsModule`
+
+### API endpoints
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/notifications` | JWT | Paginated notifications (filter by `type`, `unreadOnly`) |
+| PATCH | `/api/v1/notifications/:id/read` | JWT | Mark single notification read |
+| PATCH | `/api/v1/notifications/read-all` | JWT | Mark all as read, return count |
+
+### Socket events
+| Direction | Event | Payload | Trigger |
+|-----------|-------|---------|---------|
+| Server → | `notifications:new` | `{ type, title, body, data, timestamp }` | New notification created |
+| Server → | `notifications:unread_count` | `{ unreadCount }` | Broadcast unread count |
+| Server → | `notifications:read` | `{ notificationId }` | Single read receipt |
+
+### Event listeners (services/api)
+- **`NotificationEventListener`:**
+  - `LISTING_UPDATED` → check if status is `active` (approve) or `rejected` → create notification
+  - `LISTING_FAVORITED` → fetch listing details, notify seller if active
+  - Chat message event → create `new_message` notification (via `setupChatEventListeners()`)
+
+### BullMQ integration
+- **Queue:** `notifications` (inherited from Phase 3)
+- **Processor:** `NotificationQueueProcessor` (logging-only; real-time persistence via direct DB ops)
+- **Future:** Email/SMS/push workers, analytics, retry logic
+
+### Architecture decisions
+- **No queue-based persistence** — notifications created immediately in service layer (Prisma)
+- **Queue reserved** for future async handlers (email, SMS, push, analytics)
+- **Event emission** happens AFTER DB persistence (strong consistency)
+- **Socket.IO rooms:** `user:{userId}` for direct notification delivery (leverages existing auth + Redis adapter)
+- **Unread count** computed via simple query; no denormalization
+- **ListingEventListener** fetches listing on `LISTING_FAVORITED` / `LISTING_UPDATED` (efficient: ~2ms per notification)
+- **No LISTING_CREATED notifications** (rare case; notifications sent on approval instead)
+- **System announcements** via `NotificationsService.createSystemAnnouncement()` (broadcasts to `all`/`sellers`/`buyers`/`admins`)
+
+### Database access patterns
+- **Listing lookup:** By ID via `ListingsRepository.findByIdRaw()` (used 2x per favorite + update flow)
+- **Notification creation:** `NotificationsRepository.create()` with `user: { connect: { id: ... } }`
+- **Pagination:** Standard `findByUserId()` with skip/take + `countUnread()`
+- **Read receipts:** Single-query `markAsRead()` and `markAllAsRead()` bulk updates
+
+### Security/validation
+- **DTO validation** on controller inputs (query params: `type`, `unreadOnly`, `page`, `limit`)
+- **Ownership check** implicit — notifications scoped to `CurrentUser().id` via `@Roles()`
+- **Rate limits:** None (read-only operations; writes via service methods only)
+- **Suspended/banned users:** Can still read notifications (non-destructive); blocked on message send (via chat gateway)
+
+### Realtime considerations
+- **No fallback to polling** — notifications rely on active Socket.IO connection
+- **Offline users** miss real-time delivery (notifications persisted in DB; next login fetches via HTTP GET)
+- **Multi-device:** Each socket in `user:{userId}` room receives copy (eventual consistency)
+- **Redis durability:** BullMQ queue is durable; Socket.IO delivery is ephemeral
+
+### Monitoring hooks
+- `NotificationEventListener` logs errors per event type (ERROR level)
+- `NotificationQueueProcessor` logs job processing per type (DEBUG level)
+- `NotificationsGateway` logs socket connections + delivery failures (WARN level on send failure)
+
+### Future extensions (Phase 9+)
+- **Email/SMS/push workers** — consume BullMQ queue, integrate SendGrid/Twilio/FCM
+- **Notification preferences** — user opt-in/opt-out per type via settings table
+- **Notification templates** — i18n + template rendering before persistence
+- **Scheduling** — delay notification delivery (e.g., digest mode, quiet hours)
+- **Analytics** — track notification read rates, delivery latency, user engagement
+

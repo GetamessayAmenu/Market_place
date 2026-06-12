@@ -6,13 +6,17 @@ import { slugifyWithSuffix } from '@marketplace/utils';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
-import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
-import { UploadsService } from '../uploads/uploads.service';
+import { toPaginatedResponse } from '../../common/utils/pagination.util';
+import { AdminLogsService } from '../admin-logs/admin-logs.service';
 import { CategoriesService } from '../categories/categories.service';
 import { FavoritesService } from '../favorites/favorites.service';
+import { UploadsService } from '../uploads/uploads.service';
+
 import { ListingsCacheService } from './cache/listings-cache.service';
 import { LISTING_EVENTS } from './constants/listings.constants';
+import type { BulkListingActionDto } from './dto/bulk-listing-action.dto';
+import { BulkListingAction } from './dto/bulk-listing-action.dto';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { ListingQueryDto } from './dto/listing-query.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
@@ -47,6 +51,7 @@ export class ListingsService {
     private readonly favoritesService: FavoritesService,
     private readonly listingsCacheService: ListingsCacheService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly adminLogsService: AdminLogsService,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateListingDto) {
@@ -93,6 +98,33 @@ export class ListingsService {
     this.flagSpamIfNeeded(listing.id, user.id, dto.description);
 
     return serializeListing(listing);
+  }
+
+  async findAllAdmin(query: ListingQueryDto, admin: AuthenticatedUser) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = buildListingWhere(query, { publicOnly: false });
+    const result = await this.listingsRepository.findManyWithRelations({
+      where,
+      orderBy: buildListingOrderBy(query.sortBy),
+      page,
+      limit,
+    });
+
+    const favoritedIds = new Set(
+      await this.favoritesService.getFavoritedIds(
+        admin.id,
+        result.items.map((l) => l.id),
+      ),
+    );
+
+    return toPaginatedResponse({
+      ...result,
+      items: result.items.map((l) => {
+        const summary = serializeListingSummary(l);
+        return { ...summary, isFavorited: favoritedIds.has(l.id) };
+      }),
+    });
   }
 
   async findAll(query: ListingQueryDto, viewer?: AuthenticatedUser) {
@@ -228,6 +260,23 @@ export class ListingsService {
       new ListingUpdatedEvent(listing.id, listing.sellerId),
     );
 
+    if (dto.status && canModerateListings(user)) {
+      const actionMap: Record<string, string> = {
+        active: 'listing.approved',
+        rejected: 'listing.rejected',
+        archived: 'listing.archived',
+        sold: 'listing.marked_sold',
+      };
+      const action = actionMap[dto.status] ?? `listing.status_changed:${dto.status}`;
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action,
+        resource: 'listing',
+        resourceId: listing.id,
+        metadata: { newStatus: dto.status },
+      });
+    }
+
     return serializeListing(listing);
   }
 
@@ -248,6 +297,15 @@ export class ListingsService {
       LISTING_EVENTS.DELETED,
       new ListingDeletedEvent(id, existing.sellerId),
     );
+    if (existing.sellerId !== user.id && canModerateListings(user)) {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'listing.soft_deleted',
+        resource: 'listing',
+        resourceId: id,
+        metadata: { sellerId: existing.sellerId },
+      });
+    }
     return { deleted: true, soft: true };
   }
 
@@ -263,6 +321,15 @@ export class ListingsService {
     await this.uploadsService.deleteImages(publicIds);
     await this.listingsRepository.hardDelete(id);
     await this.listingsCacheService.invalidateAllForListing(existing.categoryId);
+    if (existing.sellerId !== user.id && canModerateListings(user)) {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'listing.hard_deleted',
+        resource: 'listing',
+        resourceId: id,
+        metadata: { sellerId: existing.sellerId },
+      });
+    }
     return { deleted: true, soft: false };
   }
 
@@ -321,6 +388,74 @@ export class ListingsService {
     });
   }
 
+  async bulkAction(dto: BulkListingActionDto, admin: AuthenticatedUser) {
+    const statusMap: Record<BulkListingAction, ListingStatus> = {
+      [BulkListingAction.approve]: 'active',
+      [BulkListingAction.reject]: 'rejected',
+      [BulkListingAction.archive]: 'archived',
+    };
+    const targetStatus = statusMap[dto.action];
+    const now = new Date();
+
+    const listings = await this.listingsRepository.findByIds(dto.listingIds);
+    const results: { id: string; success: boolean; error?: string }[] = [];
+
+    for (const listing of listings) {
+      try {
+        const updateData: Prisma.ListingUpdateInput = { status: targetStatus };
+        if (targetStatus === 'active') {
+          updateData.publishedAt = listing.publishedAt ?? now;
+          updateData.expiresAt = this.addDays(now, LISTING_DEFAULT_TTL_DAYS);
+        }
+        if (targetStatus === 'rejected' && dto.reason) {
+          updateData.rejectedReason = dto.reason;
+        }
+
+        await this.listingsRepository.updateListing(listing.id, updateData);
+        await this.listingsCacheService.invalidateAllForListing(listing.categoryId);
+
+        this.eventEmitter.emit(
+          LISTING_EVENTS.UPDATED,
+          new ListingUpdatedEvent(listing.id, listing.sellerId),
+        );
+
+        const actionMap: Record<string, string> = {
+          active: 'listing.approved',
+          rejected: 'listing.rejected',
+          archived: 'listing.archived',
+        };
+        await this.adminLogsService.createLog({
+          actorId: admin.id,
+          action: actionMap[targetStatus] ?? `listing.bulk_${dto.action}`,
+          resource: 'listing',
+          resourceId: listing.id,
+          metadata: { newStatus: targetStatus, bulk: true, reason: dto.reason },
+        });
+
+        results.push({ id: listing.id, success: true });
+      } catch (err) {
+        results.push({
+          id: listing.id,
+          success: false,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      }
+    }
+
+    const missing = dto.listingIds.filter(
+      (id) => !listings.some((l) => l.id === id),
+    );
+    for (const id of missing) {
+      results.push({ id, success: false, error: 'Listing not found' });
+    }
+
+    return {
+      processed: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
+  }
+
   private async updateStatus(
     user: AuthenticatedUser,
     id: string,
@@ -339,6 +474,22 @@ export class ListingsService {
       this.applyStatusChange(status, existing),
     );
     await this.listingsCacheService.invalidateAllForListing(listing.categoryId);
+    if (canModerateListings(user)) {
+      const actionMap: Record<string, string> = {
+        active: 'listing.approved',
+        rejected: 'listing.rejected',
+        archived: 'listing.archived',
+        sold: 'listing.marked_sold',
+      };
+      const action = actionMap[status] ?? `listing.status_changed:${status}`;
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action,
+        resource: 'listing',
+        resourceId: id,
+        metadata: { newStatus: status },
+      });
+    }
     if (status === 'sold') {
       this.eventEmitter.emit(LISTING_EVENTS.SOLD, { listingId: id, sellerId: user.id });
     }

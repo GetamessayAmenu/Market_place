@@ -16,6 +16,13 @@ export const CHAT_SERVER_EVENTS = {
   JOINED: 'chat:joined',
 } as const;
 
+export const NOTIFICATIONS_SERVER_EVENTS = {
+  NEW_NOTIFICATION: 'notifications:new',
+  NOTIFICATION_READ: 'notifications:read',
+  NOTIFICATION_READ_ALL: 'notifications:read_all',
+  UNREAD_COUNT: 'notifications:unread_count',
+} as const;
+
 /** In-process domain events (moderation / notifications). */
 export const CHAT_DOMAIN_EVENTS = {
   MESSAGE_SENT: 'chat.message_sent',
@@ -41,4 +48,8 @@ export const RATE_LIMIT_CHAT_PREFIX = 'chat' as const;
 
 export function conversationRoomId(conversationId: string): string {
   return `conversation:${conversationId}`;
+}
+
+export function userRoom(userId: string): string {
+  return `user:${userId}`;
 }

@@ -76,6 +76,12 @@ export class ListingsRepository extends BaseRepository<Listing> {
     return this.prisma.listing.findUnique({ where: { id } });
   }
 
+  async findByIds(ids: string[]): Promise<Listing[]> {
+    return this.prisma.listing.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+    });
+  }
+
   async slugExists(slug: string, excludeId?: string): Promise<boolean> {
     const found = await this.prisma.listing.findFirst({
       where: {

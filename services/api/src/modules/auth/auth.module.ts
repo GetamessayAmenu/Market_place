@@ -44,6 +44,6 @@ import { VerificationService } from './verification/verification.service';
     JwtRefreshGuard,
     RateLimitGuard,
   ],
-  exports: [AuthService, JwtModule, TokenService],
+  exports: [AuthService, JwtModule, TokenService, VerificationService],
 })
 export class AuthModule {}

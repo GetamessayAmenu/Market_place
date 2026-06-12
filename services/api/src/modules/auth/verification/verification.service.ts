@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { RedisService } from '../../../infrastructure/redis/redis.service';
+import { AdminLogsService } from '../../admin-logs/admin-logs.service';
 import { VERIFICATION_TOKEN_TTL_SECONDS } from '../auth.constants';
 
 const VERIFICATION_REDIS_PREFIX = 'mp:verification:';
@@ -19,6 +20,7 @@ export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly adminLogsService: AdminLogsService,
   ) {}
 
   /** Email verification — token stored in Redis; request persisted for audit. */
@@ -58,6 +60,18 @@ export class VerificationService {
       where: { id: payload.verificationRequestId },
       data: { status: 'approved' },
     });
+    // create an audit log for the verification approval (self-service)
+    try {
+      await this.adminLogsService.createLog({
+        actorId: payload.userId,
+        action: 'verification.approved',
+        resource: 'verification_request',
+        resourceId: payload.verificationRequestId,
+        metadata: { type },
+      });
+    } catch {
+      // non-fatal: do not block verification flow if logging fails
+    }
     return payload;
   }
 
