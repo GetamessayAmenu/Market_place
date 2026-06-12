@@ -1,168 +1,81 @@
-import React, { createContext, useContext, useState, useRef, useEffect, forwardRef, cloneElement } from 'react';
-import { cn } from '../lib/cn.js';
+"use client"
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-interface DropdownContextValue {
-  isOpen: boolean;
-  setIsOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
-  triggerRef: React.RefObject<HTMLButtonElement | null>;
+import { cn } from '../lib/cn';
+
+export interface DropdownItem {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  destructive?: boolean;
 }
 
-const DropdownContext = createContext<DropdownContextValue | undefined>(undefined);
-
-const useDropdownContext = () => {
-  const context = useContext(DropdownContext);
-  if (!context) {
-    throw new Error('Dropdown components must be used within a Dropdown provider');
-  }
-  return context;
-};
-
-export interface DropdownProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
+export interface DropdownProps {
+  trigger: React.ReactNode;
+  items: DropdownItem[];
+  onSelect: (value: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
 }
 
-const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(({ children, className, ...props }, ref) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+function Dropdown({ trigger, items, onSelect, align = 'left', className }: DropdownProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      setOpen(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
+  }, [handleClickOutside]);
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
+  const handleSelect = (item: DropdownItem) => {
+    if (item.disabled) return;
+    onSelect(item.value);
+    setOpen(false);
+  };
 
   return (
-    <DropdownContext.Provider value={{ isOpen, setIsOpen, triggerRef }}>
-      <div ref={ref} className={cn('relative inline-block text-left', className)} {...props}>
-        {children}
+    <div ref={containerRef} className={cn('relative inline-block', className)}>
+      <div onClick={() => { setOpen(!open); }} role="button" tabIndex={0} aria-expanded={open} aria-haspopup="menu">
+        {trigger}
       </div>
-    </DropdownContext.Provider>
+      {open && (
+        <div
+          className={cn(
+            'absolute z-50 mt-1 min-w-[160px] rounded-md border bg-popover p-1 shadow-md animate-fade-in',
+            align === 'right' ? 'right-0' : 'left-0'
+          )}
+          role="menu"
+        >
+          {items.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              onClick={() => { handleSelect(item); }}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm transition-colors',
+                'hover:bg-accent hover:text-accent-foreground',
+                'focus:bg-accent focus:text-accent-foreground focus:outline-none',
+                'disabled:opacity-50 disabled:pointer-events-none',
+                item.destructive && 'text-destructive hover:bg-destructive/10'
+              )}
+            >
+              {item.icon && <span className="h-4 w-4">{item.icon}</span>}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
-});
-
-Dropdown.displayName = 'Dropdown';
-
-export interface DropdownTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  asChild?: boolean;
 }
 
-const DropdownTrigger = forwardRef<HTMLButtonElement, DropdownTriggerProps>(
-  ({ className, asChild = false, children, ...props }, ref) => {
-    const { isOpen, setIsOpen, triggerRef } = useDropdownContext();
-
-    if (asChild && React.isValidElement(children)) {
-      return cloneElement(children as React.ReactElement<any>, {
-        ref: triggerRef,
-        onClick: (e: React.MouseEvent) => {
-          setIsOpen((prev: boolean) => !prev);
-          (children as React.ReactElement<any>).props.onClick?.(e);
-        },
-        'aria-haspopup': true,
-        'aria-expanded': isOpen,
-      });
-    }
-
-    return (
-      <button
-        ref={(node) => {
-          triggerRef.current = node;
-          if (typeof ref === 'function') ref(node);
-          else if (ref) ref.current = node;
-        }}
-        className={cn('inline-flex items-center justify-center', className)}
-        onClick={() => setIsOpen((prev: boolean) => !prev)}
-        aria-haspopup
-        aria-expanded={isOpen}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  }
-);
-
-DropdownTrigger.displayName = 'DropdownTrigger';
-
-const DropdownContent = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, children, ...props }, ref) => {
-    const { isOpen } = useDropdownContext();
-
-    if (!isOpen) return null;
-
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          'absolute right-0 mt-2 w-56 rounded-md border bg-background shadow-lg animate-in fade-in zoom-in-95',
-          'z-50',
-          className
-        )}
-        {...props}
-      >
-        <div className="py-1">{children}</div>
-      </div>
-    );
-  }
-);
-
-DropdownContent.displayName = 'DropdownContent';
-
-const DropdownItem = forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
-  ({ className, children, ...props }, ref) => {
-    const { setIsOpen } = useDropdownContext();
-
-    return (
-      <button
-        ref={ref}
-        className={cn(
-          'block w-full px-4 py-2 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground',
-          'focus:outline-none focus:bg-accent focus:text-accent-foreground',
-          className
-        )}
-        onClick={(e) => {
-          setIsOpen(false);
-          props.onClick?.(e);
-        }}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  }
-);
-
-DropdownItem.displayName = 'DropdownItem';
-
-const DropdownSeparator = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('h-px bg-border my-1', className)} {...props} />
-  )
-);
-
-DropdownSeparator.displayName = 'DropdownSeparator';
-
-export { Dropdown, DropdownTrigger, DropdownContent, DropdownItem, DropdownSeparator };
+export { Dropdown };

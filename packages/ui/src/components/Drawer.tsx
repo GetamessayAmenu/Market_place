@@ -1,88 +1,81 @@
-import React, { forwardRef, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { cn } from '../lib/cn.js';
-import { cva } from '../lib/cva.js';
+"use client"
+import React, { useCallback, useEffect, useRef } from 'react';
 
-const drawerVariants = cva({
-  base: 'fixed z-50 h-full bg-background border shadow-lg transition-transform duration-300 ease-in-out',
-  variants: {
-    side: {
-      left: 'left-0 top-0 border-r animate-in slide-in-from-left',
-      right: 'right-0 top-0 border-l animate-in slide-in-from-right',
-    },
-  },
-  defaultVariants: {
-    side: 'right',
-  },
-});
+import { cn } from '../lib/cn';
 
-export interface DrawerProps extends React.HTMLAttributes<HTMLDivElement> {
-  isOpen: boolean;
+export interface DrawerProps {
+  open: boolean;
   onClose: () => void;
   side?: 'left' | 'right';
-  closeOnEscape?: boolean;
-  closeOnOverlayClick?: boolean;
+  title?: string;
+  children: React.ReactNode;
+  className?: string;
+  width?: string;
 }
 
-const Drawer = forwardRef<HTMLDivElement, DrawerProps>(
-  ({ className, isOpen, onClose, side = 'right', closeOnEscape = true, closeOnOverlayClick = true, children, ...props }, ref) => {
-    const drawerRef = useRef<HTMLDivElement>(null);
-    const previousActiveElement = useRef<HTMLElement | null>(null);
+function Drawer({ open, onClose, side = 'right', title, children, className, width = '320px' }: DrawerProps) {
+  const drawerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-      if (isOpen) {
-        previousActiveElement.current = document.activeElement as HTMLElement;
-        drawerRef.current?.focus();
-      } else {
-        previousActiveElement.current?.focus();
-      }
-    }, [isOpen]);
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose]
+  );
 
-    useEffect(() => {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (closeOnEscape && e.key === 'Escape' && isOpen) {
-          onClose();
-        }
-      };
-
+  useEffect(() => {
+    if (open) {
       document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }, [isOpen, onClose, closeOnEscape]);
-
-    if (!isOpen) return null;
-
-    const handleOverlayClick = (e: React.MouseEvent) => {
-      if (closeOnOverlayClick && e.target === e.currentTarget) {
-        onClose();
-      }
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
     };
+  }, [open, handleEscape]);
 
-    return createPortal(
-      <div className="fixed inset-0 z-50 flex">
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in"
-          onClick={handleOverlayClick}
-        />
-        <div
-          ref={(node) => {
-            drawerRef.current = node;
-            if (typeof ref === 'function') ref(node);
-            else if (ref) ref.current = node;
-          }}
-          className={cn(drawerVariants({ side }), 'w-80', className)}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          {...props}
-        >
-          {children}
-        </div>
-      </div>,
-      document.body
-    );
-  }
-);
+  if (!open) return null;
 
-Drawer.displayName = 'Drawer';
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
 
-export { Drawer, drawerVariants };
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 animate-fade-in"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? 'drawer-title' : undefined}
+    >
+      <div
+        ref={drawerRef}
+        className={cn(
+          'fixed top-0 h-full bg-background shadow-xl p-6 overflow-y-auto',
+          side === 'left' ? 'left-0 animate-slide-in-left' : 'right-0 animate-slide-in-right',
+          className
+        )}
+        style={{ width }}
+      >
+        {title && (
+          <div className="flex items-center justify-between mb-4">
+            <h2 id="drawer-title" className="text-lg font-semibold">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Close drawer"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export { Drawer };

@@ -1,33 +1,35 @@
-"use client"
-import React, { useState } from 'react'
-import Container from '../../components/Container'
-import ListingCard from '../../components/ListingCard'
-import { useListings } from '../../hooks/useListings'
+import React, { Suspense } from 'react'
+
+import SearchClient from '../../components/marketplace/SearchClient'
+
+export function generateMetadata() {
+  return {
+    title: 'Search Listings — Marketplace',
+    description: 'Search and browse marketplace listings. Filter by category, price, condition, and location.',
+  }
+}
 
 export default function SearchPage() {
-  const [q, setQ] = useState('')
-  const { data, isLoading, error } = useListings({ q })
-
   return (
-    <Container>
-      <section className="py-8">
-        <h2 className="text-2xl font-semibold">Search Results</h2>
-        <div className="mt-4">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search listings"
-            className="w-full max-w-md px-3 py-2 border rounded"
-          />
+    <Suspense
+      fallback={
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="animate-pulse bg-muted h-11 rounded-lg mb-6" aria-hidden="true" />
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-lg border bg-card shadow-sm" aria-hidden="true">
+                <div className="animate-pulse bg-muted aspect-[4/3] rounded-t-lg" />
+                <div className="p-4 space-y-3">
+                  <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
+                  <div className="animate-pulse bg-muted h-5 w-1/3 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {isLoading && <div>Loading...</div>}
-          {error && <div className="text-red-600">Error loading results</div>}
-          {data?.data?.map((item: any) => (
-            <ListingCard key={item.id} title={item.title} price={item.price} />
-          ))}
-        </div>
-      </section>
-    </Container>
+      }
+    >
+      <SearchClient />
+    </Suspense>
   )
 }

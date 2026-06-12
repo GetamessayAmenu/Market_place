@@ -1,69 +1,103 @@
-'use client';
+"use client"
+import { Button, Input, Select, type SelectOption } from '@marketplace/ui';
+import React, { useState } from 'react';
 
-import React from 'react';
-import { Card, CardContent, Select } from '@marketplace/ui';
-
-interface FilterPanelProps {
-  categories?: { value: string; label: string }[];
-  conditions?: { value: string; label: string }[];
-  cities?: { value: string; label: string }[];
-  onFilterChange?: (filters: Record<string, string>) => void;
+export interface FilterValues {
+  category?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  condition?: string;
+  city?: string;
 }
 
-export function FilterPanel({ categories, conditions, cities, onFilterChange }: FilterPanelProps) {
-  const [selectedCategory, setSelectedCategory] = React.useState<string>('');
-  const [selectedCondition, setSelectedCondition] = React.useState<string>('');
-  const [selectedCity, setSelectedCity] = React.useState<string>('');
+export interface FilterPanelProps {
+  categories?: SelectOption[];
+  conditions?: SelectOption[];
+  cities?: SelectOption[];
+  initialValues?: FilterValues;
+  onApply: (values: FilterValues) => void;
+  onReset?: () => void;
+}
 
-  const handleFilterChange = (key: string, value: string) => {
-    const filters: Record<string, string> = {};
-    if (selectedCategory) filters.category = selectedCategory;
-    if (selectedCondition) filters.condition = selectedCondition;
-    if (selectedCity) filters.city = selectedCity;
-    filters[key] = value;
-    onFilterChange?.(filters);
+export default function FilterPanel({
+  categories = [],
+  conditions = [],
+  cities = [],
+  initialValues = {},
+  onApply,
+  onReset,
+}: FilterPanelProps) {
+  const [values, setValues] = useState<FilterValues>(initialValues);
+
+  const updateValue = (key: keyof FilterValues, val: string) => {
+    setValues((prev) => ({ ...prev, [key]: val }));
   };
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4">
-        <div>
-          <h3 className="font-semibold mb-3">Category</h3>
-          <Select
-            options={categories || []}
-            placeholder="All Categories"
-            value={selectedCategory}
-            onChange={(e) => {
-              setSelectedCategory(e.target.value);
-              handleFilterChange('category', e.target.value);
-            }}
-          />
-        </div>
-        <div>
-          <h3 className="font-semibold mb-3">Condition</h3>
-          <Select
-            options={conditions || []}
-            placeholder="All Conditions"
-            value={selectedCondition}
-            onChange={(e) => {
-              setSelectedCondition(e.target.value);
-              handleFilterChange('condition', e.target.value);
-            }}
-          />
-        </div>
-        <div>
-          <h3 className="font-semibold mb-3">Location</h3>
-          <Select
-            options={cities || []}
-            placeholder="All Cities"
-            value={selectedCity}
-            onChange={(e) => {
-              setSelectedCity(e.target.value);
-              handleFilterChange('city', e.target.value);
-            }}
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4 rounded-lg border bg-card p-4">
+      <h3 className="font-semibold text-card-foreground">Filters</h3>
+
+      {categories.length > 0 && (
+        <Select
+          label="Category"
+          options={categories}
+          placeholder="All categories"
+          value={values.category ?? ''}
+          onChange={(e) => { updateValue('category', e.target.value); }}
+        />
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Min Price"
+          type="number"
+          placeholder="0"
+          value={values.minPrice ?? ''}
+          onChange={(e) => { updateValue('minPrice', e.target.value); }}
+        />
+        <Input
+          label="Max Price"
+          type="number"
+          placeholder="Any"
+          value={values.maxPrice ?? ''}
+          onChange={(e) => { updateValue('maxPrice', e.target.value); }}
+        />
+      </div>
+
+      {conditions.length > 0 && (
+        <Select
+          label="Condition"
+          options={conditions}
+          placeholder="Any condition"
+          value={values.condition ?? ''}
+          onChange={(e) => { updateValue('condition', e.target.value); }}
+        />
+      )}
+
+      {cities.length > 0 && (
+        <Select
+          label="City"
+          options={cities}
+          placeholder="All cities"
+          value={values.city ?? ''}
+          onChange={(e) => { updateValue('city', e.target.value); }}
+        />
+      )}
+
+      <div className="flex gap-2 pt-2">
+        <Button onClick={() => { onApply(values); }} className="flex-1">
+          Apply
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setValues({});
+            onReset?.();
+          }}
+        >
+          Reset
+        </Button>
+      </div>
+    </div>
   );
 }

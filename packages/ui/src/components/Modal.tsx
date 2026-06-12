@@ -1,76 +1,86 @@
-import React, { forwardRef, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { cn } from '../lib/cn.js';
+"use client"
+import React, { useCallback, useEffect, useRef } from 'react';
 
-export interface ModalProps extends React.HTMLAttributes<HTMLDivElement> {
-  isOpen: boolean;
+import { cn } from '../lib/cn';
+
+export interface ModalProps {
+  open: boolean;
   onClose: () => void;
-  closeOnEscape?: boolean;
-  closeOnOverlayClick?: boolean;
+  title?: string;
+  children: React.ReactNode;
+  className?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-const Modal = forwardRef<HTMLDivElement, ModalProps>(
-  ({ className, isOpen, onClose, closeOnEscape = true, closeOnOverlayClick = true, children, ...props }, ref) => {
-    const modalRef = useRef<HTMLDivElement>(null);
-    const previousActiveElement = useRef<HTMLElement | null>(null);
+const sizeClasses = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+};
 
-    useEffect(() => {
-      if (isOpen) {
-        previousActiveElement.current = document.activeElement as HTMLElement;
-        modalRef.current?.focus();
-      } else {
-        previousActiveElement.current?.focus();
-      }
-    }, [isOpen]);
+function Modal({ open, onClose, title, children, className, size = 'md' }: ModalProps) {
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (closeOnEscape && e.key === 'Escape' && isOpen) {
-          onClose();
-        }
-      };
+  const handleEscape = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    },
+    [onClose]
+  );
 
+  useEffect(() => {
+    if (open) {
       document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }, [isOpen, onClose, closeOnEscape]);
-
-    if (!isOpen) return null;
-
-    const handleOverlayClick = (e: React.MouseEvent) => {
-      if (closeOnOverlayClick && e.target === e.currentTarget) {
-        onClose();
-      }
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
     };
+  }, [open, handleEscape]);
 
-    return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in"
-          onClick={handleOverlayClick}
-        />
-        <div
-          ref={(node) => {
-            modalRef.current = node;
-            if (typeof ref === 'function') ref(node);
-            else if (ref) ref.current = node;
-          }}
-          className={cn(
-            'relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg animate-in scale-in fade-in slide-in-from-bottom-4',
-            className
-          )}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          {...props}
-        >
-          {children}
-        </div>
-      </div>,
-      document.body
-    );
-  }
-);
+  if (!open) return null;
 
-Modal.displayName = 'Modal';
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === overlayRef.current) onClose();
+  };
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={title ? 'modal-title' : undefined}
+    >
+      <div
+        className={cn(
+          'w-full bg-background rounded-lg shadow-xl p-6 mx-4 animate-scale-in',
+          sizeClasses[size],
+          className
+        )}
+      >
+        {title && (
+          <div className="flex items-center justify-between mb-4">
+            <h2 id="modal-title" className="text-lg font-semibold">{title}</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-sm opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Close dialog"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export { Modal };

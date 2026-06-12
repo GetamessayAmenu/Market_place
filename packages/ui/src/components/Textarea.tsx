@@ -1,35 +1,44 @@
-import React, { forwardRef, useEffect, useRef, useState } from 'react';
-import { cn } from '../lib/cn.js';
+"use client"
+import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
+
+import { cn } from '../lib/cn';
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
   helperText?: string;
   autoResize?: boolean;
-  showCharacterCount?: boolean;
   maxLength?: number;
+  showCount?: boolean;
 }
 
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, label, error, helperText, autoResize, showCharacterCount, maxLength, id, value, ...props }, ref) => {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [characterCount, setCharacterCount] = useState(0);
-    const combinedRef = (ref as React.RefObject<HTMLTextAreaElement>) || textareaRef;
+  ({ className, label, error, helperText, autoResize, maxLength, showCount, id, value, onChange, ...props }, ref) => {
+    const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-') ?? '';
+    const internalRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const textareaId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const setRefs = useCallback(
+      (node: HTMLTextAreaElement | null) => {
+        internalRef.current = node;
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref]
+    );
+
+    const resize = useCallback(() => {
+      const el = internalRef.current;
+      if (el && autoResize) {
+        el.style.height = 'auto';
+        el.style.height = String(el.scrollHeight) + 'px';
+      }
+    }, [autoResize]);
 
     useEffect(() => {
-      if (showCharacterCount && value !== undefined) {
-        setCharacterCount(String(value).length);
-      }
-    }, [value, showCharacterCount]);
+      resize();
+    }, [value, resize]);
 
-    useEffect(() => {
-      if (autoResize && combinedRef?.current) {
-        combinedRef.current.style.height = 'auto';
-        combinedRef.current.style.height = `${combinedRef.current.scrollHeight}px`;
-      }
-    }, [value, autoResize, combinedRef]);
+    const charCount = typeof value === 'string' ? value.length : 0;
 
     return (
       <div className="w-full">
@@ -39,38 +48,36 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           </label>
         )}
         <textarea
-          ref={combinedRef}
+          ref={setRefs}
           id={textareaId}
-          maxLength={maxLength}
           value={value}
+          onChange={onChange}
           className={cn(
             'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
             'placeholder:text-muted-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'resize-y',
             error && 'border-destructive focus-visible:ring-destructive',
-            autoResize && 'resize-none overflow-hidden',
             className
           )}
           aria-invalid={!!error}
-          aria-describedby={error ? `${textareaId}-error` : helperText ? `${textareaId}-helper` : undefined}
+          maxLength={maxLength}
           {...props}
         />
         <div className="flex items-center justify-between mt-1.5">
-          {error && (
-            <p id={`${textareaId}-error`} className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-          {helperText && !error && (
-            <p id={`${textareaId}-helper`} className="text-sm text-muted-foreground">
-              {helperText}
-            </p>
-          )}
-          {showCharacterCount && maxLength && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              {characterCount}/{maxLength}
+          <div>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+            {helperText && !error && (
+              <p className="text-sm text-muted-foreground">{helperText}</p>
+            )}
+          </div>
+          {showCount && maxLength && (
+            <span className="text-xs text-muted-foreground">
+              {charCount}/{maxLength}
             </span>
           )}
         </div>

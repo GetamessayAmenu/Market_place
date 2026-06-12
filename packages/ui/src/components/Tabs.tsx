@@ -1,123 +1,93 @@
-import React, { createContext, useContext, forwardRef, useState, useCallback } from 'react';
-import { cn } from '../lib/cn.js';
+"use client"
+import React, { forwardRef, useCallback, useRef } from 'react';
 
-interface TabsContextValue {
+import { cn } from '../lib/cn';
+
+export interface Tab {
   value: string;
-  onValueChange: (value: string) => void;
+  label: string;
+  disabled?: boolean;
 }
 
-const TabsContext = createContext<TabsContextValue | undefined>(undefined);
-
-const useTabsContext = () => {
-  const context = useContext(TabsContext);
-  if (!context) {
-    throw new Error('Tabs components must be used within a Tabs provider');
-  }
-  return context;
-};
-
-export interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
-  defaultValue: string;
-  value?: string;
-  onValueChange?: (value: string) => void;
+export interface TabsProps {
+  tabs: Tab[];
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  children?: React.ReactNode;
 }
 
 const Tabs = forwardRef<HTMLDivElement, TabsProps>(
-  ({ className, defaultValue, value: controlledValue, onValueChange, ...props }, ref) => {
-    const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
-    const value = controlledValue ?? uncontrolledValue;
+  ({ tabs, value, onChange, className, children }, ref) => {
+    const tabListRef = useRef<HTMLDivElement>(null);
 
-    const handleValueChange = useCallback(
-      (newValue: string) => {
-        if (controlledValue === undefined) {
-          setUncontrolledValue(newValue);
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        const enabledTabs = tabs.filter((t) => !t.disabled);
+        const currentIndex = enabledTabs.findIndex((t) => t.value === value);
+        let nextIndex = currentIndex;
+
+        if (e.key === 'ArrowRight') {
+          nextIndex = (currentIndex + 1) % enabledTabs.length;
+        } else if (e.key === 'ArrowLeft') {
+          nextIndex = (currentIndex - 1 + enabledTabs.length) % enabledTabs.length;
+        } else if (e.key === 'Home') {
+          nextIndex = 0;
+        } else if (e.key === 'End') {
+          nextIndex = enabledTabs.length - 1;
+        } else {
+          return;
         }
-        onValueChange?.(newValue);
+
+        e.preventDefault();
+        const nextTab = enabledTabs[nextIndex];
+        if (nextTab) onChange(nextTab.value);
       },
-      [controlledValue, onValueChange]
+      [tabs, value, onChange]
     );
 
     return (
-      <TabsContext.Provider value={{ value, onValueChange: handleValueChange }}>
-        <div ref={ref} className={cn('w-full', className)} {...props} />
-      </TabsContext.Provider>
+      <div ref={ref} className={cn('w-full', className)}>
+        <div
+          ref={tabListRef}
+          role="tablist"
+          className="flex border-b"
+          onKeyDown={handleKeyDown}
+          aria-label="Tabs"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={value === tab.value}
+              aria-controls={'tabpanel-' + tab.value}
+              tabIndex={value === tab.value ? 0 : -1}
+              disabled={tab.disabled}
+              onClick={() => { if (!tab.disabled) onChange(tab.value); }}
+              className={cn(
+                'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                'disabled:opacity-50 disabled:pointer-events-none',
+                value === tab.value
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {children && (
+          <div role="tabpanel" id={'tabpanel-' + value} className="mt-4" tabIndex={0}>
+            {children}
+          </div>
+        )}
+      </div>
     );
   }
 );
 
 Tabs.displayName = 'Tabs';
 
-const TabsList = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground', className)}
-    {...props}
-  />
-));
-
-TabsList.displayName = 'TabsList';
-
-export interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  value: string;
-}
-
-const TabsTrigger = forwardRef<HTMLButtonElement, TabsTriggerProps>(
-  ({ className, value, children, ...props }, ref) => {
-    const { value: selectedValue, onValueChange } = useTabsContext();
-    const isSelected = value === selectedValue;
-
-    return (
-      <button
-        ref={ref}
-        type="button"
-        role="tab"
-        aria-selected={isSelected}
-        className={cn(
-          'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          'disabled:pointer-events-none disabled:opacity-50',
-          isSelected ? 'bg-background text-foreground shadow-sm' : 'hover:bg-background/50 hover:text-foreground',
-          className
-        )}
-        onClick={() => onValueChange(value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onValueChange(value);
-          }
-        }}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  }
-);
-
-TabsTrigger.displayName = 'TabsTrigger';
-
-export interface TabsContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  value: string;
-}
-
-const TabsContent = forwardRef<HTMLDivElement, TabsContentProps>(({ className, value, children, ...props }, ref) => {
-  const { value: selectedValue } = useTabsContext();
-  const isSelected = value === selectedValue;
-
-  if (!isSelected) return null;
-
-  return (
-    <div
-      ref={ref}
-      role="tabpanel"
-      className={cn('mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', className)}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-});
-
-TabsContent.displayName = 'TabsContent';
-
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs };

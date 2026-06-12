@@ -1,38 +1,42 @@
 "use client"
-import React from 'react'
-import { useForm } from 'react-hook-form'
-import { useRouter } from 'next/navigation'
-import { login as clientLogin } from '../../lib/authClient'
-import useAuth from '../../hooks/useAuth'
-import { AuthLayout } from '../../components/layouts/AuthLayout'
-import { FormInput, Button } from '@marketplace/ui'
-import { loginSchema } from '../../lib/validation'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button, FormInput } from '@marketplace/ui';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+import { useForm } from 'react-hook-form';
 
-type FormData = { email: string; password: string }
+import AuthLayout from '../../components/layouts/AuthLayout';
+import useAuth from '../../hooks/useAuth';
+import { login as clientLogin } from '../../lib/authClient';
+import { loginSchema, type LoginInput } from '../../lib/validation';
 
 export default function LoginPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema)
   })
   const router = useRouter()
   const setUser = useAuth((s) => s.setUser)
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: LoginInput) {
     try {
-      const res = await clientLogin(data.email, data.password)
-      if (res?.data) {
+      const res = await clientLogin(data.email, data.password) as { data?: { id: string; name?: string; email?: string } }
+      if (res.data) {
         setUser(res.data)
         router.push('/dashboard')
       }
-    } catch (e: any) {
-      alert(e?.response?.data?.error || 'Login failed')
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      alert(err.response?.data?.error ?? 'Login failed')
     }
   }
 
+  const onFormSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
+    void handleSubmit(onSubmit)(e);
+  };
+
   return (
     <AuthLayout title="Sign in" subtitle="Welcome back to Marketplace">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={onFormSubmit} className="space-y-4">
         <FormInput
           label="Email"
           type="email"

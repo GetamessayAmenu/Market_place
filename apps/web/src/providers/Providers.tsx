@@ -1,27 +1,29 @@
 "use client"
-import React, { useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { apiGet } from '../lib/api'
+import React, { useEffect } from 'react'
+
 import useAuth from '../hooks/useAuth'
+import { apiGet } from '../lib/api'
 
 const queryClient = new QueryClient()
 
+interface AuthMeResponse {
+  success: boolean
+  data: { id: string; name?: string; email?: string }
+}
+
 export default function Providers({ children }: { children: React.ReactNode }) {
-  const setUser = useAuth((s: any) => s.setUser)
+  const setUser = useAuth((s) => s.setUser)
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
+    void (async () => {
       try {
-        const res = await apiGet('/auth/me')
-        if (mounted) setUser(res.data)
-      } catch (e) {
+        const res = await apiGet<AuthMeResponse>('/auth/me')
+        setUser(res.data)
+      } catch {
         // not authenticated or error; ignore
       }
     })()
-    return () => {
-      mounted = false
-    }
   }, [setUser])
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

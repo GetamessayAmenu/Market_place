@@ -1,70 +1,100 @@
-import React, { forwardRef, useEffect, useState } from 'react';
-import { cn } from '../lib/cn.js';
-import { cva } from '../lib/cva.js';
+"use client"
+import React, { createContext, useCallback, useContext, useState } from 'react';
 
-const toastVariants = cva({
-  base: 'relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-4 pr-8 shadow-lg transition-all',
-  variants: {
-    variant: {
-      info: 'border-info bg-background text-info-foreground',
-      success: 'border-success bg-background text-success-foreground',
-      warning: 'border-warning bg-background text-warning-foreground',
-      error: 'border-destructive bg-background text-destructive-foreground',
-    },
-  },
-  defaultVariants: {
-    variant: 'info',
-  },
-});
+import { cn } from '../lib/cn';
 
-export interface ToastProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'info' | 'success' | 'warning' | 'error';
+type ToastVariant = 'default' | 'success' | 'error' | 'warning';
+
+interface ToastItem {
+  id: string;
+  title?: string;
+  description?: string;
+  variant?: ToastVariant;
   duration?: number;
-  onClose?: () => void;
 }
 
-const Toast = forwardRef<HTMLDivElement, ToastProps>(
-  ({ className, variant, duration = 5000, onClose, children, ...props }, ref) => {
-    const [isVisible, setIsVisible] = useState(true);
+interface ToastContextType {
+  toasts: ToastItem[];
+  addToast: (toast: Omit<ToastItem, 'id'>) => void;
+  removeToast: (id: string) => void;
+}
 
-    useEffect(() => {
-      if (duration > 0) {
-        const timer = setTimeout(() => {
-          setIsVisible(false);
-          onClose?.();
-        }, duration);
-        return () => clearTimeout(timer);
-      }
-      return undefined;
-    }, [duration, onClose]);
+const ToastContext = createContext<ToastContextType | null>(null);
 
-    if (!isVisible) return null;
+export function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used within a ToastProvider');
+  return ctx;
+}
 
-    return (
-      <div
-        ref={ref}
-        className={cn(toastVariants({ ...(variant !== undefined && { variant }) }), 'animate-in slide-in-from-right', className)}
-        {...props}
-      >
-        <div className="flex-1">{children}</div>
-        {onClose && (
-          <button
-            onClick={() => {
-              setIsVisible(false);
-              onClose();
-            }}
-            className="absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 group-hover:opacity-100"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-    );
-  }
-);
+let toastCounter = 0;
 
-Toast.displayName = 'Toast';
+const variantClasses: Record<ToastVariant, string> = {
+  default: 'bg-background border-border text-foreground',
+  success: 'bg-success/10 border-success/30 text-foreground',
+  error: 'bg-destructive/10 border-destructive/30 text-foreground',
+  warning: 'bg-warning/10 border-warning/30 text-foreground',
+};
 
-export { Toast, toastVariants };
+export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const addToast = useCallback(
+    (toast: Omit<ToastItem, 'id'>) => {
+      const id = String(++toastCounter);
+      setToasts((prev) => [...prev, { ...toast, id }]);
+      const duration = toast.duration ?? 5000;
+      setTimeout(() => { removeToast(id); }, duration);
+    },
+    [removeToast]
+  );
+
+  return (
+    <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+      {children}
+      <Toaster />
+    </ToastContext.Provider>
+  );
+}
+
+function Toaster() {
+  const { toasts, removeToast } = useContext(ToastContext) ?? { toasts: [], removeToast: (_id: string) => { /* noop */ } };
+
+  if (toasts.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" aria-live="polite">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={cn(
+            'rounded-lg border p-4 shadow-lg animate-slide-in-right',
+            variantClasses[toast.variant ?? 'default']
+          )}
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              {toast.title && <p className="font-semibold text-sm">{toast.title}</p>}
+              {toast.description && <p className="text-sm opacity-90 mt-1">{toast.description}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => { removeToast(toast.id); }}
+              className="opacity-70 hover:opacity-100 transition-opacity"
+              aria-label="Dismiss notification"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

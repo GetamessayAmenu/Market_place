@@ -1,24 +1,30 @@
-import React from 'react';
 import Link from 'next/link';
+import React from 'react';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
-  title?: string;
+  title: string;
   subtitle?: string;
 }
 
-export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
+export default function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block">
-            <h1 className="text-3xl font-bold text-primary">Marketplace</h1>
+        <div className="mb-8 text-center">
+          <Link href="/" className="text-2xl font-bold text-foreground">
+            Marketplace
           </Link>
-          {title && <h2 className="mt-4 text-2xl font-semibold text-foreground">{title}</h2>}
-          {subtitle && <p className="mt-2 text-muted-foreground">{subtitle}</p>}
         </div>
-        <div className="bg-card rounded-lg border shadow-sm p-6">{children}</div>
+        <div className="rounded-lg border bg-card p-8 shadow-sm">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-card-foreground">{title}</h1>
+            {subtitle && (
+              <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
+          {children}
+        </div>
       </div>
     </div>
   );

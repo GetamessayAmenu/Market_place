@@ -1,13 +1,23 @@
-import { serverGet } from './serverApi'
 import { redirect } from 'next/navigation'
 
-export type AuthUser = { id: string; name?: string; email?: string }
+import { serverGet } from './serverApi'
 
-export async function requireUser(): Promise<any> {
+export interface AuthUser {
+  id: string
+  name?: string
+  email?: string
+}
+
+interface AuthResponse {
+  success: boolean
+  data: AuthUser
+}
+
+export async function requireUser(): Promise<AuthUser | undefined> {
   try {
-    const res = await serverGet('/auth/me')
-    return res.data as AuthUser
-  } catch (err) {
+    const res = await serverGet<AuthResponse>('/auth/me')
+    return res.data
+  } catch {
     redirect('/login')
     return undefined
   }

@@ -1,13 +1,19 @@
 import React from 'react'
-import { requireUser } from '../../../lib/authServer'
-import { serverGet } from '../../../lib/serverApi'
+
 import Container from '../../../components/Container'
 import NotificationsClient from '../../../components/dashboard/NotificationsClient'
+import { requireUser } from '../../../lib/authServer'
+import { serverGet } from '../../../lib/serverApi'
+
+interface NotificationResponse {
+  success: boolean
+  data: { id: string; type: string; title: string; body: string }[]
+}
 
 export default async function NotificationsPage() {
   await requireUser()
-  const res = await serverGet('/notifications')
-  const notifications = res.data || []
+  const res = await serverGet<NotificationResponse>('/notifications')
+  const notifications = res.data
 
   return (
     <Container>

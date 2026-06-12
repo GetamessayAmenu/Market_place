@@ -1,74 +1,69 @@
-import React from 'react';
 import Link from 'next/link';
+import React from 'react';
 
-export function Footer() {
+const footerSections = [
+  {
+    title: 'Marketplace',
+    links: [
+      { label: 'Browse', href: '/search' },
+      { label: 'Categories', href: '/categories' },
+      { label: 'Sellers', href: '/sellers' },
+    ],
+  },
+  {
+    title: 'Account',
+    links: [
+      { label: 'Dashboard', href: '/dashboard' },
+      { label: 'Messages', href: '/dashboard/messages' },
+      { label: 'Settings', href: '/dashboard/settings' },
+    ],
+  },
+  {
+    title: 'Support',
+    links: [
+      { label: 'Help Center', href: '#' },
+      { label: 'Terms of Service', href: '#' },
+      { label: 'Privacy Policy', href: '#' },
+    ],
+  },
+];
+
+export default function Footer() {
   return (
-    <footer className="border-t bg-muted/50">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Marketplace</h3>
-            <p className="text-sm text-muted-foreground">
-              Buy and sell items in your local community.
+    <footer className="border-t bg-muted/30">
+      <div className="container-responsive py-12">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <Link href="/" className="text-lg font-bold">
+              Marketplace
+            </Link>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Find great local deals. Buy and sell with confidence.
             </p>
           </div>
-          <div>
-            <h4 className="font-semibold mb-4">Browse</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/search" className="text-muted-foreground hover:text-foreground transition-colors">
-                  All Listings
-                </Link>
-              </li>
-              <li>
-                <Link href="/categories" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Categories
-                </Link>
-              </li>
-              <li>
-                <Link href="/sellers" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Sellers
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Support</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/help" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Help Center
-                </Link>
-              </li>
-              <li>
-                <Link href="/safety" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Safety Tips
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Contact Us
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
+
+          {/* Link sections */}
+          {footerSections.map((section) => (
+            <div key={section.title}>
+              <h3 className="text-sm font-semibold">{section.title}</h3>
+              <ul className="mt-3 space-y-2">
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
+
+        <div className="mt-8 border-t pt-8 text-center text-sm text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Marketplace. All rights reserved.</p>
         </div>
       </div>

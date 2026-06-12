@@ -1,32 +1,43 @@
-'use client';
-
-import React from 'react';
 import Link from 'next/link';
-import { Card, CardContent } from '@marketplace/ui';
+import React from 'react';
 
-interface CategoryCardProps {
+export interface CategoryCardProps {
   slug: string;
   name: string;
-  listingCount: number;
-  icon?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  listingCount?: number;
 }
 
-export function CategoryCard({ slug, name, listingCount, icon, imageUrl }: CategoryCardProps) {
+export default function CategoryCard({ slug, name, imageUrl, listingCount }: CategoryCardProps) {
   return (
-    <Link href={`/categories/${slug}`}>
-      <Card hover>
-        <CardContent className="p-6 text-center">
-          {icon && <div className="text-4xl mb-3">{icon}</div>}
-          {imageUrl && (
-            <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted overflow-hidden">
-              <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+    <Link href={'/categories/' + slug}>
+      <div className="group relative overflow-hidden rounded-lg border bg-card shadow-sm transition-shadow hover:shadow-md">
+        <div className="aspect-[3/2] bg-muted">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={name}
+              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
             </div>
           )}
-          <h3 className="font-semibold text-lg mb-1">{name}</h3>
-          <p className="text-sm text-muted-foreground">{listingCount} listings</p>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="font-semibold text-white">{name}</h3>
+          {listingCount !== undefined && (
+            <p className="text-sm text-white/80">
+              {String(listingCount)} listing{listingCount !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }

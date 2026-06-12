@@ -1,80 +1,60 @@
-'use client';
-
-import React from 'react';
+"use client"
 import Link from 'next/link';
-import { Drawer } from '@marketplace/ui';
+import React from 'react';
 
 interface MobileNavProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }
 
-export function MobileNav({ isOpen, onClose }: MobileNavProps) {
+const navLinks = [
+  { href: '/search', label: 'Browse' },
+  { href: '/categories', label: 'Categories' },
+  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/saved', label: 'Saved' },
+  { href: '/dashboard/messages', label: 'Messages' },
+  { href: '/dashboard/notifications', label: 'Notifications' },
+  { href: '/dashboard/settings', label: 'Settings' },
+];
+
+export default function MobileNav({ open, onClose }: MobileNavProps) {
+  if (!open) return null;
+
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} side="right">
-      <div className="flex flex-col h-full">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">Menu</h2>
+    <>
+      <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={onClose} aria-hidden="true" />
+      <nav
+        className="fixed left-0 top-0 z-50 h-full w-72 bg-background shadow-xl md:hidden animate-slide-in-left overflow-y-auto"
+        aria-label="Mobile navigation"
+      >
+        <div className="flex items-center justify-between p-4 border-b">
+          <Link href="/" className="font-bold text-lg" onClick={onClose}>
+            Marketplace
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 hover:bg-accent"
+            aria-label="Close menu"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <nav className="flex-1 p-4">
-          <ul className="space-y-4">
-            <li>
-              <Link
-                href="/"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Home
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/search"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Browse
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/categories"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Categories
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/sellers"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Sellers
-              </Link>
-            </li>
-            <li className="pt-4 border-t">
-              <Link
-                href="/login"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Sign In
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/register"
-                onClick={onClose}
-                className="block py-2 text-foreground hover:text-primary transition-colors"
-              >
-                Sign Up
-              </Link>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </Drawer>
+        <div className="p-4 space-y-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+              onClick={onClose}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+    </>
   );
 }

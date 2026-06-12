@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 12 (2026-06-10)
+**Last updated:** Phase 15 (2026-06-12)
 
 ---
 
@@ -16,9 +16,10 @@ Living record of implementation progress. Updated after each phase.
 | Realtime (`services/realtime`) | Socket.IO chat + notifications + Redis adapter |
 | Meilisearch | Integrated (index `listings`) |
 | Notifications system | Event-driven, BullMQ queues, real-time delivery |
-| Web / Admin apps | Stub only |
+| Web / Admin apps | Design system + layouts + UI components (Phase 14) |
+| Public Marketplace Pages | Full marketplace experience with SSR/ISR (Phase 15) |
 
-**Next:** Phase 15 — Testing & Deployment Preparation
+**Next:** Phase 16 — Testing & Deployment Preparation
 
 ---
 
@@ -206,11 +207,14 @@ Implemented a comprehensive design system and UI foundation for the marketplace 
 - ImageGallery.tsx - main image + thumbnails, lightbox-ready
 
 ### Validation Schemas (apps/web/src/lib/validation.ts)
-- loginSchema - email and password validation
-- registerSchema - name, email, password, confirmPassword with matching
-- listingSchema - title, description, price, category, condition, location, images
-- profileSchema - name, email, phone, bio, location
-- messageSchema - content validation
+- loginSchema — email and password validation
+- registerSchema — name, email, password, confirmPassword with matching
+- forgotPasswordSchema — email validation
+- resetPasswordSchema — password + confirmPassword with token
+- changePasswordSchema — currentPassword + newPassword + confirmNewPassword
+- profileUpdateSchema — name, email, phone, bio, location
+- listingCreateSchema — title, description, price, category, condition, location, images
+- reportSchema — reason, description, listingId
 
 ### Page Integration
 - Updated `apps/web/src/app/layout.tsx` to use PublicLayout
@@ -219,7 +223,7 @@ Implemented a comprehensive design system and UI foundation for the marketplace 
 
 ### Validation
 - TypeScript compilation: `npm run -w apps/web typecheck` passes with 0 errors
-- UI package build: `npm run -w packages/ui build` passes with 0 errors
+- UI package typecheck: `npm run -w packages/ui typecheck` passes with 0 errors
 - All imports resolve correctly with transpilePackages configuration
 - No circular dependencies between packages
 
@@ -254,6 +258,129 @@ Implemented a comprehensive design system and UI foundation for the marketplace 
 - **Class Variance Authority (CVA)** pattern for component variants (lightweight implementation, no external dependency)
 - **Form patterns** combine FormControl with input components for consistent form field styling
 - **ExactOptionalPropertyTypes** TypeScript strict mode requires conditional prop spreading for optional properties
+
+---
+
+## Phase 15 — Public Marketplace Experience (apps/web)
+
+### Summary
+Implemented the full public-facing marketplace experience across 5 pages: Homepage, Search Results, Category Page, Listing Details, and Seller Profile. All pages use the existing design system (`@marketplace/ui`), marketplace components (ListingCard, CategoryCard, SearchBar, FilterPanel, ImageGallery), and backend API contracts — with zero backend modifications.
+
+### Pages Implemented
+
+**Homepage (`src/app/page.tsx`):**
+- Hero search section with `HeroSearch` client component navigating to `/search?q=...`
+- Featured listings grid (fetched from `GET /listings?featured=true&limit=8`)
+- Categories grid (top-level categories from `GET /categories`)
+- Recent listings grid (fetched from `GET /listings?sortBy=newest&limit=12`)
+- Server-rendered with `Promise.allSettled` for graceful error handling
+- `generateMetadata` with Open Graph tags
+
+**Search Results (`src/app/search/page.tsx` + `SearchClient.tsx`):**
+- Client component with URL-driven state (query, page, sort, filters)
+- `SearchBar` pre-filled from URL, `FilterPanel` with category/price/condition/city filters
+- Sort dropdown (relevance, newest, oldest, price_asc, price_desc)
+- Pagination via `Pagination` component
+- Loading state with skeleton grid, error state with retry, empty state
+- Suspense wrapper in page for `useSearchParams` compatibility
+
+**Category Page (`src/app/categories/[slug]/page.tsx`):**
+- Server component fetching category + listings (`GET /listings?categorySlug=:slug`)
+- Subcategory pill navigation for child categories
+- Breadcrumb navigation
+- Listings grid with server-side pagination
+- ISR revalidate 120s
+- `generateMetadata` with category name, description, Open Graph
+
+**Listing Details (`src/app/listings/[id]/page.tsx`):**
+- Server component fetching listing + related listings
+- `ImageGallery` component for listing images
+- Listing info: title, price, condition badge, location, posted date, favorites count
+- Seller info card with Avatar, name, verified badge, link to profile
+- Contact actions: Call, WhatsApp, Telegram, in-app messaging (based on `contactOptions`)
+- `FavoriteButton` client component with optimistic UI update
+- Related listings grid (same category, excludes current listing)
+- Schema.org JSON-LD with Product + Offer + Seller
+- ISR revalidate 60s, `generateMetadata` with Open Graph images, canonical URL
+
+**Seller Profile (`src/app/sellers/[id]/page.tsx`):**
+- Server component fetching seller profile + seller listings
+- Seller header: Avatar, name, bio, location, member since date
+- Verification badges: Email Verified, Phone Verified
+- Statistics grid: listing count, verified status, member since, response rate placeholder
+- Seller listings grid with server-side pagination
+- ISR revalidate 120s, `generateMetadata` with profile type Open Graph
+
+### New Hooks Added
+- `useCategories.ts` — fetch category tree with 5-minute stale time
+- `useFavorites.ts` — fetch user favorites + `useToggleFavorite` mutation (POST/DELETE with optimistic updates)
+- `useSeller.ts` — `useSeller` (profile) + `useSellerListings` (paginated listings)
+- Updated `useListings.ts` — full filter params, typed `PaginatedResponse<Listing>` return
+- Updated `useSearch.ts` — full search params with `undefined` support for `exactOptionalPropertyTypes`
+
+### API Helper Updates
+- `api.ts` — added `apiDelete` and `apiPatch` helpers, typed generics default to `unknown`
+- `serverApi.ts` — added `params` option for query string building, typed generics default to `unknown`
+- `authServer.ts` — typed `requireUser()` with `AuthUser` interface, removed `any`
+
+### New Components Added
+- `HeroSearch.tsx` — client component with search input, navigates to `/search`
+- `SearchClient.tsx` — full search experience client component
+- `FavoriteButton.tsx` — client component for toggle favorite with optimistic UI
+- `ListingCardSkeleton.tsx` — skeleton loader matching ListingCard layout
+- `CategoryCardSkeleton.tsx` — skeleton loader matching CategoryCard layout
+
+### Pre-existing Files Fixed (Type Compatibility)
+- `src/app/dashboard/messages/page.tsx` — typed `serverGet` response
+- `src/app/dashboard/messages/[id]/page.tsx` — typed `serverGet` responses
+- `src/app/dashboard/notifications/page.tsx` — typed `serverGet` response
+- `src/app/dashboard/saved/page.tsx` — typed `serverGet` response, removed `any`
+- `src/app/sitemap.xml/route.ts` — typed `serverGet` response, removed `any`
+- `src/providers/Providers.tsx` — typed `apiGet` response, fixed import ordering
+- `src/app/layout.tsx` — enhanced root metadata with `metadataBase`, Open Graph, robots
+
+### SEO Implementation
+- SSR on server components (Homepage, Category, Listing Details, Seller Profile)
+- ISR: listings 60s, categories/sellers 120s
+- `generateMetadata` on all pages with title, description, Open Graph tags
+- Schema.org JSON-LD on listing pages (Product, Offer, Seller)
+- Canonical URLs on listing pages
+- Root layout `metadataBase` with site URL
+
+### Validation
+- TypeScript compilation: `npm run -w apps/web typecheck` passes with 0 errors
+- All imports resolve correctly
+- `exactOptionalPropertyTypes` strict mode respected (conditional prop spreading)
+- No backend service modifications
+
+### Architecture Decisions
+- **Server components by default:** All pages are server components; client components only where interactivity is needed (SearchClient, FavoriteButton, HeroSearch)
+- **`Promise.allSettled`** for parallel data fetching with graceful fallback on partial failures
+- **URL-driven search state:** Search page syncs all filter/sort/pagination state to URL searchParams for shareability and back-button support
+- **Suspense boundary** on search page for `useSearchParams` compatibility (Next.js requirement)
+- **Conditional prop spreading** for `exactOptionalPropertyTypes` compliance: `...(value !== undefined && { prop: value })`
+- **No external state management** for public pages — React Query handles all client-side data fetching
+
+### Files Added/Modified
+
+**New files (~10):**
+- `src/hooks/useCategories.ts`, `useFavorites.ts`, `useSeller.ts`
+- `src/components/marketplace/HeroSearch.tsx`, `SearchClient.tsx`, `FavoriteButton.tsx`
+- `src/components/marketplace/ListingCardSkeleton.tsx`, `CategoryCardSkeleton.tsx`
+
+**Updated files (~15):**
+- `src/hooks/useListings.ts`, `useSearch.ts`
+- `src/lib/api.ts`, `serverApi.ts`, `authServer.ts`
+- `src/app/page.tsx`, `layout.tsx`
+- `src/app/search/page.tsx`
+- `src/app/categories/[slug]/page.tsx`
+- `src/app/listings/[id]/page.tsx`
+- `src/app/sellers/[id]/page.tsx`
+- `src/providers/Providers.tsx`
+- `src/app/dashboard/messages/page.tsx`, `[id]/page.tsx`
+- `src/app/dashboard/notifications/page.tsx`
+- `src/app/dashboard/saved/page.tsx`
+- `src/app/sitemap.xml/route.ts`
 
 ---
 

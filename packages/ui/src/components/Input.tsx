@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { cn } from '../lib/cn.js';
+
+import { cn } from '../lib/cn';
 
 export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'prefix' | 'suffix'> {
   label?: string;
@@ -11,7 +12,10 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, helperText, prefix, suffix, id, ...props }, ref) => {
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-') ?? '';
+    const errorId = inputId ? `${inputId}-error` : undefined;
+    const helperId = inputId ? `${inputId}-helper` : undefined;
+    const describedBy = error ? errorId : helperText ? helperId : undefined;
 
     return (
       <div className="w-full">
@@ -41,7 +45,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             aria-invalid={!!error}
-            aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
+            aria-describedby={describedBy}
             {...props}
           />
           {suffix && (
@@ -50,13 +54,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {error && (
-          <p id={`${inputId}-error`} className="mt-1.5 text-sm text-destructive" role="alert">
+        {error && errorId && (
+          <p id={errorId} className="mt-1.5 text-sm text-destructive" role="alert">
             {error}
           </p>
         )}
-        {helperText && !error && (
-          <p id={`${inputId}-helper`} className="mt-1.5 text-sm text-muted-foreground">
+        {helperText && !error && helperId && (
+          <p id={helperId} className="mt-1.5 text-sm text-muted-foreground">
             {helperText}
           </p>
         )}

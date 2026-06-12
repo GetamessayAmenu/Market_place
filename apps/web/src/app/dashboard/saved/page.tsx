@@ -1,13 +1,27 @@
 import React from 'react'
-import { requireUser } from '../../../lib/authServer'
-import { serverGet } from '../../../lib/serverApi'
+
 import Container from '../../../components/Container'
 import ListingCard from '../../../components/ListingCard'
+import { requireUser } from '../../../lib/authServer'
+import { serverGet } from '../../../lib/serverApi'
+
+interface FavoriteItem {
+  listing: {
+    id: string
+    title: string
+    price: number
+  }
+}
+
+interface FavoritesResponse {
+  success: boolean
+  data: FavoriteItem[]
+}
 
 export default async function SavedListingsPage() {
   const user = await requireUser()
-  const res = await serverGet(`/favorites`)
-  const items = res.data || []
+  const res = await serverGet<FavoritesResponse>('/favorites')
+  const items = res.data
 
   return (
     <Container>
@@ -16,7 +30,7 @@ export default async function SavedListingsPage() {
         <p className="mt-2 text-sm text-gray-600">Saved items for {user?.name}</p>
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.length === 0 && <div className="text-gray-600">No saved listings.</div>}
-          {items.map((fav: any) => (
+          {items.map((fav) => (
             <ListingCard key={fav.listing.id} title={fav.listing.title} price={fav.listing.price} />
           ))}
         </div>

@@ -1,13 +1,19 @@
 import React from 'react'
-import { requireUser } from '../../../lib/authServer'
-import { serverGet } from '../../../lib/serverApi'
+
 import Container from '../../../components/Container'
 import MessagesClient from '../../../components/dashboard/MessagesClient'
+import { requireUser } from '../../../lib/authServer'
+import { serverGet } from '../../../lib/serverApi'
+
+interface ConversationResponse {
+  success: boolean
+  data: { id: string; title?: string }[]
+}
 
 export default async function MessagesPage() {
   await requireUser()
-  const res = await serverGet('/conversations')
-  const conversations = res.data || []
+  const res = await serverGet<ConversationResponse>('/conversations')
+  const conversations = res.data
 
   return (
     <Container>
