@@ -1,17 +1,29 @@
-import create from 'zustand'
+import { create } from 'zustand'
 
-type User = { id: string; name?: string; email?: string } | null
-
-type AuthState = {
-  user: User
-  setUser: (u: User) => void
-  clear: () => void
+export interface AuthUser {
+  id: string
+  email: string
+  role: string
+  displayName: string
+  avatarUrl: string | null
+  emailVerified: boolean
+  phoneVerified: boolean
 }
 
-export const useAuth = create<AuthState>((set: any) => ({
+interface AuthState {
+  user: AuthUser | null
+  isLoading: boolean
+  setUser: (u: AuthUser) => void
+  clear: () => void
+  setLoading: (loading: boolean) => void
+}
+
+export const useAuth = create<AuthState>((set) => ({
   user: null,
-  setUser: (u: User) => set({ user: u }),
-  clear: () => set({ user: null }),
+  isLoading: true,
+  setUser: (u: AuthUser) => { set({ user: u, isLoading: false }) },
+  clear: () => { set({ user: null, isLoading: false }) },
+  setLoading: (loading: boolean) => { set({ isLoading: loading }) },
 }))
 
 export default useAuth

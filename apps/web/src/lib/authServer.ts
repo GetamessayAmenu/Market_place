@@ -1,26 +1,39 @@
 import { redirect } from 'next/navigation'
 
+import type { AuthUser } from '../hooks/useAuth'
+
 import { serverGet } from './serverApi'
 
-export interface AuthUser {
-  id: string
-  name?: string
-  email?: string
+interface MeResponse {
+  user: AuthUser
 }
 
-interface AuthResponse {
-  success: boolean
-  data: AuthUser
-}
+export type { AuthUser }
 
+/**
+ * Server-side auth guard. Redirects to /login if not authenticated.
+ */
 export async function requireUser(): Promise<AuthUser | undefined> {
   try {
-    const res = await serverGet<AuthResponse>('/auth/me')
-    return res.data
+    const res = await serverGet<MeResponse>('/auth/me')
+    return res.user
   } catch {
     redirect('/login')
     return undefined
   }
 }
 
-export default { requireUser }
+/**
+ * Server-side auth check that returns null instead of redirecting.
+ * Useful for pages that work for both authenticated and unauthenticated users.
+ */
+export async function optionalUser(): Promise<AuthUser | null> {
+  try {
+    const res = await serverGet<MeResponse>('/auth/me')
+    return res.user
+  } catch {
+    return null
+  }
+}
+
+export default { requireUser, optionalUser }

@@ -1,11 +1,12 @@
 import React from 'react';
 
+import type { AuthUser } from '../../hooks/useAuth';
 import Header from '../navigation/Header';
 import Sidebar from '../navigation/Sidebar';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  user?: { name?: string; email?: string } | null;
+  user?: AuthUser | null;
 }
 
 export default function DashboardLayout({ children, user }: DashboardLayoutProps) {
@@ -18,7 +19,7 @@ export default function DashboardLayout({ children, user }: DashboardLayoutProps
           <div className="container-responsive py-6">
             {user && (
               <div className="mb-6">
-                <h1 className="text-2xl font-semibold">Welcome, {user.name ?? 'User'}</h1>
+                <h1 className="text-2xl font-semibold">Welcome, {user.displayName}</h1>
               </div>
             )}
             {children}

@@ -13,7 +13,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
-    name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+    displayName: z.string().min(2, 'Name must be at least 2 characters').max(100),
     email: z.string().email('Invalid email address'),
     password: z
       .string()
@@ -21,6 +21,7 @@ export const registerSchema = z
       .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
       .regex(/[0-9]/, 'Password must contain at least one number'),
     confirmPassword: z.string(),
+    phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number').optional().or(z.literal('')),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -63,13 +64,34 @@ export const changePasswordSchema = z
 
 // Profile schemas
 export const profileUpdateSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
-  city: z.string().max(100).optional(),
+  displayName: z.string().min(2, 'Name must be at least 2 characters').max(100),
   phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number').optional().or(z.literal('')),
 });
 
+// Notification preferences schema
+export const notificationPreferencesSchema = z.object({
+  emailNotifications: z.boolean().default(true),
+  pushNotifications: z.boolean().default(true),
+  chatNotifications: z.boolean().default(true),
+  listingAlerts: z.boolean().default(true),
+  marketingEmails: z.boolean().default(false),
+});
+
 // Listing schemas
+const contactOptionsSchema = z.object({
+  showPhone: z.boolean().default(false),
+  whatsapp: z.string().max(30).optional().or(z.literal('')),
+  telegram: z.string().max(64).optional().or(z.literal('')),
+  inAppMessaging: z.boolean().default(true),
+});
+
+const listingImageSchema = z.object({
+  url: z.string().url('Invalid image URL'),
+  cloudinaryPublicId: z.string().min(1, 'Image ID is required'),
+  sortOrder: z.number().int().min(0).max(11).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
 export const listingCreateSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200, 'Title must be 200 characters or less'),
   description: z.string().min(10, 'Description must be at least 10 characters').max(5000, 'Description must be 5000 characters or less'),
@@ -79,6 +101,21 @@ export const listingCreateSchema = z.object({
   condition: z.enum(['new', 'like_new', 'good', 'fair', 'poor'], {
     errorMap: () => ({ message: 'Please select a condition' }),
   }),
+  contactOptions: contactOptionsSchema.optional(),
+  images: z.array(listingImageSchema).min(1, 'At least one image is required').max(10, 'Maximum 10 images allowed'),
+});
+
+export const listingUpdateSchema = z.object({
+  title: z.string().min(3, 'Title must be at least 3 characters').max(200, 'Title must be 200 characters or less').optional(),
+  description: z.string().min(10, 'Description must be at least 10 characters').max(5000, 'Description must be 5000 characters or less').optional(),
+  price: z.coerce.number().min(0, 'Price must be 0 or more').max(9999999, 'Price is too high').optional(),
+  categoryId: z.string().uuid('Please select a category').optional(),
+  city: z.string().min(2, 'City is required').max(100).optional(),
+  condition: z.enum(['new', 'like_new', 'good', 'fair', 'poor'], {
+    errorMap: () => ({ message: 'Please select a condition' }),
+  }).optional(),
+  contactOptions: contactOptionsSchema.optional(),
+  images: z.array(listingImageSchema).min(1, 'At least one image is required').max(10, 'Maximum 10 images allowed').optional(),
 });
 
 // Report schema
@@ -96,5 +133,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
 export type ListingCreateInput = z.infer<typeof listingCreateSchema>;
+export type ListingUpdateInput = z.infer<typeof listingUpdateSchema>;
 export type ReportInput = z.infer<typeof reportSchema>;

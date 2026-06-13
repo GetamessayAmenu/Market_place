@@ -3,28 +3,36 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React, { useEffect } from 'react'
 
 import useAuth from '../hooks/useAuth'
+import type { AuthUser } from '../hooks/useAuth'
 import { apiGet } from '../lib/api'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
-interface AuthMeResponse {
-  success: boolean
-  data: { id: string; name?: string; email?: string }
+interface MeResponse {
+  user: AuthUser
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const setUser = useAuth((s) => s.setUser)
+  const clear = useAuth((s) => s.clear)
 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await apiGet<AuthMeResponse>('/auth/me')
-        setUser(res.data)
+        const res = await apiGet<MeResponse>('/auth/me')
+        setUser(res.user)
       } catch {
-        // not authenticated or error; ignore
+        clear()
       }
     })()
-  }, [setUser])
+  }, [setUser, clear])
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }

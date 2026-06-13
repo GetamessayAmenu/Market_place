@@ -16,10 +16,16 @@ interface SidebarProps {
 
 const defaultItems: SidebarItem[] = [
   { label: 'Overview', href: '/dashboard' },
+  { label: 'Seller Dashboard', href: '/dashboard/seller' },
+  { label: 'My Listings', href: '/dashboard/seller/listings' },
+  { label: 'Create Listing', href: '/dashboard/seller/create' },
   { label: 'Saved', href: '/dashboard/saved' },
   { label: 'Messages', href: '/dashboard/messages' },
   { label: 'Notifications', href: '/dashboard/notifications' },
-  { label: 'Settings', href: '/dashboard/settings' },
+  { label: 'Profile', href: '/dashboard/profile' },
+  { label: 'Account Settings', href: '/dashboard/settings/account' },
+  { label: 'Security', href: '/dashboard/settings/security' },
+  { label: 'Notification Preferences', href: '/dashboard/settings/notifications' },
 ];
 
 export default function Sidebar({ items = defaultItems, className }: SidebarProps) {

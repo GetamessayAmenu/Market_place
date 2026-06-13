@@ -27,7 +27,7 @@ export default async function SavedListingsPage() {
     <Container>
       <section className="py-8">
         <h2 className="text-2xl font-semibold">Saved Listings</h2>
-        <p className="mt-2 text-sm text-gray-600">Saved items for {user?.name}</p>
+        <p className="mt-2 text-sm text-gray-600">Saved items for {user?.displayName}</p>
         <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.length === 0 && <div className="text-gray-600">No saved listings.</div>}
           {items.map((fav) => (

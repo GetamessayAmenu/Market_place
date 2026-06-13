@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 15 (2026-06-12)
+**Last updated:** Phase 17 (2026-06-13)
 
 ---
 
@@ -18,8 +18,10 @@ Living record of implementation progress. Updated after each phase.
 | Notifications system | Event-driven, BullMQ queues, real-time delivery |
 | Web / Admin apps | Design system + layouts + UI components (Phase 14) |
 | Public Marketplace Pages | Full marketplace experience with SSR/ISR (Phase 15) |
+| Authentication & User Area | Complete auth flow + user profile + settings (Phase 16) |
+| Seller Dashboard & Listing Management | Full seller experience with CRUD, stats, image upload (Phase 17) |
 
-**Next:** Phase 16 — Testing & Deployment Preparation
+**Next:** Phase 18 — Testing & Deployment Preparation
 
 ---
 
@@ -381,6 +383,260 @@ Implemented the full public-facing marketplace experience across 5 pages: Homepa
 - `src/app/dashboard/notifications/page.tsx`
 - `src/app/dashboard/saved/page.tsx`
 - `src/app/sitemap.xml/route.ts`
+
+---
+
+## Phase 16 — Authentication & User Area (apps/web)
+
+### Summary
+Implemented the complete authentication experience and user account area: login, register, forgot/reset password, email verification, user profile (view + edit), account settings, security settings, notification preferences, route protection, and navigation updates. All forms use React Hook Form + Zod validation. Zero backend modifications.
+
+### Auth Foundation Fixes
+- **`useAuth.ts`** — Updated Zustand store from `{ id, name, email }` to full `AuthUser` type matching backend (`displayName`, `avatarUrl`, `emailVerified`, `phoneVerified`, `role`). Added `isLoading` state for auth resolution.
+- **`authClient.ts`** — Added `register()`, `forgotPassword()`, `resetPassword()`, `changePassword()`, `updateProfile()`. Fixed response contracts: `res.user` not `res.data`.
+- **`authServer.ts`** — Updated `AuthUser` interface, added `optionalUser()` that returns `null` instead of redirecting.
+- **`Providers.tsx`** — Fixed `/auth/me` response reading: `res.user` instead of `res.data`. Calls `clear()` on auth error.
+- **`validation.ts`** — Fixed `registerSchema` to use `displayName` (matching backend DTO), added `changePasswordSchema`, `notificationPreferencesSchema`.
+
+### Auth Pages Implemented
+
+**Login (`/login`):**
+- Email + password form with error/success alerts
+- Loading state on submit, links to register and forgot-password
+- Redirect parameter support for post-login navigation
+
+**Register (`/register`):**
+- Display name, email, optional phone, password, confirm password
+- Password strength validation (8+ chars, uppercase, number)
+- Redirects to `/verify-email` on successful registration
+
+**Forgot Password (`/forgot-password`):**
+- Email form with anti-enumeration safe success message
+- Link back to login
+
+**Reset Password (`/reset-password`):**
+- Reads `token` from URL searchParams
+- New password + confirm with same strength rules as register
+- Redirects to `/login?reset=success` on completion
+- Suspense boundary for `useSearchParams` compatibility
+
+**Verify Email (`/verify-email`):**
+- Auto-calls `POST /auth/verify/email` with token from URL
+- Loading, success, and error states
+
+**Verification Status (`/verification-status`):**
+- Server component showing email and phone verification badges
+- Account information display (name, role, ID)
+
+### User Profile Pages
+
+**Profile View (`/dashboard/profile`):**
+- Server component with Avatar, verification badges, account details
+- Link to edit profile
+
+**Profile Edit (`/dashboard/profile/edit`):**
+- Client form with `profileUpdateSchema` (displayName, phone)
+- Calls `PATCH /users/me`, updates Zustand store on success
+- Pre-populated from current user data
+
+### Settings Pages
+
+**Settings Index (`/dashboard/settings`):**
+- Server component with card links to sub-pages
+- Account overview summary (name, email, role, verification)
+
+**Account Settings (`/dashboard/settings/account`):**
+- Display name and phone form, calls `PATCH /users/me`
+- Email shown as read-only
+
+**Security Settings (`/dashboard/settings/security`):**
+- Change password form with current/new/confirm fields
+- Calls `POST /auth/change-password`
+- Account information display
+
+**Notification Preferences (`/dashboard/settings/notifications`):**
+- Toggle checkboxes for 5 notification types
+- Email, push, chat, listing alerts, marketing emails
+- Client component with local state + save (TODO: API when available)
+
+### Route Protection
+- **`middleware.ts`** — Next.js middleware checks `access_token` cookie on `/dashboard/*`, redirects to `/login` with redirect param. Also redirects authenticated users away from `/login` and `/register`.
+- **`ProtectedRoute.tsx`** — Client-side auth guard component for wrapping interactive content. Shows spinner during auth resolution.
+- **Dashboard layout** — Server-side `requireUser()` guard remains as primary protection.
+
+### Navigation Updates
+- **Sidebar** — Added Profile, Account Settings, Security, Notification Preferences links
+- **UserMenu** — Fixed `user.name` → `user.displayName`, added avatar with `avatarUrl`, added Profile/Account/Security/Notifications menu items, proper logout with API call + store cleanup
+- **AuthLayout** — Added gradient background, back-to-home link, footer with Terms/Privacy/Help links
+
+### Files Added (~12)
+- `src/app/register/page.tsx`
+- `src/app/forgot-password/page.tsx`
+- `src/app/reset-password/page.tsx`
+- `src/app/verify-email/page.tsx`
+- `src/app/verification-status/page.tsx`
+- `src/app/dashboard/profile/page.tsx`
+- `src/app/dashboard/profile/edit/page.tsx`
+- `src/app/dashboard/settings/account/page.tsx`
+- `src/app/dashboard/settings/security/page.tsx`
+- `src/app/dashboard/settings/notifications/page.tsx`
+- `src/components/auth/ProtectedRoute.tsx`
+- `src/middleware.ts`
+
+### Files Modified (~10)
+- `src/hooks/useAuth.ts` — Full AuthUser type, isLoading state
+- `src/lib/authClient.ts` — All auth functions added
+- `src/lib/authServer.ts` — optionalUser(), AuthUser interface
+- `src/lib/validation.ts` — Fixed schemas, added new schemas
+- `src/providers/Providers.tsx` — Fixed response handling
+- `src/app/login/page.tsx` — Full auth flow with errors/loading
+- `src/app/dashboard/settings/page.tsx` — Rewritten as settings hub
+- `src/components/navigation/Sidebar.tsx` — Added profile/settings links
+- `src/components/navigation/UserMenu.tsx` — Fixed user.name, proper logout
+- `src/components/layouts/AuthLayout.tsx` — Enhanced design, footer, back link
+- `src/app/dashboard/saved/page.tsx` — Fixed `user.name` → `user.displayName`
+
+### Architecture Decisions
+- **Server components by default** for profile/settings pages; client only for forms
+- **`PATCH /users/me`** for all profile updates (backend contract)
+- **Response mapping**: `{ user, tokens }` for auth, `{ user }` for `/auth/me`
+- **Zustand store** holds full `AuthUser` object from backend types
+- **React Hook Form + Zod** for all forms
+- **`Alert` component** from `@marketplace/ui` for error/success feedback
+- **No new dependencies** added
+- **Suspense boundaries** on pages using `useSearchParams`
+- **Conditional prop spreading** for `exactOptionalPropertyTypes` compliance
+
+### Validation
+- TypeScript compilation: `npm run -w apps/web typecheck` passes with 0 errors
+- All imports resolve correctly
+- `exactOptionalPropertyTypes` strict mode respected
+- No backend service modifications
+
+---
+
+## Phase 17 — Seller Dashboard & Listing Management (apps/web)
+
+### Summary
+Implemented the complete seller experience and listing management system: Seller Dashboard with stats and performance metrics, My Listings with filters/pagination/status actions, Create/Edit Listing with multi-step form and Cloudinary image upload integration, and Listing Detail management page with full CRUD operations. All pages use React Hook Form + Zod validation, TanStack Query for data fetching, and the existing design system — with zero backend modifications.
+
+### Pages Implemented
+
+**Seller Dashboard (`/dashboard/seller`):**
+- Client component with `useMyListings` hook fetching all seller listings
+- Stat cards: Active Listings, Sold Listings, Pending Review, Total Favorites
+- Performance overview: active rate, sold rate, avg. favorites per listing
+- Quick actions: Create Listing, Manage Listings, View Messages, Settings
+- Recent listings grid (top 5) with status badges and image thumbnails
+- Loading skeletons, error state with retry, empty state with CTA
+
+**My Listings (`/dashboard/seller/listings`):**
+- Client component with full filter bar: search, status filter, sort options
+- Status filters: All, Active, Pending Review, Sold, Hidden, Rejected, Expired
+- Sort options: Newest, Oldest, Price High/Low
+- Pagination via `Pagination` component
+- Per-listing actions: Edit, Mark Sold, Hide, Unhide, Renew, Delete
+- Delete confirmation modal with loading state
+- Success/error alerts for all actions
+- Loading spinner, error retry, empty state
+
+**Create Listing (`/dashboard/seller/create`):**
+- Uses `ListingForm` multi-step component
+- Calls `POST /listings` via `useCreateListing` mutation
+- Redirects to `/dashboard/seller/listings` on success
+- Error handling with dismissible alert
+
+**Edit Listing (`/dashboard/seller/listings/[id]/edit`):**
+- Pre-populates `ListingForm` with existing listing data
+- Calls `PATCH /listings/:id` via `useUpdateListing` mutation
+- Redirects to listing detail page on success
+- Loading skeleton while fetching
+
+**Listing Detail (`/dashboard/seller/listings/[id]`):**
+- Full listing view with image gallery, details, description, contact options
+- Performance metrics: favorites count, condition, featured status
+- Action buttons: Mark Sold, Hide, Publish, Renew, Delete (context-dependent on status)
+- Delete confirmation modal
+- Success/error alerts with auto-dismiss
+- Loading skeleton, error retry
+
+### Components Added
+
+**ListingForm (`src/components/seller/ListingForm.tsx`):**
+- Multi-step form with 4 steps: Details, Photos, Contact, Review
+- Step indicator with clickable back-navigation
+- Step validation before proceeding
+- Image upload section with Cloudinary signed upload integration
+- Image preview grid with reorder (move up/down), remove, primary indicator
+- Category picker using `useCategories` hook with flattened tree
+- Contact options: phone toggle, in-app messaging toggle, WhatsApp, Telegram
+- Review step with full summary before submission
+- Responsive design, loading states on upload
+
+### Hooks Added (`src/hooks/useSeller.ts`)
+- `useMyListings(userId, params)` — paginated seller listings with filters
+- `useMyListing(id)` — single listing detail
+- `useCreateListing()` — mutation, invalidates `my-listings`
+- `useUpdateListing()` — mutation, invalidates `my-listings` + `my-listing`
+- `useDeleteListing()` — mutation with optional hard delete
+- `useMarkSold()` — mutation, invalidates queries
+- `useRenewListing()` — mutation, invalidates queries
+- `useHideListing()` — mutation, invalidates queries
+- `usePublishListing()` — mutation, invalidates queries
+- `useImageUpload()` — Cloudinary signed upload with loading/error state
+
+### API Client Added (`src/lib/sellerApi.ts`)
+- `fetchMyListings(params)` — GET `/listings` with `sellerId` filter
+- `fetchMyListing(id)` — GET `/listings/:id`
+- `createListing(data)` — POST `/listings`
+- `updateListing(id, data)` — PATCH `/listings/:id`
+- `deleteListing(id, hard)` — DELETE `/listings/:id`
+- `markListingSold(id)` — POST `/listings/:id/sold`
+- `renewListing(id)` — POST `/listings/:id/renew`
+- `hideListing(id)` — POST `/listings/:id/hide`
+- `publishListing(id)` — POST `/listings/:id/publish`
+- `getSignedUpload(count)` — POST `/uploads/sign`
+- `computeSellerStats(listings)` — client-side stats computation
+- Full TypeScript interfaces: `SellerListing`, `ListingImage`, `ContactOptions`, etc.
+
+### Validation Schemas Updated (`src/lib/validation.ts`)
+- Enhanced `listingCreateSchema` with `contactOptions` (showPhone, whatsapp, telegram, inAppMessaging) and `images` array (url, cloudinaryPublicId, sortOrder, isPrimary)
+- Added `listingUpdateSchema` with all optional fields for PATCH operations
+- Added `ListingUpdateInput` type export
+
+### Sidebar Updated
+- Added Seller Dashboard, My Listings, Create Listing links to default sidebar items
+
+### Files Added (~8)
+- `src/lib/sellerApi.ts`
+- `src/hooks/useSeller.ts`
+- `src/components/seller/ListingForm.tsx`
+- `src/app/dashboard/seller/page.tsx`
+- `src/app/dashboard/seller/listings/page.tsx`
+- `src/app/dashboard/seller/create/page.tsx`
+- `src/app/dashboard/seller/listings/[id]/page.tsx`
+- `src/app/dashboard/seller/listings/[id]/edit/page.tsx`
+
+### Files Modified (~3)
+- `src/lib/validation.ts` — Enhanced listing schemas with contact options and images
+- `src/components/navigation/Sidebar.tsx` — Added seller navigation links
+- `PROJECT_CONTEXT.md` — Updated with Phase 17
+
+### Architecture Decisions
+- **Client components** for all seller pages (forms require interactivity)
+- **TanStack Query mutations** for all CRUD operations with automatic cache invalidation
+- **Multi-step form** pattern with local state and step-level validation
+- **Cloudinary signed upload** — client-side upload using server-signed parameters
+- **Client-side stats computation** from listings array (no separate analytics endpoint needed for seller)
+- **Conditional prop spreading** for `exactOptionalPropertyTypes` compliance
+- **No backend modifications** — uses existing API contracts
+- **`useAuth` Zustand store** for current user context in hooks and components
+
+### Validation
+- TypeScript compilation: `npm run -w apps/web typecheck` passes with 0 errors
+- All imports resolve correctly
+- `exactOptionalPropertyTypes` strict mode respected
+- No backend service modifications
 
 ---
 
