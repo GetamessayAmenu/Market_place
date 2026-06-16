@@ -9,16 +9,57 @@ export interface Tab {
   disabled?: boolean;
 }
 
+export type TabVariant = 'default' | 'underline' | 'pills';
+
 export interface TabsProps {
   tabs: Tab[];
   value: string;
   onChange: (value: string) => void;
   className?: string;
   children?: React.ReactNode;
+  variant?: TabVariant;
+}
+
+const containerClasses: Record<TabVariant, string> = {
+  default: 'flex border-b',
+  underline: 'flex border-b',
+  pills: 'flex flex-wrap gap-1 rounded-lg bg-muted p-1',
+};
+
+const tabBaseClasses: Record<TabVariant, string> = {
+  default:
+    'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
+    'disabled:opacity-50 disabled:pointer-events-none',
+  underline:
+    'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
+    'disabled:opacity-50 disabled:pointer-events-none',
+  pills:
+    'px-3 py-1.5 text-sm font-medium transition-all rounded-md ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ' +
+    'disabled:opacity-50 disabled:pointer-events-none',
+};
+
+function getTabActiveClasses(variant: TabVariant, isActive: boolean): string {
+  if (variant === 'pills') {
+    return isActive
+      ? 'bg-background text-foreground shadow-sm'
+      : 'text-muted-foreground hover:text-foreground';
+  }
+  if (variant === 'underline') {
+    return isActive
+      ? 'border-primary text-foreground'
+      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border';
+  }
+  // default
+  return isActive
+    ? 'border-primary text-foreground'
+    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border';
 }
 
 const Tabs = forwardRef<HTMLDivElement, TabsProps>(
-  ({ tabs, value, onChange, className, children }, ref) => {
+  ({ tabs, value, onChange, className, children, variant = 'default' }, ref) => {
     const tabListRef = useRef<HTMLDivElement>(null);
 
     const handleKeyDown = useCallback(
@@ -51,7 +92,7 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
         <div
           ref={tabListRef}
           role="tablist"
-          className="flex border-b"
+          className={containerClasses[variant]}
           onKeyDown={handleKeyDown}
           aria-label="Tabs"
         >
@@ -66,12 +107,8 @@ const Tabs = forwardRef<HTMLDivElement, TabsProps>(
               disabled={tab.disabled}
               onClick={() => { if (!tab.disabled) onChange(tab.value); }}
               className={cn(
-                'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                'disabled:opacity-50 disabled:pointer-events-none',
-                value === tab.value
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                tabBaseClasses[variant],
+                getTabActiveClasses(variant, value === tab.value)
               )}
             >
               {tab.label}

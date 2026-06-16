@@ -1,106 +1,218 @@
 /**
- * Marketplace Design System — Shared Design Tokens
+ * Ethiopian Fashion Marketplace — Design System Tokens
+ * Modern global fashion rooted in Ethiopian craftsmanship.
  * Consumed by apps/web and apps/admin via @marketplace/ui/styles.css
  */
 
-/* Light theme (default) */
+/* ============================================================
+   LIGHT THEME (default)
+   ============================================================ */
 :root {
-  /* Base */
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* ── Brand Palette (Ethiopian-inspired) ────────────────── */
+  --brand-gold: 38 80% 55%;          /* Threadwork & jewelry gold */
+  --brand-gold-foreground: 38 90% 14%;
+  --brand-green: 155 60% 35%;        /* Highland emerald */
+  --brand-green-foreground: 155 70% 95%;
+  --brand-terra: 15 55% 50%;         /* Earthy terracotta */
+  --brand-terra-foreground: 15 60% 96%;
+  --brand-wine: 345 50% 35%;         /* Rich burgundy textile */
+  --brand-wine-foreground: 345 60% 96%;
+  --brand-ivory: 40 30% 95%;         /* Cotton gabi ivory */
+  --brand-ivory-foreground: 30 20% 20%;
 
-  /* Card */
+  /* ── Marketplace Action Colors ─────────────────────────── */
+  --buy: 155 60% 35%;                /* Buy = brand-green */
+  --buy-foreground: 155 70% 95%;
+  --rent: 38 80% 55%;                /* Rent = brand-gold */
+  --rent-foreground: 38 90% 14%;
+  --custom: 345 50% 35%;             /* Custom = brand-wine */
+  --custom-foreground: 345 60% 96%;
+
+  /* ── Base ──────────────────────────────────────────────── */
+  --background: 40 25% 98%;
+  --foreground: 25 20% 10%;
+
+  /* ── Card ──────────────────────────────────────────────── */
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 25 20% 10%;
 
-  /* Popover */
+  /* ── Popover ───────────────────────────────────────────── */
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
+  --popover-foreground: 25 20% 10%;
 
-  /* Primary */
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
+  /* ── Primary → brand-gold ──────────────────────────────── */
+  --primary: 38 80% 55%;
+  --primary-foreground: 38 90% 14%;
 
-  /* Secondary */
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
+  /* ── Secondary → warm neutral ──────────────────────────── */
+  --secondary: 30 15% 93%;
+  --secondary-foreground: 25 20% 18%;
 
-  /* Muted */
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  /* ── Muted ─────────────────────────────────────────────── */
+  --muted: 30 12% 94%;
+  --muted-foreground: 25 10% 46%;
 
-  /* Accent */
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  /* ── Accent → brand-green ──────────────────────────────── */
+  --accent: 155 60% 35%;
+  --accent-foreground: 155 70% 95%;
 
-  /* Destructive */
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  /* ── Destructive ───────────────────────────────────────── */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
 
-  /* Success */
-  --success: 142.1 76.2% 36.3%;
-  --success-foreground: 355.7 100% 97.3%;
+  /* ── Success ───────────────────────────────────────────── */
+  --success: 155 55% 38%;
+  --success-foreground: 155 70% 95%;
 
-  /* Warning */
+  /* ── Warning ───────────────────────────────────────────── */
   --warning: 38 92% 50%;
-  --warning-foreground: 48 96% 89%;
+  --warning-foreground: 38 90% 14%;
 
-  /* Info */
-  --info: 199.5 89.5% 48.4%;
-  --info-foreground: 210 40% 98%;
+  /* ── Info ──────────────────────────────────────────────── */
+  --info: 210 70% 50%;
+  --info-foreground: 210 80% 96%;
 
-  /* Border & Input */
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
+  /* ── Border & Input ────────────────────────────────────── */
+  --border: 30 18% 88%;
+  --input: 30 18% 88%;
+  --ring: 38 80% 55%;
 
-  /* Radius */
+  /* ── Border Radius Scale ───────────────────────────────── */
   --radius: 0.5rem;
+  --radius-xs: 0.25rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* ── Spacing Scale (8-point grid) ──────────────────────── */
+  --space-1: 0.25rem;   /*  4px */
+  --space-2: 0.5rem;    /*  8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-7: 2rem;      /* 32px */
+  --space-8: 2.5rem;    /* 40px */
+  --space-9: 3rem;      /* 48px */
+  --space-10: 4rem;     /* 64px */
+  --space-11: 5rem;     /* 80px */
+  --space-12: 6rem;     /* 96px */
+
+  /* ── Typography ────────────────────────────────────────── */
+  --font-display: 'Playfair Display', 'Georgia', serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-amharic: 'Noto Sans Ethiopic', 'Nyala', sans-serif;
+
+  --text-display-lg: 3.5rem;    /* 56px — hero headings */
+  --text-display-md: 2.5rem;    /* 40px — section headings */
+  --text-display-sm: 1.75rem;   /* 28px — card titles */
+
+  /* ── Shadows (warm-tinted) ─────────────────────────────── */
+  --shadow-xs: 0 1px 2px 0 rgba(80, 40, 20, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(80, 40, 20, 0.08), 0 1px 2px -1px rgba(80, 40, 20, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(80, 40, 20, 0.08), 0 2px 4px -2px rgba(80, 40, 20, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(80, 40, 20, 0.08), 0 4px 6px -4px rgba(80, 40, 20, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(80, 40, 20, 0.08), 0 8px 10px -6px rgba(80, 40, 20, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(80, 40, 20, 0.15);
+
+  /* ── Z-index Hierarchy ─────────────────────────────────── */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-toast: 600;
+  --z-tooltip: 700;
 }
 
-/* Dark theme */
+/* ============================================================
+   DARK THEME
+   ============================================================ */
 [data-theme="dark"] {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  /* ── Brand Palette (richer, deeper dark-mode tones) ────── */
+  --brand-gold: 38 65% 48%;
+  --brand-gold-foreground: 38 80% 90%;
+  --brand-green: 155 50% 42%;
+  --brand-green-foreground: 155 60% 92%;
+  --brand-terra: 15 50% 45%;
+  --brand-terra-foreground: 15 55% 92%;
+  --brand-wine: 345 45% 42%;
+  --brand-wine-foreground: 345 55% 92%;
+  --brand-ivory: 25 15% 10%;
+  --brand-ivory-foreground: 30 15% 85%;
 
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
+  /* ── Marketplace Action Colors ─────────────────────────── */
+  --buy: 155 50% 42%;
+  --buy-foreground: 155 60% 92%;
+  --rent: 38 65% 48%;
+  --rent-foreground: 38 80% 90%;
+  --custom: 345 45% 42%;
+  --custom-foreground: 345 55% 92%;
 
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  /* ── Base ──────────────────────────────────────────────── */
+  --background: 25 20% 6%;
+  --foreground: 30 15% 90%;
 
-  --primary: 217.2 91.2% 59.8%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  /* ── Card ──────────────────────────────────────────────── */
+  --card: 25 18% 9%;
+  --card-foreground: 30 15% 90%;
 
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+  /* ── Popover ───────────────────────────────────────────── */
+  --popover: 25 18% 9%;
+  --popover-foreground: 30 15% 90%;
 
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  /* ── Primary → muted amber ─────────────────────────────── */
+  --primary: 38 65% 48%;
+  --primary-foreground: 38 80% 90%;
 
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  /* ── Secondary → warm dark ─────────────────────────────── */
+  --secondary: 25 12% 15%;
+  --secondary-foreground: 30 15% 85%;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
+  /* ── Muted ─────────────────────────────────────────────── */
+  --muted: 25 12% 15%;
+  --muted-foreground: 25 8% 55%;
 
-  --success: 142.1 70.6% 45.3%;
-  --success-foreground: 144.9 80.4% 10%;
+  /* ── Accent → deep green ───────────────────────────────── */
+  --accent: 155 50% 42%;
+  --accent-foreground: 155 60% 92%;
 
-  --warning: 48 96% 89%;
-  --warning-foreground: 38 92% 50%;
+  /* ── Destructive ───────────────────────────────────────── */
+  --destructive: 0 62% 40%;
+  --destructive-foreground: 0 0% 98%;
 
-  --info: 199.5 89.5% 48.4%;
-  --info-foreground: 210 40% 98%;
+  /* ── Success ───────────────────────────────────────────── */
+  --success: 155 50% 42%;
+  --success-foreground: 155 60% 92%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 224.3 76.3% 48%;
+  /* ── Warning ───────────────────────────────────────────── */
+  --warning: 38 80% 45%;
+  --warning-foreground: 38 80% 90%;
 
-  --radius: 0.5rem;
+  /* ── Info ──────────────────────────────────────────────── */
+  --info: 210 60% 45%;
+  --info-foreground: 210 70% 92%;
+
+  /* ── Border & Input ────────────────────────────────────── */
+  --border: 25 12% 18%;
+  --input: 25 12% 18%;
+  --ring: 38 65% 48%;
+
+  /* ── Shadows (deeper for dark mode) ────────────────────── */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
-/* Base reset & defaults */
+/* ============================================================
+   BASE RESET & DEFAULTS
+   ============================================================ */
 * {
   border-color: hsl(var(--border));
 }
@@ -108,25 +220,68 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family: var(--font-body);
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Utility classes */
+/* ── Typography Utilities ─────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-amharic {
+  font-family: var(--font-amharic);
+}
+
+.text-display-lg {
+  font-family: var(--font-display);
+  font-size: var(--text-display-lg);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.text-display-md {
+  font-family: var(--font-display);
+  font-size: var(--text-display-md);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.text-display-sm {
+  font-family: var(--font-display);
+  font-size: var(--text-display-sm);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+/* ── Utility Classes ──────────────────────────────────────── */
 .text-muted-foreground {
   color: hsl(var(--muted-foreground));
 }
 
-/* Focus ring utility */
+/* Focus ring utility — uses brand-gold ring */
 .focus-ring {
   outline: 2px solid transparent;
   outline-offset: 2px;
-  ring: 2px solid hsl(var(--ring));
-  ring-offset: 2px;
+  --tw-ring-color: hsl(var(--ring));
+  --tw-ring-offset-width: 2px;
 }
 
-/* Scrollbar styling */
+/* ── Reduced Motion ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Scrollbar Styling ────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

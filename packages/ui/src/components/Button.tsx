@@ -1,4 +1,5 @@
 import React, { forwardRef } from 'react';
+
 import { cn } from '../lib/cn';
 import { cva } from '../lib/cva';
 
@@ -8,12 +9,17 @@ const buttonVariants = cva({
     variant: {
       primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
       secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      outline: 'border border-input bg-background hover:bg-accent/10 hover:text-accent-foreground',
+      ghost: 'hover:bg-accent/10 hover:text-accent-foreground',
       destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
       link: 'text-primary underline-offset-4 hover:underline',
+      /* Marketplace action variants */
+      buy: 'bg-action-buy text-action-buy-foreground hover:bg-action-buy/90 shadow-sm',
+      rent: 'border-2 border-action-rent text-action-rent bg-transparent hover:bg-action-rent/10',
+      custom: 'bg-action-custom text-action-custom-foreground hover:bg-action-custom/90 shadow-sm',
     },
     size: {
+      xs: 'h-7 rounded px-2 text-xs',
       sm: 'h-9 rounded-md px-3',
       md: 'h-10 px-4 py-2',
       lg: 'h-11 rounded-md px-8',
@@ -27,8 +33,8 @@ const buttonVariants = cva({
 });
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link' | 'buy' | 'rent' | 'custom';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'icon';
   loading?: boolean;
 }
 

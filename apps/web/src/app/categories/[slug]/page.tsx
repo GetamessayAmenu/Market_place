@@ -149,8 +149,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
                   title={listing.title}
                   price={listing.price}
                   {...(listing.primaryImageUrl !== undefined && { imageUrl: listing.primaryImageUrl })}
-                  city={listing.city}
-                  condition={listing.condition}
                 />
               ))}
             </div>

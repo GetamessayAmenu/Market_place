@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 17 (2026-06-13)
+**Last updated:** Phase 20 — Global Application Layout + UX Architecture Specification (2026-06-16)
 
 ---
 
@@ -20,8 +20,10 @@ Living record of implementation progress. Updated after each phase.
 | Public Marketplace Pages | Full marketplace experience with SSR/ISR (Phase 15) |
 | Authentication & User Area | Complete auth flow + user profile + settings (Phase 16) |
 | Seller Dashboard & Listing Management | Full seller experience with CRUD, stats, image upload (Phase 17) |
+| Admin Experience & Moderation UX | Complete admin platform with moderation, verification, analytics, audit (Phase 19) |
+| Global Application Layout | Responsive layout system: Public, Dashboard, Auth layouts with comprehensive wireframe specs, component specifications, interaction states, and responsive behavior matrix (Phase 20) |
 
-**Next:** Phase 18 — Testing & Deployment Preparation
+**Next:** Phase 21 — Testing & Deployment Preparation
 
 ---
 
@@ -640,6 +642,121 @@ Implemented the complete seller experience and listing management system: Seller
 
 ---
 
+## Phase 19 — Admin Experience Enhancement & Moderation UX (apps/admin)
+
+### Summary
+Transformed the admin panel from placeholder pages into a complete operational platform for moderators, admins, support agents, and super admins. Implemented fully functional pages for Listings Moderation (with bulk actions), Reports Management (resolution workflow), Verification Queue (approve/reject), User Management (sanctions, suspend/ban), Audit Logs (searchable filtering), and Analytics Dashboard (date ranges, bar charts, metrics). Enhanced the Dashboard overview with live analytics data. All pages use server components for initial data + client components for interactivity, with zero backend modifications.
+
+### Pages Implemented
+
+**Listings Moderation (`/listings`):**
+- Server component fetches initial data via `fetchAdminListings`
+- Client `ListingsTable` with filters (status, search), pagination, checkbox selection
+- Bulk actions modal: Approve, Reject, Archive with optional reason
+- Per-listing detail modal with image, seller, category, favorites, slug
+- Error handling with alerts, loading states
+
+**Reports Management (`/reports`):**
+- Filters by status (pending, under_review, resolved, dismissed) and target type
+- Resolution workflow: Set Under Review → Resolve/Dismiss with resolution notes
+- Detail modal showing reporter, target, listing, resolution history
+- Quick actions per row for pending reports
+
+**Verification Queue (`/verification`):**
+- Status filter (pending, approved, rejected)
+- Quick approve/reject buttons for fast processing
+- Full review modal with document link, user notes, reviewer notes
+- Auto-refresh on action
+
+**User Management (`/users`):**
+- Filters by status and search (name/email)
+- User detail modal with avatar, role, verification status, listings/reports counts
+- Sanction modal: change status (active/suspended/banned) with reason
+- Avatar fallback with initials
+
+**Audit Logs (`/audit`):**
+- Filters by resource type, action type, actor ID
+- Color-coded action badges (create=success, delete=error, update=info, suspend=warning)
+- Chronological table with timestamps, actor IDs, IP addresses
+- Resource ID references for traceability
+
+**Analytics Dashboard (`/analytics`):**
+- Date range selector (7d, 30d, 90d, all time) with refresh
+- Stat cards: Total Users, Active Listings, Open Reports, Messages (with new-in-range metrics)
+- CSS bar charts: Listings by Status, Users by Status, Top Categories
+- New listings in range card with breakdown
+
+**Dashboard Overview (`/`):**
+- Updated to use `fetchDashboardStats` and `fetchReportStats` from analytics API
+- Stat cards: Total Users, Total Listings (with active count), Open Reports
+- Pending Actions, Quick Links, System Status sections
+
+### Components Added (`src/components/admin/`)
+- **StatusBadge** — Status badge with domain-specific color variants (listing, report, user, verification) + `formatCurrency`, `formatDate`, `formatDateTime`, `truncate` helpers
+- **ListingsTable** — Client component: filters, pagination, bulk select, bulk action modal, detail modal
+- **ReportsTable** — Client component: filters, review/resolve workflow, detail modal
+- **VerificationTable** — Client component: status filter, quick approve/reject, review modal
+- **UsersTable** — Client component: search, status filter, detail modal, sanction modal
+- **AuditLogsTable** — Client component: resource/action filters, actor search, color-coded badges
+- **AnalyticsDashboard** — Client component: date range, refresh, stat cards, CSS bar charts
+
+### API Layer Added
+
+**Server API (`src/lib/adminApi.ts`):**
+- Types: `PaginatedResponse<T>`, `ApiResponse<T>`, `AdminListing`, `AdminUser`, `AdminReport`, `VerificationRequest`, `DashboardStats`, `TopCategory`, `AuditLog`
+- Functions: `fetchAdminListings`, `fetchAdminListing`, `bulkListingAction`, `fetchAdminUsers`, `fetchAdminUser`, `fetchUserStats`, `adminUpdateUser`, `fetchReports`, `fetchReportStats`, `fetchReport`, `setReportUnderReview`, `resolveReport`, `fetchVerifications`, `reviewVerification`, `fetchDashboardStats`, `fetchListingsByStatus`, `fetchUsersByStatus`, `fetchTopCategories`, `fetchAuditLogs`
+
+**Client API (`src/lib/clientApi.ts`):**
+- `clientGet<T>(path)`, `clientPost<T>(path, body?)`, `clientPatch<T>(path, body?)` — client-side fetch wrappers with credentials
+- `buildQuery(params)` — URL query string builder
+
+**Server API Enhanced (`src/lib/serverApi.ts`):**
+- Added `serverPost<T>` and `serverPatch<T>` for mutation support
+- Fixed lint compliance (`interface`, `??`, `@ts-expect-error`, `String()` for numbers)
+
+**Auth Server (`src/lib/authServer.ts`):**
+- Updated to use `interface` instead of `type`
+- Fixed `serverGet` type parameter for proper typing
+- Lint compliance: `??`, catch without unused variable
+
+### Files Added (~9)
+- `src/lib/adminApi.ts` — Server-side admin API client with all types and functions
+- `src/lib/clientApi.ts` — Client-side API helpers for interactive components
+- `src/components/admin/StatusBadge.tsx` — Status badges + formatting helpers
+- `src/components/admin/ListingsTable.tsx` — Listings moderation table
+- `src/components/admin/ReportsTable.tsx` — Reports management table
+- `src/components/admin/VerificationTable.tsx` — Verification queue table
+- `src/components/admin/UsersTable.tsx` — User management table
+- `src/components/admin/AuditLogsTable.tsx` — Audit logs table
+- `src/components/admin/AnalyticsDashboard.tsx` — Analytics dashboard
+
+### Files Modified (~8)
+- `src/app/listings/page.tsx` — Replaced placeholder with full moderation UI
+- `src/app/reports/page.tsx` — Replaced placeholder with full reports management
+- `src/app/verification/page.tsx` — Replaced placeholder with verification queue
+- `src/app/users/page.tsx` — Replaced basic table with full user management
+- `src/app/audit/page.tsx` — Replaced placeholder with full audit logs
+- `src/app/analytics/page.tsx` — Replaced placeholder with analytics dashboard
+- `src/app/page.tsx` — Updated dashboard with live analytics API
+- `src/lib/authServer.ts` — Lint fixes and proper typing
+
+### Architecture Decisions
+- **Server component pages** with `requireAdmin()` + initial data fetch → client component for interactivity
+- **Dual API layer**: `adminApi.ts` for server-side (SSR/ISR), `clientApi.ts` for client-side (filters, mutations)
+- **Reusable StatusBadge** with domain-specific color mapping instead of per-page badge logic
+- **CSS bar charts** for analytics (no chart library dependency)
+- **Conditional prop spreading** for `exactOptionalPropertyTypes` compliance
+- **No backend modifications** — uses existing API contracts
+- **`@marketplace/ui`** shared components: Table, Badge, Modal, Pagination, Select, Card, Button, Alert, Spinner
+
+### Validation
+- TypeScript compilation: `npx tsc --noEmit` passes with 0 errors
+- All imports resolve correctly
+- `exactOptionalPropertyTypes` strict mode respected
+- No backend service modifications
+
+---
+
 ## Phase 12 — Backend Completion (services/api)
 
 ### Summary
@@ -1131,4 +1248,916 @@ All database models have corresponding REST API endpoints.
 - **Notification templates** — i18n + template rendering before persistence
 - **Scheduling** — delay notification delivery (e.g., digest mode, quiet hours)
 - **Analytics** — track notification read rates, delivery latency, user engagement
+
+---
+
+## Phase 20 — Global Application Layout
+
+### Summary
+Designed and implemented the global application layout system for Habesha Market, covering three layout contexts (Public, Dashboard, Auth) with a unified spacing system, responsive grid, navigation patterns, and wireframe specifications. Includes comprehensive component-level specifications, interaction states, transition behaviors, and a detailed responsive behavior matrix. All layouts use the design system tokens from `@marketplace/ui` and follow mobile-first responsive principles.
+
+### Layout Hierarchy
+
+```
+RootLayout (html, body, fonts, Providers)
+│
+├── PublicLayout  (home, search, listings, categories, sellers, designers)
+│   ├── SkipToContent  → #main-content
+│   ├── Header  (sticky, z-sticky, scroll-aware: transparent on hero → solid w/ blur)
+│   │   ├── Logo  ("HM" mobile → "Habesha Market" md+)
+│   │   ├── Desktop Nav  (hidden <md: Shop, Rent, Custom Order, Designers)
+│   │   ├── UserMenu  (avatar dropdown, hidden <md)
+│   │   └── Hamburger  → MobileNav  (slide-in drawer, visible <md)
+│   │
+│   ├── Main Content  (flex-1, id="main-content", pb-20 on mobile for BottomNav)
+│   │   └── {children}  (page-specific content, uses Container for max-width)
+│   │
+│   ├── Footer  (5-col grid, brand + 4 link sections, social icons)
+│   └── BottomNav  (fixed bottom, visible <md: Home, Search, +Sell, Saved, Profile)
+│
+├── DashboardLayout  (authenticated: dashboard/*)
+│   ├── Header  (always solid)
+│   ├── Body  (flex row)
+│   │   ├── Sidebar  (hidden <lg, w-64 expanded / w-16 collapsed)
+│   │   │   └── Sections: Dashboard, Seller, Account
+│   │   └── Main  (flex-1, overflow-y-auto, max-w-7xl inner container)
+│   │       ├── Welcome Banner  (font-display heading + subtitle)
+│   │       └── {children}
+│   └── (MobileNav available via Header hamburger for <lg)
+│
+├── AuthLayout  (login, register, forgot-password, reset-password)
+│   ├── Back Link  (absolute top-left)
+│   ├── Center Column  (max-w-md, centered)
+│   │   ├── Logo  (font-display "Habesha Market" + tagline)
+│   │   ├── Card  (rounded-xl, shadow-sm, title + form)
+│   │   └── Footer Links  (Terms, Privacy, Help + copyright)
+│   └── (no Header, no Footer, no BottomNav)
+```
+
+### Spacing Rules
+
+All spacing derives from the 8-point grid tokens defined in `globals.css`:
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--space-1` | 4px | Tight inline gaps (icon + text) |
+| `--space-2` | 8px | Card grid gaps (compact), tag spacing |
+| `--space-3` | 12px | Card grid gaps (standard), list item spacing |
+| `--space-4` | 16px | Page edge padding (mobile), section gaps |
+| `--space-5` | 20px | Form field spacing |
+| `--space-6` | 24px | Page edge padding (tablet sm:), card padding |
+| `--space-7` | 32px | Page edge padding (desktop lg:), section separation |
+| `--space-8` | 40px | Hero section vertical padding |
+| `--space-9` | 48px | Major section separation (py-12) |
+| `--space-10` | 64px | Hero section vertical padding (py-16) |
+| `--space-11` | 80px | Large hero (py-20) |
+| `--space-12` | 96px | Page top/bottom (py-24) |
+
+**Applied rules:**
+- **Page horizontal padding:** `px-4` mobile → `px-6` tablet (sm) → `px-8` desktop (lg)
+- **Container max-width:** `max-w-7xl` (1280px) default; `max-w-3xl` (narrow/forms); `max-w-[1600px]` (wide dashboards)
+- **Section vertical spacing:** `py-12` (48px) between major homepage sections; `py-8` between dashboard sections
+- **Card grid gap:** `gap-3` (compact) or `gap-4` (standard) or `gap-6` (featured)
+- **Content top padding:** `py-6` mobile → `py-8` desktop
+- **Bottom padding for BottomNav:** `pb-20` (80px) on mobile `<md` to prevent content overlap
+
+### Grid System
+
+**Tailwind breakpoints (mobile-first):**
+
+| Breakpoint | Width | Context |
+|-----------|-------|---------|
+| (default) | 0–639px | Mobile — single column, full-width cards |
+| `sm` | 640px | Large mobile — 2-col grids |
+| `md` | 768px | Tablet — Header nav visible, BottomNav hidden, multi-col footer |
+| `lg` | 1024px | Desktop — Sidebar visible, 3–4 col grids |
+| `xl` | 1280px | Large desktop — max container width reached |
+| `2xl` | 1536px | Ultra-wide |
+| `fashion-sm` | 640px | Product grid: 3 columns |
+| `fashion-md` | 860px | Product grid: 4 columns |
+| `fashion-lg` | 1100px | Sidebar + content layouts |
+| `fashion-xl` | 1400px | Product grid: 5 columns |
+
+**Grid patterns:**
+
+| Pattern | Mobile | fashion-sm | fashion-md | fashion-xl |
+|---------|--------|------------|------------|------------|
+| Product grid (standard) | 2-col | 3-col | 4-col | 5-col |
+| Product grid (featured) | 1-col | 2-col | 3-col | 3-col |
+| Category grid | 2-col | 3-col | 4-col | 4-col |
+| Footer sections | 2-col | 2-col | 5-col | 5-col |
+| Search page (filter+results) | stacked | stacked | sidebar+content | sidebar+content |
+
+### Responsive Behavior
+
+**Mobile (< 768px):**
+- Header shows "HM" logo mark, hamburger menu, no nav links
+- MobileNav slides in from left (Drawer) with grouped sections
+- BottomNav fixed at bottom: Home, Search, +Sell (FAB), Saved, Profile
+- Sidebar is hidden (accessed via MobileNav hamburger)
+- Content is single-column, full-width
+- Footer shows 2-column grid
+- Bottom padding `pb-20` on main to clear BottomNav
+
+**Tablet (768px – 1023px):**
+- Header shows full "Habesha Market" logo + desktop nav links + UserMenu
+- BottomNav is hidden (`md:hidden`)
+- MobileNav still accessible via hamburger if needed
+- Sidebar is still hidden (`hidden lg:flex`)
+- Content uses multi-column grids (3–4 col)
+- Footer shows 5-column grid
+
+**Desktop (≥ 1024px):**
+- Full Header with all nav links and UserMenu avatar
+- Sidebar visible on dashboard pages (w-64, collapsible to w-16)
+- No BottomNav, no MobileNav
+- Full container width with `px-8` padding
+- All grid patterns at maximum columns
+
+### Navigation Patterns
+
+| Pattern | Component | Visibility | Purpose |
+|---------|-----------|-----------|---------|
+| **Top Header** | `Header.tsx` | Always | Primary navigation, branding, user menu |
+| **Desktop Nav** | Inside Header | `md+` | Shop, Rent, Custom Order, Designers links |
+| **Mobile Nav** | `MobileNav.tsx` | `<md` (triggered) | Slide-in drawer with grouped navigation |
+| **Bottom Nav** | `BottomNav.tsx` | `<md` (always) | Quick-access tabs: Home, Search, Sell, Saved, Profile |
+| **Dashboard Sidebar** | `Sidebar.tsx` | `lg+` | Dashboard sections: Overview, Seller, Account |
+| **User Menu** | `UserMenu.tsx` | `md+` (in Header) | Avatar dropdown with buyer/seller-specific items |
+| **Skip to Content** | Inline in Header | Focus only | Accessibility: jump to `#main-content` |
+| **Breadcrumb** | Per-page | Content area | Category > Subcategory navigation |
+
+### Z-Index Hierarchy
+
+| Layer | Token | Value | Usage |
+|-------|-------|-------|-------|
+| Base | `--z-base` | 0 | Normal flow content |
+| Dropdown | `--z-dropdown` | 100 | UserMenu dropdown, filter dropdowns |
+| Sticky | `--z-sticky` | 200 | Header, BottomNav |
+| Overlay | `--z-overlay` | 300 | MobileNav backdrop, modal backdrop |
+| Modal | `--z-modal` | 400 | Modal dialogs |
+| Popover | `--z-popover` | 500 | Tooltips on hover, filter popovers |
+| Toast | `--z-toast` | 600 | Toast notifications |
+| Tooltip | `--z-tooltip` | 700 | Inline tooltips |
+
+### Wireframe Descriptions
+
+#### Public Homepage (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]   Shop  Rent  Custom  Designers  [👤]│  ← Header (sticky, z-200)
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Discover Ethiopia's                                │   │  ← Hero Section (full-bleed)
+│  │  Finest Fashion                   [  Search...  🔍] │   │     bg-brand-ivory/5, py-24
+│  │  Buy · Rent · Custom Order                         │   │     SearchBar variant="hero"
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Featured Designs                                   See all │  ← Section Header
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐            │
+│  │ 3:4  │ │ 3:4  │ │ 3:4  │ │ 3:4  │ │ 3:4  │            │  ← ProductGrid (5-col)
+│  │Card  │ │Card  │ │Card  │ │Card  │ │Card  │            │     ListingCard variant="product"
+│  │      │ │      │ │      │ │      │ │      │            │
+│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘            │
+│                                                             │
+│  Shop by Category                                   See all │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐             │
+│  │  Category  │ │  Category  │ │  Category  │             │  ← CategoryGrid (4-col desktop)
+│  │  3:2 wide  │ │  3:2       │ │  3:2       │             │     CategoryCard variant="standard"
+│  └────────────┘ └────────────┘ └────────────┘             │
+│                                                             │
+│  Trending Now                                               │
+│  ◄ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ►                 │  ← ProductCarousel
+│     │Card  │ │Card  │ │Card  │ │Card  │                    │     horizontal scroll-snap
+│     └──────┘ └──────┘ └──────┘ └──────┘                   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [Logo] Shop | For Sellers | Account | Support    [socials] │  ← Footer (5-col grid)
+│ © 2026 Habesha Market                           📷 🐦 ✈️   │     border-brand-gold/20 top
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Public Homepage (Mobile)
+
+```
+┌──────────────────────────┐
+│ [HM]          [☰]        │  ← Header (compact, "HM" mark + hamburger)
+├──────────────────────────┤
+│                          │
+│  Discover Ethiopia's     │  ← Hero (stacked, smaller text)
+│  Finest Fashion          │
+│  [  Search...  🔍       ]│  ← SearchBar variant="hero"
+│                          │
+│  Featured Designs        │
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││  ← ProductGrid (2-col mobile)
+│  │  3:4     ││  3:4     ││
+│  └──────────┘└──────────┘│
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││
+│  └──────────┘└──────────┘│
+│                          │
+│  Shop by Category        │
+│  ┌──────────┐┌──────────┐│
+│  │Category  ││Category  ││  ← CategoryGrid (2-col mobile)
+│  └──────────┘└──────────┘│
+│                          │
+├──────────────────────────┤
+│ 🏠    🔍    [+]   ❤️   👤│  ← BottomNav (fixed bottom, z-200)
+│ Home Search Sell Saved  │     Center "+" is FAB (primary, -mt-4)
+└──────────────────────────┘
+```
+
+#### Dashboard (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]   Shop  Rent  Custom  Designers  [👤]│  ← Header (always solid)
+├──────────┬──────────────────────────────────────────────────┤
+│Dashboard │                                                  │
+│ ──────── │  Welcome, Sara                                   │  ← Welcome banner
+│ Overview │  Manage your account, orders, and listings.      │     (font-display heading)
+│ Saved    │                                                  │
+│ Messages │  ┌──────────────────────────────────────────┐   │
+│ Notifs   │  │                                          │   │  ← Dashboard content
+│          │  │  Stats Cards  (grid 4-col)               │   │     (max-w-7xl, px-8)
+│Seller    │  │  ┌────┐ ┌────┐ ┌────┐ ┌────┐           │   │
+│ ──────── │  │  │ 📊 │ │ 💰 │ │ 📦 │ │ 👁 │           │   │
+│ My Shop  │  │  └────┘ └────┘ └────┘ └────┘           │   │
+│ Listings │  │                                          │   │
+│ Create   │  │  Recent Listings Table                   │   │
+│ Orders   │  │  ┌──────────────────────────────────┐   │   │
+│          │  │  │ ...                              │   │   │
+│Account   │  │  └──────────────────────────────────┘   │   │
+│ ──────── │  │                                          │   │
+│ Profile  │  └──────────────────────────────────────────┘   │
+│ Settings │                                                  │
+│ Security │                                                  │
+│ Notifs   │                                                  │
+├──────────┴──────────────────────────────────────────────────┤
+│                    (no footer on dashboard)                 │
+└─────────────────────────────────────────────────────────────┘
+  ↑ Sidebar: w-64 expanded, collapsible to w-16 (icons only)
+    Active item: bg-primary/10 text-primary
+    Section headers: text-2xs uppercase tracking-wider
+```
+
+#### Dashboard (Mobile)
+
+```
+┌──────────────────────────┐
+│ [HM]          [☰]        │  ← Header (hamburger opens MobileNav)
+├──────────────────────────┤
+│                          │
+│  Welcome, Sara           │  ← Welcome banner (no sidebar)
+│  Manage your account...  │
+│                          │
+│  ┌──────────┐┌──────────┐│
+│  │  Stats   ││  Stats   ││  ← Stats cards (2-col mobile)
+│  └──────────┘└──────────┘│
+│                          │
+│  Recent Listings         │
+│  ┌──────────────────────┐│
+│  │  Card list / table   ││
+│  └──────────────────────┘│
+│                          │
+├──────────────────────────┤
+│ 🏠    🔍    [+]   ❤️   👤│  ← BottomNav (dashboard nav)
+└──────────────────────────┘
+  ↑ Sidebar hidden (<lg)
+    Dashboard nav accessed via MobileNav drawer
+```
+
+#### Auth Page (Login/Register)
+
+```
+┌──────────────────────────┐
+│ [← Back to home]         │  ← Absolute positioned
+│                          │
+│                          │
+│     Habesha Market       │  ← Logo (font-display, centered)
+│  Ethiopian Fashion Market│
+│                          │
+│  ┌──────────────────────┐│
+│  │  Sign In             ││  ← Card (rounded-xl, shadow-sm)
+│  │                      ││     max-w-md, centered
+│  │  [Email         ]    ││
+│  │  [Password      ]    ││
+│  │                      ││
+│  │  [  Sign In  ]       ││
+│  │                      ││
+│  │  Forgot password?    ││
+│  │  Don't have account? ││
+│  └──────────────────────┘│
+│                          │
+│   Terms · Privacy · Help │  ← Footer links (centered)
+│  © 2026 Habesha Market   │
+└──────────────────────────┘
+  bg-gradient: brand-ivory/30 → muted/40
+  No Header, Footer, or BottomNav
+```
+
+#### Public Homepage (Tablet — 768px–1023px)
+
+```
+┌──────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]  Shop  Rent  Custom  Designers [👤]│  ← Header (solid, full nav visible ≥md)
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌────────────────────────────────────────────────┐ │
+│  │  Discover Ethiopia's                           │ │  ← Hero (reduced py-16, full-width)
+│  │  Finest Fashion              [  Search...  🔍] │ │
+│  │  Buy · Rent · Custom Order                     │ │
+│  └────────────────────────────────────────────────┘ │
+│                                                      │
+│  Featured Designs                            See all │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐  │
+│  │  Card   │ │  Card   │ │  Card   │ │  Card   │  │  ← ProductGrid (4-col at fashion-md)
+│  │  3:4    │ │  3:4    │ │  3:4    │ │  3:4    │  │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘  │
+│                                                      │
+│  Shop by Category                            See all │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐         │
+│  │ Category  │ │ Category  │ │ Category  │         │  ← CategoryGrid (3-col tablet)
+│  │  3:2      │ │  3:2      │ │  3:2      │         │
+│  └───────────┘ └───────────┘ └───────────┘         │
+│                                                      │
+│  Trending Now                                        │
+│  ◄ ┌─────────┐ ┌─────────┐ ┌─────────┐ ►           │  ← ProductCarousel (3 visible)
+│     │  Card   │ │  Card   │ │  Card   │             │
+│     └─────────┘ └─────────┘ └─────────┘             │
+│                                                      │
+├──────────────────────────────────────────────────────┤
+│ [Logo] Shop | For Sellers | Account | Support [soc.] │  ← Footer (5-col grid, same as desktop)
+│ © 2026 Habesha Market                                │
+└──────────────────────────────────────────────────────┘
+  ↑ No BottomNav (hidden ≥md). No Sidebar.
+    Desktop nav links visible. UserMenu avatar visible.
+    Hamburger still available for MobileNav drawer if needed.
+    Content padding: px-6 (sm breakpoint).
+```
+
+#### Listing Detail Page (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]   Shop  Rent  Custom  Designers  [👤]│  ← Header (sticky, solid)
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ‹ Back to results   Home > Women > Dresses > This Item    │  ← Breadcrumb
+│                                                             │
+│  ┌───────────────────────┐  ┌──────────────────────────┐   │
+│  │                       │  │                          │   │
+│  │   Image Gallery       │  │  Designer Name           │   │  ← 2-column layout
+│  │   (main + thumbs)     │  │  Listing Title           │   │     (fashion-md: side-by-side)
+│  │                       │  │  ★★★★★ (24 reviews)     │   │
+│  │   3:4 aspect ratio    │  │                          │   │
+│  │                       │  │  ETB 4,500  ·  Rent:     │   │  ← PriceTag (buy + rent)
+│  │   ◄ 1/5 ►            │  │  ETB 350/day             │   │
+│  │                       │  │                          │   │
+│  └───────────────────────┘  │  [  Buy Now  ]           │   │  ← Button variant="buy"
+│                             │  [  Rent This  ]         │   │  ← Button variant="rent"
+│                             │  [  Custom Order  ]      │   │  ← Button variant="custom"
+│                             │                          │   │
+│                             │  ───────────────────      │   │  ← Divider
+│                             │  Size: S M L XL          │   │  ← Tag (selectable)
+│                             │  Color: ■ ■ ■            │   │
+│                             │  Condition: Excellent    │   │
+│                             │                          │   │
+│                             │  Description             │   │
+│                             │  Lorem ipsum...          │   │
+│                             │                          │   │
+│                             │  [Contact Seller 💬]     │   │
+│                             │  [Save ♥]  [Share ↗]    │   │
+│                             └──────────────────────────┘   │
+│                                                             │
+│  You May Also Like                                  See all │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐            │
+│  │ Card │ │ Card │ │ Card │ │ Card │ │ Card │            │  ← RelatedGrid (5-col)
+│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘            │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [Footer]                                                    │
+└─────────────────────────────────────────────────────────────┘
+  Container: max-w-7xl, px-8
+  Image column: ~55% width. Detail column: ~45% width.
+  Stacks vertically on mobile (< fashion-md).
+```
+
+#### Listing Detail Page (Mobile)
+
+```
+┌──────────────────────────┐
+│ [HM]          [☰]        │  ← Header (compact)
+├──────────────────────────┤
+│                          │
+│  ‹ Back                  │  ← Back link (simplified)
+│                          │
+│  ┌──────────────────────┐│
+│  │                      ││
+│  │   Image Gallery      ││  ← Full-width, swipeable
+│  │   ● ○ ○ ○ ○         ││     Dots indicator
+│  │   3:4 aspect         ││
+│  └──────────────────────┘│
+│                          │
+│  Designer Name           │
+│  Listing Title           │
+│  ★★★★★ (24 reviews)     │
+│                          │
+│  ETB 4,500               │
+│  Rent: ETB 350/day       │
+│                          │
+│  [  Buy Now          ]   │  ← Full-width Button
+│  [  Rent This        ]   │
+│  [  Custom Order     ]   │
+│                          │
+│  ───────────────────     │
+│  Size: S M L XL         │
+│  Color: ■ ■ ■           │
+│  Condition: Excellent    │
+│                          │
+│  ▼ Description           │  ← Collapsible section
+│  Lorem ipsum...          │
+│                          │
+│  [Contact Seller 💬]     │
+│  [Save ♥]  [Share ↗]    │
+│                          │
+│  You May Also Like       │
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││  ← RelatedGrid (2-col)
+│  └──────────┘└──────────┘│
+│                          │
+├──────────────────────────┤
+│ 🏠    🔍    [+]   ❤️   👤│  ← BottomNav
+└──────────────────────────┘
+```
+
+#### Search Results Page (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]   Shop  Rent  Custom  Designers  [👤]│  ← Header
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  [  Search Ethiopian fashion...            🔍  ]     │  │  ← SearchBar (inline, not hero)
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌──────────┐  ┌──────────────────────────────────────┐   │
+│  │ Filters  │  │  248 results for "habesha dress"     │   │  ← Results header
+│  │          │  │  Sort: [Relevance ▾]                 │   │
+│  │ Category │  │                                      │   │
+│  │ ☐ Women  │  │  ┌──────┐ ┌──────┐ ┌──────┐        │   │
+│  │ ☐ Men    │  │  │ Card │ │ Card │ │ Card │        │   │  ← ProductGrid (3-col w/ sidebar)
+│  │ ☐ Kids   │  │  └──────┘ └──────┘ └──────┘        │   │
+│  │          │  │  ┌──────┐ ┌──────┐ ┌──────┐        │   │
+│  │ Type     │  │  │ Card │ │ Card │ │ Card │        │   │
+│  │ ☐ Buy    │  │  └──────┘ └──────┘ └──────┘        │   │
+│  │ ☐ Rent   │  │                                      │   │
+│  │ ☐ Custom │  │  ┌──────┐ ┌──────┐ ┌──────┐        │   │
+│  │          │  │  │ Card │ │ Card │ │ Card │        │   │
+│  │ Price    │  │  └──────┘ └──────┘ └──────┘        │   │
+│  │ [min-max]│  │                                      │   │
+│  │          │  │  ◄ Prev  1 2 3 ... 12  Next ►      │   │  ← Pagination
+│  │ Size     │  │                                      │   │
+│  │ ☐ S ☐ M │  └──────────────────────────────────────┘   │
+│  │ ☐ L ☐ XL│                                             │
+│  │          │                                             │
+│  │ [Apply]  │                                             │
+│  └──────────┘                                             │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [Footer]                                                    │
+└─────────────────────────────────────────────────────────────┘
+  Filter sidebar: w-64, sticky top-20, visible ≥fashion-md
+  Results grid: flex-1, 3-col (adapts to 4-col at fashion-xl)
+  Stacks on mobile: filter becomes a slide-up Drawer.
+```
+
+#### Search Results Page (Mobile)
+
+```
+┌──────────────────────────┐
+│ [HM]          [☰]        │  ← Header (compact)
+├──────────────────────────┤
+│                          │
+│  [  Search...        🔍 ]│  ← SearchBar (full-width)
+│                          │
+│  248 results             │
+│  [≡ Filters] [Sort ▾]   │  ← Filter button opens Drawer
+│                          │     Sort opens Dropdown
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││  ← ProductGrid (2-col)
+│  │  3:4     ││  3:4     ││
+│  └──────────┘└──────────┘│
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││
+│  └──────────┘└──────────┘│
+│  ┌──────────┐┌──────────┐│
+│  │  Card    ││  Card    ││
+│  └──────────┘└──────────┘│
+│                          │
+│  ◄ 1 2 3 ... 12 ►       │  ← Pagination (compact)
+│                          │
+├──────────────────────────┤
+│ 🏠    🔍    [+]   ❤️   👤│  ← BottomNav
+└──────────────────────────┘
+
+  Filter Drawer (slide-up from bottom):
+  ┌──────────────────────────┐
+  │  Filters            [✕]  │
+  │  ─────────────────────── │
+  │  Category                │
+  │  ☐ Women ☐ Men ☐ Kids   │
+  │  Type                    │
+  │  ☐ Buy ☐ Rent ☐ Custom  │
+  │  Price: [min] — [max]    │
+  │  Size: ☐S ☐M ☐L ☐XL    │
+  │                          │
+  │  [  Apply Filters  ]     │
+  │  [  Clear All  ]         │
+  └──────────────────────────┘
+  ↑ Drawer z-modal (400), backdrop z-overlay (300)
+```
+
+#### Dashboard — Seller Shop (Desktop)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]   Shop  Rent  Custom  Designers  [👤]│  ← Header (always solid)
+├──────────┬──────────────────────────────────────────────────┤
+│Dashboard │                                                  │
+│ ──────── │  My Shop                                         │  ← Page title (no welcome banner
+│ Overview │  Manage your listings and track sales.            │     when hideWelcome=true)
+│ Saved    │                                                  │
+│ Messages │  ┌──────────────────────────────────────────┐   │
+│ Notifs   │  │  Revenue    Orders     Views      Conv.  │   │  ← Stats cards (4-col grid)
+│          │  │  ETB 45.2K  28        1,240     3.2%   │   │
+│Seller    │  │  ▲ +12%     ▲ +3      ▲ +180    ▼ -0.5%│   │
+│ ──────── │  └──────────────────────────────────────────┘   │
+│ My Shop  │                                                  │
+│ Listings │  ┌──────────────────────────────────────────┐   │
+│ Create   │  │  Recent Listings                  [+ New]│   │  ← Section header + action
+│ Orders   │  │  ┌──────────────────────────────────┐   │   │
+│          │  │  │ img │ Title    │ Price │ Status │ … │   │   │  ← Table (responsive)
+│Account   │  │  │  🖼  │ Dress A  │ 4,500 │ Active │ … │   │   │
+│ ──────── │  │  │  🖼  │ Dress B  │ 3,200 │ Draft  │ … │   │   │
+│ Profile  │  │  └──────────────────────────────────┘   │   │
+│ Settings │  │                                          │   │
+│ Security │  │  ◄ Prev  1 2 3  Next ►                  │   │  ← Pagination
+│ Notifs   │  └──────────────────────────────────────────┘   │
+│          │                                                  │
+├──────────┴──────────────────────────────────────────────────┤
+│                    (no footer on dashboard)                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Dashboard — Seller Shop (Tablet — 768px–1023px)
+
+```
+┌──────────────────────────────────────────────────────┐
+│ [Logo: Habesha Market]  Shop  Rent  Custom  Designers [👤]│  ← Header (nav visible ≥md)
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  My Shop                                             │  ← No sidebar (< lg)
+│  Manage your listings and track sales.               │     Welcome banner hidden
+│                                                      │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐       │
+│  │  Revenue   │ │  Orders    │ │  Views     │       │  ← Stats cards (3-col tablet)
+│  │  ETB 45.2K │ │  28        │ │  1,240     │       │
+│  └────────────┘ └────────────┘ └────────────┘       │
+│                                                      │
+│  Recent Listings                          [+ New]    │
+│  ┌────────────────────────────────────────────────┐ │
+│  │ img │ Title    │ Price │ Status │ Actions      │ │  ← Table (full-width)
+│  │  🖼  │ Dress A  │ 4,500 │ Active │ [Edit] [🗑] │ │
+│  │  🖼  │ Dress B  │ 3,200 │ Draft  │ [Edit] [🗑] │ │
+│  └────────────────────────────────────────────────┘ │
+│                                                      │
+│  ◄ Prev  1 2 3  Next ►                              │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+  ↑ Sidebar hidden (<lg). Dashboard nav via MobileNav drawer.
+    Stats: 3-col tablet, 2-col mobile.
+    Table: scrollable horizontally on narrow screens.
+```
+
+#### Auth Page — Registered User
+
+```
+┌──────────────────────────┐
+│ [← Back to home]         │  ← Absolute positioned
+│                          │
+│                          │
+│     Habesha Market       │  ← Logo (font-display, centered)
+│  Ethiopian Fashion Market│
+│                          │
+│  ┌──────────────────────┐│
+│  │  Welcome Back        ││  ← Card (max-w-md)
+│  │  Sign in to continue ││
+│  │                      ││
+│  │  [Email         ]    ││  ← Input (auto-focus)
+│  │  [Password      ]    ││  ← Input type="password"
+│  │                      ││
+│  │  ☐ Remember me       ││  ← Checkbox
+│  │                      ││
+│  │  [  Sign In  ]       ││  ← Button (full-width, primary)
+│  │                      ││
+│  │  Forgot password?    ││  ← Link (text-sm, muted)
+│  │  ─────────────────   ││  ← Divider
+│  │  Don't have account? ││
+│  │  [  Create Account ] ││  ← Button (outline variant)
+│  └──────────────────────┘│
+│                          │
+│   Terms · Privacy · Help │
+│  © 2026 Habesha Market   │
+└──────────────────────────┘
+  bg-gradient: brand-ivory/30 → muted/40
+  Card: rounded-xl, border, bg-card, p-8, shadow-sm
+  Form spacing: space-y-4 between fields
+  Submit button: h-11, font-semibold
+```
+
+### Component Specifications
+
+#### Header Component (`Header.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Height** | `h-16` (64px) |
+| **Position** | `sticky top-0` |
+| **Z-index** | `--z-sticky` (200) |
+| **Max-width** | `max-w-7xl` inner container |
+| **Padding** | `px-4 sm:px-6 lg:px-8` |
+| **Transition** | `transition-all duration-300` |
+
+**Visual states:**
+
+| State | Condition | Background | Border | Shadow |
+|-------|-----------|------------|--------|--------|
+| Transparent | Homepage + `scrollY ≤ 10` | `bg-transparent` | `border-transparent` | none |
+| Solid | Any page scrolled > 10px OR not homepage | `bg-background/95 backdrop-blur` | `border-b` | `shadow-xs` |
+
+**Inner layout (flex row):**
+
+```
+[Logo] ←──flex──→ [Desktop Nav (hidden <md)] ←──flex──→ [UserMenu (hidden <md)] [Hamburger (hidden ≥md)]
+```
+
+- **Logo**: `font-display text-xl font-bold`. Shows "HM" on mobile (`<sm`), "Habesha Market" on `sm+`
+- **Desktop Nav**: `hidden md:flex`, `gap-8`, `text-sm`. Active link: `text-foreground`. Inactive: `text-foreground/60`
+- **Hamburger**: `md:hidden`, toggles MobileNav drawer. Icon swaps between ☰ and ✕
+- **UserMenu**: `hidden md:block`. Avatar trigger (`size="sm"`). Dropdown `align="right"`
+- **Skip-to-content**: `sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[999]`
+
+#### BottomNav Component (`BottomNav.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Visibility** | `md:hidden` (visible below 768px) |
+| **Position** | `fixed bottom-0 left-0 right-0` |
+| **Z-index** | `--z-sticky` (200) |
+| **Background** | `bg-background/95 backdrop-blur` |
+| **Border** | `border-t` |
+
+**Tab items:**
+
+| Tab | Icon | Route | Active indicator |
+|-----|------|-------|-----------------|
+| Home | 🏠 (outline) | `/` | `text-primary` |
+| Search | 🔍 (outline) | `/search` | `text-primary` |
+| Sell | ➕ (filled, larger) | `/dashboard/seller/create` | FAB style (see below) |
+| Saved | ♥ (outline) | `/dashboard/saved` | `text-primary` |
+| Profile | 👤 (outline) | `/dashboard` | `text-primary` |
+
+**FAB (Floating Action Button) — center "Sell" tab:**
+- `h-12 w-12 rounded-full -mt-4` (elevates 16px above bar)
+- `bg-primary text-primary-foreground shadow-lg`
+- Icon: `h-6 w-6` (larger than standard `h-5 w-5`)
+- `hover:bg-primary/90`
+
+**Standard tab styling:**
+- `flex flex-col items-center gap-0.5 px-3 py-2 rounded-md`
+- Label: `text-2xs font-medium`
+- Active: `text-primary`. Inactive: `text-muted-foreground hover:text-foreground`
+- `aria-current="page"` on active tab
+
+#### Footer Component (`Footer.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Border** | `border-t border-brand-gold/20` |
+| **Background** | `bg-muted/20` |
+| **Inner max-width** | `max-w-7xl` |
+| **Padding** | `px-4 sm:px-6 lg:px-8` |
+| **Top section** | `py-12` |
+| **Bottom bar** | `py-6` |
+
+**Grid layout:**
+
+| Breakpoint | Columns | Brand column |
+|-----------|---------|-------------|
+| Mobile | `grid-cols-2` | `col-span-2` (full width) |
+| `md+` | `grid-cols-5` | `col-span-1` |
+
+**Sections:** Brand (logo + description) → Shop → For Sellers → Account → Support
+
+**Bottom bar:** Flex row on `sm+`, stacked column on mobile. Copyright left, social icons right (Instagram, Twitter/X, Telegram).
+
+#### Sidebar Component (`Sidebar.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Visibility** | `hidden lg:flex` |
+| **Width (expanded)** | `w-64` (256px) |
+| **Width (collapsed)** | `w-16` (64px) |
+| **Transition** | `transition-all duration-300` |
+| **Background** | `bg-background` |
+| **Border** | `border-r` |
+
+**Sections:** Dashboard → Seller → Account
+
+**Item styling:**
+- Active: `bg-primary/10 text-primary`
+- Inactive: `text-foreground/70 hover:bg-muted hover:text-foreground`
+- `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium`
+- `aria-current="page"` on active item
+- Section headers: `text-2xs font-semibold uppercase tracking-wider text-muted-foreground`
+
+**Collapsed state:**
+- Section headers hidden
+- Icons only (no labels)
+- `title` attribute on items for tooltip
+- Toggle button shows expand/collapse chevron
+
+#### MobileNav Component (`MobileNav.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Trigger** | Header hamburger button (`md:hidden`) |
+| **Overlay** | `fixed inset-0 bg-foreground/40 backdrop-blur-sm`, `z-overlay` (300) |
+| **Drawer** | `fixed left-0 top-0 h-full w-72 bg-background shadow-xl`, `z-modal` (400) |
+| **Animation** | `animate-slide-in-left` (300ms ease-out) |
+
+**Drawer sections:**
+1. **Header**: Logo + close button (`p-4 border-b`)
+2. **User profile** (if authenticated): Avatar (`size="md"`) + displayName + email (`p-4 border-b`)
+3. **Shop links**: Shop All, Buy, Rent, Custom, Designers, Categories
+4. **Account links** (if authenticated): Dashboard, Saved, Messages, Notifications
+5. **Settings links** (if authenticated): Profile, Settings
+6. **Auth links** (if guest): Sign In (primary button), Create Account (text button)
+
+**Link styling:** `block rounded-md px-3 py-2.5 text-sm font-medium hover:bg-muted`
+
+#### UserMenu Component (`UserMenu.tsx`)
+
+| Property | Value |
+|----------|-------|
+| **Trigger** | Avatar (`size="sm"`) in Header, or "Sign In" link if guest |
+| **Dropdown** | `align="right"`, uses `@marketplace/ui` Dropdown component |
+| **Visibility** | `hidden md:block` (in Header) |
+
+**Menu items by role:**
+
+| Role | Items |
+|------|-------|
+| **Buyer** | Dashboard, My Profile, My Orders, My Rentals, Custom Orders, Saved Listings, Messages, Account Settings, Notifications, Sign Out |
+| **Seller/Admin** | Dashboard, My Shop, My Listings, Orders, Payouts, Messages, Account Settings, Sign Out |
+| **Guest** | Sign In, Sign Up |
+
+- Sign Out is `destructive: true`
+- Route mapping via `routeMap` record
+- Sign Out calls `logout()` → `clear()` → redirect to `/`
+
+### Interaction States & Transitions
+
+#### Header Scroll Behavior
+
+```
+scrollY = 0 (homepage):   bg-transparent → no shadow → border-transparent
+scrollY > 10:             bg-background/95 + backdrop-blur → shadow-xs → border-b
+transition:               all 300ms ease (CSS transition-all duration-300)
+```
+
+The transparent→solid transition only applies on the homepage (`pathname === '/'`). On all other pages, the Header is always solid.
+
+#### BottomNav Offset Strategy
+
+The `pb-20 md:pb-0` on `<main>` creates 80px bottom clearance:
+- BottomNav bar height: ~56px
+- Safe area / padding: ~24px
+- Total: 80px (`pb-20` = 5rem = 80px)
+- Removed at `md+` where BottomNav is `md:hidden`
+
+#### Sidebar Collapse Animation
+
+```
+Expanded (w-64):  [Icon] [Label text]    →  full navigation with section headers
+Collapsed (w-16): [Icon]                 →  icons only, title attribute for tooltip
+Transition:       width 300ms ease (transition-all duration-300)
+Content area:     flex-1, automatically fills remaining space
+```
+
+#### MobileNav Drawer Animation
+
+```
+Opening:   translateX(-100%) → translateX(0)     (animate-slide-in-left, 300ms)
+Closing:   Instant unmount (component returns null when !open)
+Backdrop:  opacity 0 → 1 (bg-foreground/40 backdrop-blur-sm)
+```
+
+#### Focus & Accessibility States
+
+| Element | Focus style |
+|---------|------------|
+| Nav links | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2` |
+| BottomNav tabs | Same ring pattern |
+| BottomNav FAB | Same ring pattern |
+| Sidebar items | Same ring pattern |
+| Skip-to-content | `focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[999] focus:bg-primary focus:text-primary-foreground focus:shadow-lg` |
+| Hamburger button | `rounded-md hover:bg-muted` |
+
+#### Loading & Empty States
+
+| Context | Component | Behavior |
+|---------|-----------|----------|
+| Page transition | Layout skeleton | Header + Footer remain; content area shows `Skeleton` placeholders |
+| Empty search | `EmptyState` | Icon + "No results found" + "Try different keywords" CTA |
+| Empty dashboard | `EmptyState` | Icon + contextual message + primary action button |
+| Auth loading | `Spinner` | Centered spinner inside AuthLayout card |
+| Sidebar loading | Skeleton items | 3-4 skeleton rows matching sidebar item height |
+
+### Responsive Behavior Matrix
+
+Detailed element visibility across breakpoints:
+
+| Element | < 640px | 640–767px | 768–1023px | ≥ 1024px |
+|---------|---------|-----------|------------|----------|
+| Header logo (full) | hidden | visible | visible | visible |
+| Header logo (HM) | visible | hidden | hidden | hidden |
+| Desktop nav links | hidden | hidden | visible | visible |
+| Hamburger button | visible | visible | hidden | hidden |
+| UserMenu avatar | hidden | hidden | visible | visible |
+| BottomNav | visible | visible | hidden | hidden |
+| Sidebar | hidden | hidden | hidden | visible |
+| Footer (5-col) | 2-col | 2-col | 5-col | 5-col |
+| MobileNav drawer | available | available | hidden | hidden |
+| Skip-to-content | focus only | focus only | focus only | focus only |
+
+**Content grid columns:**
+
+| Pattern | < 640px | fashion-sm (640) | fashion-md (860) | fashion-xl (1400) |
+|---------|---------|------------------|------------------|-------------------|
+| Product grid | 2 | 3 | 4 | 5 |
+| Category grid | 2 | 3 | 4 | 4 |
+| Stats cards | 1 | 2 | 3 | 4 |
+| Related items | 2 | 2 | 4 | 5 |
+| Footer sections | 2 | 2 | 5 | 5 |
+
+**Container padding:**
+
+| Breakpoint | Horizontal padding |
+|-----------|-------------------|
+| Mobile | `px-4` (16px) |
+| `sm` (640px) | `px-6` (24px) |
+| `lg` (1024px) | `px-8` (32px) |
+
+### Container Component
+
+The `Container` component (`apps/web/src/components/Container.tsx`) provides the standard content wrapper:
+
+| Prop | Values | Effect |
+|------|--------|--------|
+| `size` | `default` (1280px), `narrow` (768px), `wide` (1600px), `full` (none) | Max-width preset |
+| `noPadding` | `true` | Removes horizontal padding for full-bleed sections |
+| `as` | `div`, `section`, `article` | Semantic HTML element |
+
+All containers apply responsive padding: `px-4` → `sm:px-6` → `lg:px-8`.
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/web/src/components/Container.tsx` | Redesigned with `size`, `noPadding`, `as` props + responsive padding |
+| `apps/web/src/components/layouts/PublicLayout.tsx` | Added BottomNav, `id="main-content"`, `pb-20` for BottomNav offset, `fullBleed`/`hideFooter` props |
+| `apps/web/src/components/layouts/DashboardLayout.tsx` | Added `overflow-hidden` body, `font-display` welcome banner, responsive `pb-20 lg:pb-0`, `hideWelcome` prop |
+| `apps/web/src/components/layouts/AuthLayout.tsx` | Rebranded "Marketplace" → "Habesha Market", `font-display` headings, `brand-ivory` gradient, `rounded-xl` card |
+
+### Architecture Decisions
+
+- **BottomNav offset strategy:** `pb-20 md:pb-0` on `<main>` creates 80px bottom clearance on mobile for the fixed BottomNav (56px bar + 24px safe area), hidden on `md+` where BottomNav is `md:hidden`
+- **Sidebar + content overflow:** Dashboard uses `flex overflow-hidden` on the body wrapper and `overflow-y-auto` on `<main>` so the sidebar stays fixed while content scrolls
+- **Skip-to-content:** An `sr-only` link in the Header becomes visible on focus and jumps to `id="main-content"` on both PublicLayout and DashboardLayout
+- **Auth pages are standalone:** No Header, Footer, or BottomNav — the auth card is the sole focus, with a back-link and minimal footer
+- **Container max-width:** Standardized at `max-w-7xl` (1280px) across all layouts. The Container component's `size` prop allows per-page overrides without duplicating responsive padding logic
+- **Mobile-first z-index:** Header and BottomNav share `z-sticky` (200). MobileNav drawer sits at `z-overlay` (300) with a backdrop, ensuring it layers above both
+- **Search filter responsive pattern:** Desktop (≥fashion-md) uses a sticky sidebar (`w-64 sticky top-20`) alongside the results grid. Mobile uses a slide-up Drawer (`z-modal` 400) triggered by a "Filters" button, keeping the search results uncluttered
+- **Listing detail responsive split:** Desktop (≥fashion-md) uses a 2-column layout (~55% image gallery / ~45% details). Mobile stacks vertically with full-width swipeable image gallery. Action buttons become full-width on mobile
+- **Dashboard table responsive strategy:** Tables use horizontal scroll on narrow screens (`overflow-x-auto`) rather than hiding columns. Stats cards adapt: 4-col desktop → 3-col tablet → 2-col mobile → 1-col small mobile
+- **Header transparent→solid pattern:** Only the homepage (`pathname === '/'`) starts transparent. All other pages are always solid. The transition is CSS-only (`transition-all duration-300`) triggered by `scrollY > 10`, avoiding JS layout thrashing
+- **Layout composition strategy:** PublicLayout wraps all public pages (home, search, listings, categories). DashboardLayout replaces PublicLayout for authenticated dashboard routes. AuthLayout is standalone for login/register. No layout nesting — each page selects exactly one layout context
+
+
 

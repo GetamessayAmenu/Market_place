@@ -14,6 +14,14 @@ const badgeVariants = cva({
       error: 'border-transparent bg-destructive/10 text-destructive',
       info: 'border-transparent bg-info/10 text-info',
       outline: 'text-foreground',
+      /* Marketplace action badges */
+      buy: 'border-transparent bg-action-buy/10 text-action-buy',
+      rent: 'border-transparent bg-action-rent/10 text-action-rent',
+      custom: 'border-transparent bg-action-custom/10 text-action-custom',
+      /* Marketplace status badges */
+      'new-arrival': 'border-transparent bg-brand-green/10 text-brand-green',
+      featured: 'border-transparent bg-brand-gold/15 text-brand-gold',
+      'sold-out': 'border-transparent bg-muted text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -22,7 +30,20 @@ const badgeVariants = cva({
 });
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'secondary' | 'success' | 'warning' | 'error' | 'info' | 'outline';
+  variant?:
+    | 'default'
+    | 'secondary'
+    | 'success'
+    | 'warning'
+    | 'error'
+    | 'info'
+    | 'outline'
+    | 'buy'
+    | 'rent'
+    | 'custom'
+    | 'new-arrival'
+    | 'featured'
+    | 'sold-out';
 }
 
 const Badge = forwardRef<HTMLDivElement, BadgeProps>(

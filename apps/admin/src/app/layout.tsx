@@ -1,19 +1,34 @@
-import '../styles/globals.css'
+import { Inter, Playfair_Display } from 'next/font/google'
 import React from 'react'
+
+import '../styles/globals.css'
 
 import AdminHeader from '../components/AdminHeader'
 import AdminSidebar from '../components/AdminSidebar'
 import Providers from '../providers/Providers'
 
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-body',
+})
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-display',
+})
+
 export const metadata = {
-  title: 'Marketplace Admin',
-  description: 'Administration panel for Marketplace',
+  title: 'Habesha Market Admin',
+  description: 'Administration panel for Ethiopian Fashion Marketplace',
 }
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+      <body className={inter.className}>
         <Providers>
           <div className="flex h-screen overflow-hidden">
             <AdminSidebar />

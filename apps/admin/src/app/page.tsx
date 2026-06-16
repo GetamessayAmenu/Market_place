@@ -1,49 +1,41 @@
 import React from 'react'
 
+import { fetchDashboardStats, fetchReportStats } from '../lib/adminApi'
 import { requireAdmin } from '../lib/authServer'
-import { serverGet } from '../lib/serverApi'
 
 interface StatCard {
   label: string
   value: number
   icon: React.ReactNode
   color: string
-  change?: string
-}
-
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  meta?: { total: number }
+  subtitle?: string
 }
 
 export default async function DashboardPage() {
   await requireAdmin()
 
-  let stats = { users: 0, sellers: 0, listings: 0, reports: 0 }
+  let userTotal = 0
+  let listingTotal = 0
+  let listingActive = 0
+  let reportPending = 0
+
   try {
-    const res = await serverGet<ApiResponse<typeof stats>>('/admin/stats')
-    stats = { ...stats, ...res.data }
+    const [dashStats, repStats] = await Promise.all([
+      fetchDashboardStats(),
+      fetchReportStats(),
+    ])
+    userTotal = dashStats.users.total
+    listingTotal = dashStats.listings.total
+    listingActive = dashStats.listings.active
+    reportPending = repStats.data.pending ?? dashStats.reports.pending
   } catch {
-    // best effort: try individual endpoints
-    try {
-      const u = await serverGet<ApiResponse<unknown> & { meta?: { total: number } }>('/users?page=1&limit=1')
-      stats.users = u.meta?.total ?? 0
-    } catch {
-      /* ignore */
-    }
-    try {
-      const l = await serverGet<ApiResponse<unknown> & { meta?: { total: number } }>('/listings?page=1&limit=1')
-      stats.listings = l.meta?.total ?? 0
-    } catch {
-      /* ignore */
-    }
+    // best effort: stats remain at 0
   }
 
   const statCards: StatCard[] = [
     {
       label: 'Total Users',
-      value: stats.users,
+      value: userTotal,
       color: 'bg-primary/10 text-primary',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -52,19 +44,10 @@ export default async function DashboardPage() {
       ),
     },
     {
-      label: 'Active Sellers',
-      value: stats.sellers,
-      color: 'bg-success/10 text-success',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z" />
-        </svg>
-      ),
-    },
-    {
       label: 'Total Listings',
-      value: stats.listings,
+      value: listingTotal,
       color: 'bg-info/10 text-info',
+      subtitle: String(listingActive) + ' active',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
@@ -73,7 +56,7 @@ export default async function DashboardPage() {
     },
     {
       label: 'Open Reports',
-      value: stats.reports,
+      value: reportPending,
       color: 'bg-destructive/10 text-destructive',
       icon: (
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -92,7 +75,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         {statCards.map((card) => (
           <div
             key={card.label}
@@ -104,8 +87,8 @@ export default async function DashboardPage() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
               <p className="text-2xl font-bold">{card.value.toLocaleString()}</p>
-              {card.change && (
-                <p className="text-xs text-success">{card.change}</p>
+              {card.subtitle && (
+                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
               )}
             </div>
           </div>

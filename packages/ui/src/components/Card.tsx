@@ -2,17 +2,26 @@ import React, { forwardRef } from 'react';
 
 import { cn } from '../lib/cn';
 
+export type CardVariant = 'default' | 'product' | 'designer';
+
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hover?: boolean;
+  variant?: CardVariant;
 }
 
+const variantClasses: Record<CardVariant, string> = {
+  default: 'rounded-lg border bg-card text-card-foreground shadow-sm',
+  product: 'rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden group',
+  designer: 'rounded-lg border bg-card text-card-foreground shadow-sm text-center',
+};
+
 const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className, hover, ...props }, ref) => (
+  ({ className, hover, variant = 'default', ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        'rounded-lg border bg-card text-card-foreground shadow-sm',
-        hover && 'transition-shadow hover:shadow-md cursor-pointer',
+        variantClasses[variant],
+        hover && 'transition-all duration-200 hover:shadow-lg cursor-pointer hover:-translate-y-0.5',
         className
       )}
       {...props}
@@ -56,4 +65,12 @@ const CardFooter = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 );
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
+/** Image wrapper for product cards — enforces 3:4 aspect ratio typical for fashion */
+const CardImage = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('relative aspect-[3/4] overflow-hidden', className)} {...props} />
+  )
+);
+CardImage.displayName = 'CardImage';
+
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardImage };

@@ -9,7 +9,7 @@ export interface ModalProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 const sizeClasses = {
@@ -17,6 +17,7 @@ const sizeClasses = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-xl',
+  full: 'max-w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]',
 };
 
 function Modal({ open, onClose, title, children, className, size = 'md' }: ModalProps) {
@@ -49,7 +50,7 @@ function Modal({ open, onClose, title, children, className, size = 'md' }: Modal
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in"
+      className="fixed inset-0 z-modal flex items-center justify-center bg-foreground/40 backdrop-blur-sm animate-fade-in"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
@@ -58,6 +59,7 @@ function Modal({ open, onClose, title, children, className, size = 'md' }: Modal
       <div
         className={cn(
           'w-full bg-background rounded-lg shadow-xl p-6 mx-4 animate-scale-in',
+          size === 'full' && 'flex flex-col overflow-hidden',
           sizeClasses[size],
           className
         )}
@@ -77,7 +79,9 @@ function Modal({ open, onClose, title, children, className, size = 'md' }: Modal
             </button>
           </div>
         )}
-        {children}
+        <div className={cn(size === 'full' && 'flex-1 overflow-y-auto')}>
+          {children}
+        </div>
       </div>
     </div>
   );

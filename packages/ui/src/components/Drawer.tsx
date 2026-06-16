@@ -10,10 +10,16 @@ export interface DrawerProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
-  width?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-function Drawer({ open, onClose, side = 'right', title, children, className, width = '320px' }: DrawerProps) {
+const sizeClasses = {
+  sm: '280px',
+  md: '380px',
+  lg: '520px',
+};
+
+function Drawer({ open, onClose, side = 'right', title, children, className, size = 'md' }: DrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
   const handleEscape = useCallback(
@@ -42,7 +48,7 @@ function Drawer({ open, onClose, side = 'right', title, children, className, wid
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50 animate-fade-in"
+      className="fixed inset-0 z-modal bg-foreground/40 backdrop-blur-sm animate-fade-in"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
@@ -55,7 +61,7 @@ function Drawer({ open, onClose, side = 'right', title, children, className, wid
           side === 'left' ? 'left-0 animate-slide-in-left' : 'right-0 animate-slide-in-right',
           className
         )}
-        style={{ width }}
+        style={{ width: sizeClasses[size] }}
       >
         {title && (
           <div className="flex items-center justify-between mb-4">

@@ -11,6 +11,7 @@ export interface SelectOption {
 export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   label?: string;
   error?: string;
+  success?: boolean;
   helperText?: string;
   options: SelectOption[];
   placeholder?: string;
@@ -24,7 +25,7 @@ const sizeClasses = {
 };
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, helperText, options, placeholder, size = 'md', id, ...props }, ref) => {
+  ({ className, label, error, success, helperText, options, placeholder, size = 'md', id, ...props }, ref) => {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-') ?? '';
 
     return (
@@ -38,10 +39,11 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full rounded-md border border-input bg-background ring-offset-background appearance-none',
+            'w-full rounded-md border border-input bg-background ring-offset-background appearance-none transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
             error && 'border-destructive focus-visible:ring-destructive',
+            success && !error && 'border-success focus-visible:ring-success',
             sizeClasses[size],
             className
           )}

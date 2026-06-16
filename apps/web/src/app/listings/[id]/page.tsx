@@ -356,8 +356,6 @@ export default async function ListingPage({ params }: Props) {
                   title={rel.title}
                   price={rel.price}
                   {...(rel.primaryImageUrl !== undefined && { imageUrl: rel.primaryImageUrl })}
-                  city={rel.city}
-                  condition={rel.condition}
                 />
               ))}
             </div>

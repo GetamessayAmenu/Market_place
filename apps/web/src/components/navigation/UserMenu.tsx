@@ -6,14 +6,29 @@ import React from 'react';
 import useAuth from '../../hooks/useAuth';
 import { logout } from '../../lib/authClient';
 
-const loggedInItems = [
+// ─── Menu items ───────────────────────────────────────────────────────────────
+
+const buyerItems = [
   { label: 'Dashboard', value: 'dashboard' },
   { label: 'My Profile', value: 'profile' },
+  { label: 'My Orders', value: 'orders' },
+  { label: 'My Rentals', value: 'rentals' },
+  { label: 'Custom Orders', value: 'custom-orders' },
   { label: 'Saved Listings', value: 'saved' },
   { label: 'Messages', value: 'messages' },
   { label: 'Account Settings', value: 'account' },
-  { label: 'Security', value: 'security' },
   { label: 'Notifications', value: 'notifications' },
+  { label: 'Sign Out', value: 'logout', destructive: true },
+];
+
+const sellerItems = [
+  { label: 'Dashboard', value: 'dashboard' },
+  { label: 'My Shop', value: 'seller' },
+  { label: 'My Listings', value: 'my-listings' },
+  { label: 'Orders', value: 'seller-orders' },
+  { label: 'Payouts', value: 'payouts' },
+  { label: 'Messages', value: 'messages' },
+  { label: 'Account Settings', value: 'account' },
   { label: 'Sign Out', value: 'logout', destructive: true },
 ];
 
@@ -25,14 +40,22 @@ const guestItems = [
 const routeMap: Record<string, string> = {
   dashboard: '/dashboard',
   profile: '/dashboard/profile',
+  orders: '/dashboard/orders',
+  rentals: '/dashboard/rentals',
+  'custom-orders': '/dashboard/custom-orders',
   saved: '/dashboard/saved',
   messages: '/dashboard/messages',
   account: '/dashboard/settings/account',
-  security: '/dashboard/settings/security',
   notifications: '/dashboard/settings/notifications',
+  seller: '/dashboard/seller',
+  'my-listings': '/dashboard/seller/listings',
+  'seller-orders': '/dashboard/seller/orders',
+  payouts: '/dashboard/seller/payouts',
   login: '/login',
   register: '/register',
 };
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function UserMenu() {
   const user = useAuth((s) => s.user);
@@ -55,17 +78,21 @@ export default function UserMenu() {
     }
   };
 
-  const items = user ? loggedInItems : guestItems;
+  const isSeller = user?.role === 'seller' || user?.role === 'admin';
+  const items = user ? (isSeller ? sellerItems : buyerItems) : guestItems;
 
   return (
     <Dropdown
       trigger={
         user ? (
-          <button className="flex items-center gap-2 rounded-full hover:ring-2 hover:ring-ring transition-all" aria-label="User menu">
+          <button
+            className="flex items-center gap-2 rounded-full transition-all hover:ring-2 hover:ring-brand-gold/40"
+            aria-label="User menu"
+          >
             <Avatar
               name={user.displayName}
               size="sm"
-              {...(user.avatarUrl !== null && { src: user.avatarUrl })}
+              {...(user.avatarUrl !== null ? { src: user.avatarUrl } : {})}
             />
           </button>
         ) : (
