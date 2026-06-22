@@ -1,13 +1,14 @@
+import { LISTINGS_SEARCH_INDEX_UID } from '@marketplace/config';
 import {
   Injectable,
   Logger,
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { LISTINGS_SEARCH_INDEX_UID } from '@marketplace/config';
-import { Meilisearch, type Index, type SearchParams } from 'meilisearch';
+import type { Meilisearch as MeilisearchType, Index, SearchParams } from 'meilisearch';
 
 import { ApiConfigService } from '../../infrastructure/config/api-config.service';
+
 import type { ListingSearchDocument } from './interfaces/listing-search-document.interface';
 
 const SEARCHABLE_ATTRIBUTES = [
@@ -55,7 +56,7 @@ export interface MeilisearchSearchResult<T extends Record<string, unknown>> {
 @Injectable()
 export class MeilisearchService implements OnModuleInit {
   private readonly logger = new Logger(MeilisearchService.name);
-  private client: Meilisearch | null = null;
+  private client: MeilisearchType | null = null;
   private index: Index | null = null;
 
   constructor(private readonly config: ApiConfigService) {}
@@ -70,9 +71,14 @@ export class MeilisearchService implements OnModuleInit {
       return;
     }
 
+    // Dynamic import — wrapped to prevent TS from compiling to require()
+    // since `meilisearch` is an ESM-only package.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<{ Meilisearch: new (opts: { host: string; apiKey: string }) => MeilisearchType }>;
+    const { Meilisearch } = await dynamicImport('meilisearch');
     this.client = new Meilisearch({
-      host: this.config.meilisearchHost!,
-      apiKey: this.config.meilisearchApiKey!,
+      host: this.config.meilisearchHost ?? '',
+      apiKey: this.config.meilisearchApiKey ?? '',
     });
 
     await this.ensureIndex();

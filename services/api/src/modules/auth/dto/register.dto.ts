@@ -1,5 +1,6 @@
 import {
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -28,5 +29,12 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  @Matches(/^(\+251|0)(9|7)\d{8}$/, {
+    message: 'Enter a valid Ethiopian phone number (e.g. 09XXXXXXXX or +2519XXXXXXXX)',
+  })
   phone?: string;
+
+  @IsOptional()
+  @IsIn(['buyer', 'seller'])
+  userType?: 'buyer' | 'seller';
 }

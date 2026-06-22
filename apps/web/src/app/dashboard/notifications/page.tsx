@@ -5,15 +5,9 @@ import NotificationsClient from '../../../components/dashboard/NotificationsClie
 import { requireUser } from '../../../lib/authServer'
 import { serverGet } from '../../../lib/serverApi'
 
-interface NotificationResponse {
-  success: boolean
-  data: { id: string; type: string; title: string; body: string }[]
-}
-
 export default async function NotificationsPage() {
   await requireUser()
-  const res = await serverGet<NotificationResponse>('/notifications')
-  const notifications = res.data
+  const notifications = await serverGet<{ id: string; type: string; title: string; body: string }[]>('/notifications')
 
   return (
     <Container>

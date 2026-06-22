@@ -1,5 +1,5 @@
 import type { ListingContactOptions } from '@marketplace/types';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import type { ListingWithRelations } from '../interfaces/listing-with-relations.interface';
 
@@ -44,6 +44,12 @@ export interface SerializedListing {
   readonly favoritesCount: number;
   readonly isFeatured: boolean;
   readonly contactOptions: ListingContactOptions | null;
+  readonly availableForPurchase: boolean;
+  readonly availableForRent: boolean;
+  readonly customOrderAvailable: boolean;
+  readonly rentalPricePerDay: number | null;
+  readonly rentalDeposit: number | null;
+  readonly attributes: Record<string, unknown> | null;
   readonly publishedAt: string | null;
   readonly expiresAt: string | null;
   readonly createdAt: string;
@@ -65,7 +71,12 @@ function parseContactOptions(value: unknown): ListingContactOptions | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  return value as ListingContactOptions;
+  return value;
+}
+
+function parseAttributes(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null;
+  return value as Record<string, unknown>;
 }
 
 export function serializeListing(
@@ -90,6 +101,12 @@ export function serializeListing(
     favoritesCount: listing._count?.favorites ?? 0,
     isFeatured: listing.isFeatured,
     contactOptions: parseContactOptions(listing.contactOptions),
+    availableForPurchase: listing.availableForPurchase,
+    availableForRent: listing.availableForRent,
+    customOrderAvailable: listing.customOrderAvailable,
+    rentalPricePerDay: decimalToNumber(listing.rentalPricePerDay),
+    rentalDeposit: decimalToNumber(listing.rentalDeposit),
+    attributes: parseAttributes(listing.attributes),
     publishedAt: listing.publishedAt?.toISOString() ?? null,
     expiresAt: listing.expiresAt?.toISOString() ?? null,
     createdAt: listing.createdAt.toISOString(),

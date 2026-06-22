@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AdminLogsModule } from '../admin-logs/admin-logs.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -8,7 +9,7 @@ import { VerificationAdminService } from './verification-admin.service';
 import { VerificationController } from './verification.controller';
 
 @Module({
-  imports: [AuthModule, NotificationsModule],
+  imports: [AuthModule, NotificationsModule, AdminLogsModule],
   controllers: [VerificationController],
   providers: [VerificationAdminService, RolesGuard],
   exports: [VerificationAdminService],

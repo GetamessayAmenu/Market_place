@@ -3,21 +3,26 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./slug": {
       "types": "./dist/slug/index.d.ts",
-      "import": "./dist/slug/index.js"
+      "import": "./dist/slug/index.js",
+      "require": "./dist/slug/index.js",
+      "default": "./dist/slug/index.js"
     },
     "./format": {
       "types": "./dist/format/index.d.ts",
-      "import": "./dist/format/index.js"
+      "import": "./dist/format/index.js",
+      "require": "./dist/format/index.js",
+      "default": "./dist/format/index.js"
     }
   },
   "scripts": {

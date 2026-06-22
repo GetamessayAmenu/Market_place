@@ -5,6 +5,10 @@ import Container from '../components/Container'
 import CategoryCard from '../components/marketplace/CategoryCard'
 import HeroSearch from '../components/marketplace/HeroSearch'
 import ListingCard from '../components/marketplace/ListingCard'
+import NewsletterForm from '../components/marketplace/NewsletterForm'
+import ProductCarousel from '../components/marketplace/ProductCarousel'
+import QuickCategoryBar from '../components/marketplace/QuickCategoryBar'
+import SellerCard from '../components/marketplace/SellerCard'
 import { serverGet } from '../lib/serverApi'
 
 interface ListingData {
@@ -14,7 +18,9 @@ interface ListingData {
   condition: string
   city: string
   primaryImageUrl?: string | null
+  images?: { id: string; url: string; sortOrder: number }[]
   isFeatured?: boolean
+  listingType?: 'buy' | 'rent' | 'custom'
 }
 
 interface CategoryData {
@@ -27,43 +33,56 @@ interface CategoryData {
   children?: CategoryData[]
 }
 
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  meta?: { total: number; page: number; limit: number; totalPages: number }
+interface SellerData {
+  id: string
+  name: string
+  avatarUrl?: string | null
+  city?: string
+  emailVerifiedAt?: string | null
+  phoneVerifiedAt?: string | null
 }
 
 export function generateMetadata() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
   return {
-    title: 'Marketplace — Buy and Sell Locally',
-    description: 'Find great local deals. Buy and sell with confidence on our marketplace.',
+    title: 'Ethiopian Fashion Marketplace — Buy, Rent & Custom Order',
+    description: 'Discover Ethiopian fashion. Buy ready-to-wear, rent for special occasions, or order custom-made outfits from talented designers.',
     openGraph: {
-      title: 'Marketplace — Buy and Sell Locally',
-      description: 'Find great local deals. Buy and sell with confidence on our marketplace.',
+      title: 'Ethiopian Fashion Marketplace — Buy, Rent & Custom Order',
+      description: 'Discover Ethiopian fashion. Buy ready-to-wear, rent for special occasions, or order custom-made outfits.',
       url: siteUrl,
-      siteName: 'Marketplace',
+      siteName: 'Ethiopian Fashion Marketplace',
       type: 'website',
     },
   }
+}
+
+function listingImageUrl(listing: ListingData): string | null {
+  return listing.primaryImageUrl ?? listing.images?.[0]?.url ?? null
 }
 
 export default async function HomePage() {
   let featuredListings: ListingData[] = []
   let recentListings: ListingData[] = []
   let categories: CategoryData[] = []
+  let allCategories: CategoryData[] = []
+  let sellers: SellerData[] = []
 
   try {
-    const [featuredRes, recentRes, categoriesRes] = await Promise.allSettled([
-      serverGet<ApiResponse<ListingData[]>>('/listings', {
+    const [featuredRes, recentRes, categoriesRes, sellersRes] = await Promise.allSettled([
+      serverGet<{ data: ListingData[]; meta: { totalItems: number } }>('/listings', {
         revalidate: 60,
         params: { featured: 'true', limit: 8 },
       }),
-      serverGet<ApiResponse<ListingData[]>>('/listings', {
+      serverGet<{ data: ListingData[]; meta: { totalItems: number } }>('/listings', {
         revalidate: 60,
-        params: { sortBy: 'newest', limit: 12 },
+        params: { sortBy: 'newest', limit: 10 },
       }),
-      serverGet<ApiResponse<CategoryData[]>>('/categories', { revalidate: 120 }),
+      serverGet<CategoryData[]>('/categories', { revalidate: 120 }),
+      serverGet<SellerData[]>('/users', {
+        revalidate: 120,
+        params: { role: 'seller', limit: 6, verified: 'true' },
+      }),
     ])
 
     if (featuredRes.status === 'fulfilled') {
@@ -73,29 +92,37 @@ export default async function HomePage() {
       recentListings = recentRes.value.data
     }
     if (categoriesRes.status === 'fulfilled') {
-      // Filter to top-level categories for the grid
-      const allCats = categoriesRes.value.data
-      categories = allCats.filter((c) => !c.parentId)
+      allCategories = categoriesRes.value
+      categories = allCategories.filter((c) => !c.parentId)
+    }
+    if (sellersRes.status === 'fulfilled') {
+      sellers = sellersRes.value
     }
   } catch {
-    // Graceful fallback — show empty state sections
+    // Graceful fallback
   }
+
+  // Extract subcategory pills from first few parent categories
+  const subcategoryPills = allCategories
+    .filter((c) => c.parentId)
+    .slice(0, 12)
 
   return (
     <>
+      {/* Section 1 & 2: Hero + Search Bar */}
       <HeroSearch />
 
       <Container>
-        {/* Featured Listings */}
-        {featuredListings.length > 0 && (
+        {/* Section 4: Featured Listings */}
+        {featuredListings.length > 0 ? (
           <section className="py-12">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground">Featured Listings</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Featured Collections</h2>
               <Link
                 href="/search?featured=true"
                 className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
               >
-                View all
+                View all &rarr;
               </Link>
             </div>
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -105,23 +132,24 @@ export default async function HomePage() {
                   id={listing.id}
                   title={listing.title}
                   price={listing.price}
-                  {...(listing.primaryImageUrl !== undefined && { imageUrl: listing.primaryImageUrl })}
+                  {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
+                  {...(listing.listingType ? { listingType: listing.listingType } : {})}
                 />
               ))}
             </div>
           </section>
-        )}
+        ) : null}
 
-        {/* Categories Grid */}
-        {categories.length > 0 && (
+        {/* Section 3: Categories */}
+        {categories.length > 0 ? (
           <section className="py-12">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground">Browse Categories</h2>
+              <h2 className="font-display text-2xl font-bold text-foreground">Browse Categories</h2>
               <Link
                 href="/search"
                 className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
               >
-                Browse all
+                Browse all &rarr;
               </Link>
             </div>
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -130,34 +158,67 @@ export default async function HomePage() {
                   key={cat.id}
                   slug={cat.slug}
                   name={cat.name}
-                  {...(cat.imageUrl !== undefined && { imageUrl: cat.imageUrl })}
-                  {...(cat._count?.listings !== undefined && { listingCount: cat._count.listings })}
+                  {...(cat.imageUrl ? { imageUrl: cat.imageUrl } : {})}
+                  {...(cat._count?.listings !== undefined ? { listingCount: cat._count.listings } : {})}
                 />
               ))}
             </div>
+            {subcategoryPills.length > 0 ? (
+              <div className="mt-6">
+                <QuickCategoryBar categories={subcategoryPills} />
+              </div>
+            ) : null}
           </section>
-        )}
+        ) : null}
 
-        {/* Recent Listings */}
+        {/* Section 5: Trending Designers */}
+        {sellers.length > 0 ? (
+          <section className="py-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-display text-2xl font-bold text-foreground">Trending Designers</h2>
+              <Link
+                href="/search"
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                View all &rarr;
+              </Link>
+            </div>
+            <ProductCarousel variant="featured">
+              {sellers.map((seller) => (
+                <SellerCard
+                  key={seller.id}
+                  id={seller.id}
+                  name={seller.name}
+                  {...(seller.avatarUrl ? { avatarUrl: seller.avatarUrl } : {})}
+                  verified={Boolean(seller.emailVerifiedAt ?? seller.phoneVerifiedAt)}
+                  {...(seller.city ? { location: seller.city } : {})}
+                />
+              ))}
+            </ProductCarousel>
+          </section>
+        ) : null}
+
+        {/* Section 6: New Arrivals */}
         <section className="py-12">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-foreground">Recent Listings</h2>
+            <h2 className="font-display text-2xl font-bold text-foreground">New Arrivals</h2>
             <Link
               href="/search?sortBy=newest"
               className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
             >
-              View all
+              View all &rarr;
             </Link>
           </div>
           {recentListings.length > 0 ? (
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
               {recentListings.map((listing) => (
                 <ListingCard
                   key={listing.id}
                   id={listing.id}
                   title={listing.title}
                   price={listing.price}
-                  {...(listing.primaryImageUrl !== undefined && { imageUrl: listing.primaryImageUrl })}
+                  {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
+                  {...(listing.listingType ? { listingType: listing.listingType } : {})}
                 />
               ))}
             </div>
@@ -172,6 +233,126 @@ export default async function HomePage() {
               </Link>
             </div>
           )}
+        </section>
+
+        {/* Testimonials */}
+        <section className="py-12" aria-labelledby="testimonials-heading">
+          <h2 id="testimonials-heading" className="font-display text-2xl font-bold text-foreground text-center mb-10">
+            What Our Customers Say
+          </h2>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-xl border bg-card p-6">
+              <div className="flex items-center gap-1 mb-3 text-brand-gold">
+                {[1,2,3,4,5].map((s) => (
+                  <svg key={s} className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground italic">&ldquo;I ordered a custom Habesha Kemis for my wedding and it was absolutely stunning. The designer was attentive and the fit was perfect.&rdquo;</p>
+              <p className="mt-4 text-sm font-semibold text-card-foreground">— Sara M., Addis Ababa</p>
+            </div>
+            <div className="rounded-xl border bg-card p-6">
+              <div className="flex items-center gap-1 mb-3 text-brand-gold">
+                {[1,2,3,4,5].map((s) => (
+                  <svg key={s} className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground italic">&ldquo;Renting a suit for my graduation was so easy and affordable. The quality was top-notch and delivery was on time.&rdquo;</p>
+              <p className="mt-4 text-sm font-semibold text-card-foreground">— Dawit K., Bahir Dar</p>
+            </div>
+            <div className="rounded-xl border bg-card p-6">
+              <div className="flex items-center gap-1 mb-3 text-brand-gold">
+                {[1,2,3,4,5].map((s) => (
+                  <svg key={s} className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground italic">&ldquo;As a designer, this platform has helped me reach customers across Ethiopia. The custom order system is a game changer.&rdquo;</p>
+              <p className="mt-4 text-sm font-semibold text-card-foreground">— Hana T., Designer</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Trust Badges */}
+        <section className="py-12" aria-labelledby="trust-heading">
+          <h2 id="trust-heading" className="sr-only">Why Choose Us</h2>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/30">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-card-foreground text-sm">Verified Sellers</p>
+                <p className="text-xs text-muted-foreground">All designers are verified</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-card-foreground text-sm">Secure Payments</p>
+                <p className="text-xs text-muted-foreground">Protected transactions</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-gold/10 text-brand-gold">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.613-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-card-foreground text-sm">Quality Reviews</p>
+                <p className="text-xs text-muted-foreground">Honest buyer feedback</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-wine/10 text-brand-wine">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-semibold text-card-foreground text-sm">Ethiopian Made</p>
+                <p className="text-xs text-muted-foreground">Support local artisans</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA + Newsletter */}
+        <section className="py-12">
+          <div className="rounded-2xl bg-gradient-to-r from-brand-gold/10 via-brand-wine/10 to-primary/10 p-8 md:p-12 text-center">
+            <h2 className="font-display text-2xl font-bold text-foreground">Ready to Showcase Your Style?</h2>
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto">
+              Whether you are a designer looking to sell your creations or a fashion lover seeking something unique, join our marketplace today.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3 justify-center">
+              <Link
+                href="/search"
+                className="rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Explore Fashion
+              </Link>
+              <Link
+                href="/dashboard/seller"
+                className="rounded-lg border bg-card px-6 py-3 text-sm font-medium text-card-foreground transition-colors hover:bg-accent"
+              >
+                Start Selling
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 11: Newsletter */}
+        <section className="py-12 rounded-2xl bg-brand-gold/5 px-6 md:px-12 text-center">
+          <h2 className="font-display text-2xl font-bold text-foreground mb-3">Stay in Style</h2>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            Get the latest fashion drops, designer spotlights, and exclusive rental deals delivered to your inbox.
+          </p>
+          <NewsletterForm />
         </section>
       </Container>
     </>

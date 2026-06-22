@@ -85,6 +85,24 @@ export class ListingsService {
       ...(dto.contactOptions !== undefined
         ? { contactOptions: dto.contactOptions as Prisma.InputJsonValue }
         : {}),
+      ...(dto.availableForPurchase !== undefined
+        ? { availableForPurchase: dto.availableForPurchase }
+        : {}),
+      ...(dto.availableForRent !== undefined
+        ? { availableForRent: dto.availableForRent }
+        : {}),
+      ...(dto.customOrderAvailable !== undefined
+        ? { customOrderAvailable: dto.customOrderAvailable }
+        : {}),
+      ...(dto.rentalPricePerDay !== undefined
+        ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
+        : {}),
+      ...(dto.rentalDeposit !== undefined
+        ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }
+        : {}),
+      ...(dto.attributes !== undefined
+        ? { attributes: dto.attributes as Prisma.InputJsonValue }
+        : {}),
       publishedAt: now,
       expiresAt,
       images: this.normalizeImages(dto.images),
@@ -228,6 +246,24 @@ export class ListingsService {
         : {}),
       ...(dto.isFeatured !== undefined && canModerateListings(user)
         ? { isFeatured: dto.isFeatured }
+        : {}),
+      ...(dto.availableForPurchase !== undefined
+        ? { availableForPurchase: dto.availableForPurchase }
+        : {}),
+      ...(dto.availableForRent !== undefined
+        ? { availableForRent: dto.availableForRent }
+        : {}),
+      ...(dto.customOrderAvailable !== undefined
+        ? { customOrderAvailable: dto.customOrderAvailable }
+        : {}),
+      ...(dto.rentalPricePerDay !== undefined
+        ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
+        : {}),
+      ...(dto.rentalDeposit !== undefined
+        ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }
+        : {}),
+      ...(dto.attributes !== undefined
+        ? { attributes: dto.attributes as Prisma.InputJsonValue }
         : {}),
     };
 

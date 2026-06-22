@@ -11,11 +11,13 @@ import { AdminLogsService } from './modules/admin-logs/admin-logs.service';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HealthModule } from './modules/health/health.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SearchModule } from './modules/search/search.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { VerificationModule } from './modules/verification/verification.module';
@@ -34,6 +36,8 @@ import { VerificationModule } from './modules/verification/verification.module';
     ReportsModule,
     AnalyticsModule,
     VerificationModule,
+    CustomOrdersModule,
+    ReviewsModule,
   ],
   controllers: [AppController, AdminLogsController],
   providers: [

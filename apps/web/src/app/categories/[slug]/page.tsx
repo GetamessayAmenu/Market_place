@@ -45,10 +45,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   try {
-    const res = await serverGet<{ success: boolean; data: CategoryData }>(`/categories/${params.slug}`, {
+    const res = await serverGet<CategoryData>(`/categories/${params.slug}`, {
       revalidate: 120,
     })
-    const cat = res.data
+    const cat = res
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
       title: `${cat.name} — Marketplace`,
@@ -75,7 +75,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   try {
     const [categoryRes, listingsRes] = await Promise.allSettled([
-      serverGet<{ success: boolean; data: CategoryData }>(`/categories/${slug}`, { revalidate: 120 }),
+      serverGet<CategoryData>(`/categories/${slug}`, { revalidate: 120 }),
       serverGet<PaginatedResponse<ListingData>>('/listings', {
         revalidate: 60,
         params: { categorySlug: slug, page: currentPage, limit: 12 },
@@ -83,7 +83,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     ])
 
     if (categoryRes.status === 'fulfilled') {
-      category = categoryRes.value.data
+      category = categoryRes.value
     }
     if (listingsRes.status === 'fulfilled') {
       listings = listingsRes.value.data

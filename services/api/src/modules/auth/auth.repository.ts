@@ -15,6 +15,13 @@ export class AuthRepository {
     return count > 0;
   }
 
+  async phoneExists(phone: string): Promise<boolean> {
+    const count = await this.prisma.user.count({
+      where: { phone, deletedAt: null },
+    });
+    return count > 0;
+  }
+
   async createUser(params: {
     email: string;
     passwordHash: string;

@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 20 — Global Application Layout + UX Architecture Specification (2026-06-16)
+**Last updated:** Phase 21 — UX Wireframe Specification (Ethiopian Fashion Marketplace) (2026-06-16)
 
 ---
 
@@ -22,8 +22,9 @@ Living record of implementation progress. Updated after each phase.
 | Seller Dashboard & Listing Management | Full seller experience with CRUD, stats, image upload (Phase 17) |
 | Admin Experience & Moderation UX | Complete admin platform with moderation, verification, analytics, audit (Phase 19) |
 | Global Application Layout | Responsive layout system: Public, Dashboard, Auth layouts with comprehensive wireframe specs, component specifications, interaction states, and responsive behavior matrix (Phase 20) |
+| UX Wireframe Specification | Complete UX spec for Ethiopian Fashion Marketplace: 12 homepage sections, search & filter UX, product detail page with Buy/Rent/Custom Order flows, responsive rules, component catalog, and data model extensions (Phase 21) |
 
-**Next:** Phase 21 — Testing & Deployment Preparation
+**Next:** Phase 22 — Implementation (Marketplace Pages + Custom Order Flow)
 
 ---
 
@@ -2159,5 +2160,1311 @@ All containers apply responsive padding: `px-4` → `sm:px-6` → `lg:px-8`.
 - **Header transparent→solid pattern:** Only the homepage (`pathname === '/'`) starts transparent. All other pages are always solid. The transition is CSS-only (`transition-all duration-300`) triggered by `scrollY > 10`, avoiding JS layout thrashing
 - **Layout composition strategy:** PublicLayout wraps all public pages (home, search, listings, categories). DashboardLayout replaces PublicLayout for authenticated dashboard routes. AuthLayout is standalone for login/register. No layout nesting — each page selects exactly one layout context
 
+---
+
+## Phase 21 — UX Wireframe Specification (Ethiopian Fashion Marketplace)
+
+### Summary
+Complete UX wireframe specification for the Habesha Market Ethiopian Fashion Marketplace covering all three business models (Buy, Rent, Custom Order), 12 homepage sections, search & filter UX, product detail page with three purchase flows, and responsive behavior rules. This specification is implementation-ready for UI designers and frontend developers, built on the existing design system and component architecture.
+
+---
+
+### 1. Business Model & Category Architecture
+
+#### Business Models
+
+| Model | Description | Badge Color | Action Token | Entry Point |
+|-------|-------------|-------------|-------------|-------------|
+| **Buy** | Purchase the item as-is | Green | `--buy` (155 60% 35%) | Listing card, Product Detail Page |
+| **Rent** | Rent the item for a period | Gold | `--rent` (38 80% 55%) | Listing card, Product Detail Page |
+| **Custom Order** | Request a custom-made version | Wine | `--custom` (345 50% 35%) | Product Detail Page only (NOT a separate category) |
+
+**Critical rule:** Custom Order is a *listing capability*, not a marketplace category. A seller enables it per-listing (`customOrderAvailable = true`). The buyer discovers it on the Product Detail Page when clicking "Order Now".
+
+#### Seller Listing Fields (per listing)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `availableForPurchase` | boolean | Yes | Enable/disable Buy flow |
+| `availableForRent` | boolean | Yes | Enable/disable Rent flow |
+| `rentalPricePerDay` | decimal | If rent enabled | Daily rental rate |
+| `maxRentalDays` | int | If rent enabled | Maximum rental duration |
+| `customOrderAvailable` | boolean | Yes | Enable/disable Custom Order flow |
+| `customOrderBasePrice` | decimal | If custom enabled | Starting price for custom orders |
+| `customOrderLeadTimeDays` | int | If custom enabled | Estimated production days |
+
+#### Product Badges (on ListingCard & PDP)
+
+```
+ListingCard overlay positions:
+┌──────────────────┐
+│ [New/Featured]   │  ← top-left (status badge)
+│                  │
+│                  │
+│                  │
+│ [Buy] [Rent]     │  ← bottom-left (action tags, stacked)
+│ [Custom Avail.]  │
+└──────────────────┘
+
+Badge stacking: Max 3 tags. If all 3 enabled:
+  Row 1: [Buy] [Rent]  (side by side)
+  Row 2: [Custom Order Available]  (full width, wine variant)
+```
+
+#### Main Categories (Admin-managed, seed data)
+
+| Category | Slug | Icon | Description |
+|----------|------|------|-------------|
+| Women's Fashion | `women` | Dress silhouette | Dresses, traditional, modern, accessories |
+| Men's Fashion | `men` | Suit silhouette | Suits, traditional, casual, accessories |
+| Baby & Kids Fashion | `kids` | Child silhouette | Baby, toddler, youth clothing |
+
+**Subcategories are dynamic** (CRUD by Admin). The system supports unlimited nesting via `Category.parentId` (self-referential). The homepage showcases top-level categories; subcategories appear on category landing pages and in filter dropdowns.
+
+---
+
+### 2. Homepage Wireframe
+
+#### Section 1: Hero
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Instant brand recognition. Communicate the three business models. Drive search engagement. |
+| **Layout** | Full-bleed (`Container size="full"`) with centered content. `bg-brand-ivory/5` background. |
+| **Components** | `SearchBar` (variant="hero"), `Button` (3 CTAs) |
+| **Height** | `py-16 md:py-24 lg:py-32` |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│          Discover Ethiopia's                                │  ← text-display-lg, font-display
+│          Finest Fashion                                     │
+│                                                             │
+│          Buy · Rent · Custom Order                          │  ← subtitle, text-lg, muted
+│                                                             │
+│     ┌─────────────────────────────────────────────┐        │
+│     │  Search habesha dresses, rentals...       🔍 │        │  ← SearchBar variant="hero"
+│     └─────────────────────────────────────────────┘        │
+│                                                             │
+│     [Shop Now]  [Rent Fashion]  [Custom Order]             │  ← 3 CTAs: primary, outline, outline-wine
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+Tablet:
+  Hero height reduces to py-16. Title: text-4xl.
+  SearchBar max-w-lg. CTAs remain inline.
+
+Mobile:
+  Hero height: py-12. Title: text-3xl (stacked).
+  SearchBar full-width. CTAs stack vertically (full-width buttons).
+  Subtitle: text-base.
+```
+
+**Quick category links** (below hero, above content):
+```
+Desktop:  [Women's Fashion]  [Men's Fashion]  [Baby & Kids]  (3 pills, centered, gap-4)
+Tablet:   Same, centered row
+Mobile:   Horizontal scroll pills (overflow-x-auto, snap-x)
+```
+
+#### Section 2: Search Bar
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Primary discovery mechanism. Quick keyword entry leading to search results. |
+| **Layout** | Centered within Hero section. Max-width `max-w-xl`. |
+| **Components** | `SearchBar` (variant="hero") with 300ms debounce |
+| **Behavior** | On submit → `/search?q={query}`. Autocomplete suggestions (future). |
+
+The SearchBar is embedded inside the Hero section (Section 1), not a standalone section.
+
+#### Section 3: Categories
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Browse by main category. Visual entry point to category hierarchies. |
+| **Layout** | `Container size="default"`. Grid layout. |
+| **Components** | `CategoryCard` (variant="standard"), section header with "See all" link |
+| **Spacing** | `py-12` section padding, `gap-4` card gap |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  Shop by Category                                    See all │
+│  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐  │
+│  │                │ │                │ │                │  │
+│  │  Women's       │ │  Men's         │ │  Baby & Kids   │  │
+│  │  Fashion       │ │  Fashion       │ │  Fashion       │  │
+│  │  (3:2 image)   │ │  (3:2 image)   │ │  (3:2 image)   │  │
+│  │  142 listings  │ │  98 listings   │ │  56 listings   │  │
+│  └────────────────┘ └────────────────┘ └────────────────┘  │
+│                                                             │
+│  Popular Subcategories:                                     │
+│  [Habesha Dress] [Suits] [Kids Traditional] [Accessories]  │
+└─────────────────────────────────────────────────────────────┘
+
+  Grid: grid-cols-3 gap-6 desktop, grid-cols-3 gap-4 tablet, grid-cols-1 gap-4 mobile
+  Each CategoryCard: variant="standard", aspect-[3/2], font-display name, listing count
+  Popular subcategories: horizontal scroll of Tag components (variant="outline")
+
+Tablet:
+  3-col grid (same as desktop), reduced gap. Subcategories: same horizontal scroll.
+
+Mobile:
+  Single-column stack or 2-col compact. CategoryCard variant="wide" (aspect-[2/1]) for compact view.
+  Subcategories: horizontal scroll with snap-x.
+```
+
+#### Section 4: Featured Listings
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Showcase curated/promoted listings. Drive engagement with premium content. |
+| **Layout** | `Container size="default"`. ProductGrid variant="featured" or carousel. |
+| **Components** | `ListingCard`, `ProductCarousel` or `ProductGrid`, section header |
+| **Data source** | `GET /listings?featured=true&limit=10` |
+| **Spacing** | `py-12` section padding |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  Featured Designs                                   See all │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
+│  │  Card    │ │  Card    │ │  Card    │ │  Card    │      │
+│  │  3:4     │ │  3:4     │ │  3:4     │ │  3:4     │      │
+│  │  [Buy]   │ │  [Rent]  │ │  [Custom]│ │  [Buy]   │      │
+│  │  ♥       │ │  ♥       │ │  ♥       │ │  ♥       │      │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
+│  ProductGrid variant="featured" (3-col) or carousel        │
+└─────────────────────────────────────────────────────────────┘
+
+  Grid: fashion-md:grid-cols-3 fashion-xl:grid-cols-4 gap-6
+  Cards: ListingCard with all badges (buy/rent/custom), favorite button, designer avatar
+  "Featured" gold ring on cards (ring-1 ring-brand-gold/40)
+
+Tablet:
+  3-col grid or carousel showing 3 cards.
+
+Mobile:
+  ProductCarousel (horizontal scroll-snap, card min-w-[200px]).
+  Swipe left/right. No arrows (touch only).
+```
+
+#### Section 5: Trending Designers
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Promote top sellers. Build trust through designer profiles. |
+| **Layout** | `Container size="default"`. Horizontal carousel of SellerCard. |
+| **Components** | `SellerCard`, `ProductCarousel` (as carousel wrapper) |
+| **Data source** | Top sellers by rating + listing count |
+| **Spacing** | `py-12` section padding |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  Trending Designers                                See all  │
+│  ◄ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ►   │
+│    │ [Avatar]      │ │ [Avatar]      │ │ [Avatar]      │   │
+│    │ Sara Design   │ │ Beza Tailors  │ │ Luna Boutique │   │
+│    │ ★★★★★ (48)    │ │ ★★★★☆ (32)    │ │ ★★★★★ (67)    │   │
+│    │ Designer      │ │ Tailor        │ │ Boutique      │   │
+│    │ Addis Ababa   │ │ Bahir Dar     │ │ Addis Ababa   │   │
+│    │ [Habesha] [..]│ │ [Suits] [..]  │ │ [Accessories] │   │
+│    └──────────────┘ └──────────────┘ └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+
+  SellerCard: variant="designer"/"tailor"/"boutique"/"rental-shop"
+  Carousel: ProductCarousel with scroll-snap, min-w-[280px] per card
+  Desktop arrows visible (md+). Touch swipe on mobile.
+
+Tablet:
+  2-3 cards visible in carousel viewport.
+
+Mobile:
+  Single-card scroll-snap. Cards stack vertically as alternative (no carousel).
+```
+
+#### Section 6: New Arrivals
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Freshness signal. Encourage repeat visits. |
+| **Layout** | `Container size="default"`. Standard ProductGrid. |
+| **Components** | `ListingCard`, `ProductGrid` (variant="standard") |
+| **Data source** | `GET /listings?sortBy=newest&limit=10` |
+| **Spacing** | `py-12` section padding |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  New Arrivals                                        See all│
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐                 │
+│  │Card │ │Card │ │Card │ │Card │ │Card │  ← 5-col grid    │
+│  │3:4  │ │3:4  │ │3:4  │ │3:4  │ │3:4  │    fashion-xl   │
+│  │[New]│ │     │ │     │ │     │ │     │                   │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘                 │
+└─────────────────────────────────────────────────────────────┘
+
+  Grid: ProductGrid variant="standard" (2→3→4→5 cols)
+  First few cards get "New" badge (Badge variant="new-arrival")
+
+Tablet:
+  4-col grid (fashion-md).
+
+Mobile:
+  2-col grid. Compact cards with truncated titles.
+```
+
+#### Section 7: Rental Highlights
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Showcase the rental model. Drive awareness of affordable fashion access. |
+| **Layout** | `Container size="default"`. Split layout: editorial left + cards right. |
+| **Components** | `ListingCard`, `PriceTag` (rent variant), `Button` (variant="rent") |
+| **Data source** | `GET /listings?type=rent&featured=true&limit=4` |
+| **Spacing** | `py-12` section padding |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  ┌─────────────────────┐  ┌────────────────────────────┐   │
+│  │                     │  │                            │   │
+│  │  Rent the Look      │  │  ┌──────┐ ┌──────┐        │   │
+│  │                     │  │  │ Card │ │ Card │        │   │
+│  │  Why buy when you   │  │  │ Rent │ │ Rent │        │   │
+│  │  can rent? Perfect  │  │  │ETB   │ │ETB   │        │   │
+│  │  for weddings,      │  │  │350/  │ │500/  │        │   │
+│  │  events, and        │  │  │day   │ │day   │        │   │
+│  │  special occasions. │  │  └──────┘ └──────┘        │   │
+│  │                     │  │  ┌──────┐ ┌──────┐        │   │
+│  │  [Browse Rentals →] │  │  │ Card │ │ Card │        │   │
+│  │                     │  │  └──────┘ └──────┘        │   │
+│  └─────────────────────┘  └────────────────────────────┘   │
+│  Left: 40% width. Right: 60% width. 2x2 card grid.        │
+└─────────────────────────────────────────────────────────────┘
+
+  Left column: bg-brand-gold/5, rounded-xl, p-8
+    Title: text-display-md font-display
+    CTA: Button variant="rent"
+  Right column: grid-cols-2 gap-4
+    Cards show PriceTag variant="rent" with daily rate
+    Gold accent border on rent cards
+
+Tablet:
+  Stacked: editorial top (full-width), cards bottom (2x2 grid).
+
+Mobile:
+  Stacked: editorial top, ProductCarousel of rent cards (horizontal scroll).
+```
+
+#### Section 8: Custom Design Showcase
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Highlight the custom order capability. Differentiate from competitors. |
+| **Layout** | `Container size="default"`. Editorial split (reverse of Rental). |
+| **Components** | `ListingCard` (with custom badge), `Button` (variant="custom"), `Tag` (custom) |
+| **Data source** | `GET /listings?customOrderAvailable=true&featured=true&limit=4` |
+| **Spacing** | `py-12` section padding |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  ┌────────────────────────────┐  ┌─────────────────────┐   │
+│  │                            │  │                     │   │
+│  │  ┌──────┐ ┌──────┐        │  │  Your Vision,       │   │
+│  │  │ Card │ │ Card │        │  │  Their Craft         │   │
+│  │  │Custom│ │Custom│        │  │                     │   │
+│  │  │Avail.│ │Avail.│        │  │  Order custom-made   │   │
+│  │  └──────┘ └──────┘        │  │  fashion tailored    │   │
+│  │  ┌──────┐ ┌──────┐        │  │  to your exact       │   │
+│  │  │ Card │ │ Card │        │  │  measurements and    │   │
+│  │  │Custom│ │Custom│        │  │  preferences.        │   │
+│  │  │Avail.│ │Avail.│        │  │                     │   │
+│  │  └──────┘ └──────┘        │  │  [Explore Custom →] │   │
+│  │                            │  │                     │   │
+│  └────────────────────────────┘  └─────────────────────┘   │
+│  Left: 60% width. Right: 40% width (bg-brand-wine/5).     │
+└─────────────────────────────────────────────────────────────┘
+
+  Right column: bg-brand-wine/5, rounded-xl, p-8
+    Title: text-display-md font-display
+    CTA: Button variant="custom"
+  Left column: grid-cols-2 gap-4
+    Cards show "Custom Order Available" badge (Tag variant="custom")
+    Wine accent ring on custom-enabled cards
+
+Tablet:
+  Stacked: cards top (2x2 grid), editorial bottom.
+
+Mobile:
+  Stacked: cards as ProductCarousel, editorial below.
+```
+
+#### Section 9: How It Works
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Onboard new users. Explain the three business models clearly. |
+| **Layout** | `Container size="default"`. 3-column cards with icons. |
+| **Components** | `Card`, `Button`, icon illustrations |
+| **Spacing** | `py-16` (slightly more vertical space for emphasis) |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│                    How It Works                              │
+│                                                             │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐│
+│  │   [🛍 icon]    │  │   [👗 icon]    │  │   [✂️ icon]    ││
+│  │                │  │                │  │                ││
+│  │  Buy Fashion   │  │  Rent Fashion  │  │  Custom Order  ││
+│  │                │  │                │  │                ││
+│  │  Browse and    │  │  Rent designer │  │  Work directly ││
+│  │  purchase      │  │  outfits for   │  │  with designers││
+│  │  directly from │  │  events and    │  │  to create your││
+│  │  designers and │  │  occasions at  │  │  dream outfit  ││
+│  │  boutiques.    │  │  a fraction.   │  │  from scratch. ││
+│  │                │  │                │  │                ││
+│  │ [Shop Now →]   │  │ [Browse Rentals]│ │ [Learn More →] ││
+│  └────────────────┘  └────────────────┘  └────────────────┘│
+│                                                             │
+│  Grid: grid-cols-3 gap-8 desktop                           │
+│  Cards: bg-card, rounded-xl, p-8, shadow-sm                │
+│  Icons: 64x64, brand-colored (green, gold, wine)           │
+│  CTAs: Button variant="buy"/"rent"/"custom" respectively   │
+└─────────────────────────────────────────────────────────────┘
+
+Tablet:
+  3-col grid (same), reduced padding (p-6).
+
+Mobile:
+  Single-column stack, gap-6.
+  Each card: horizontal layout (icon left, text right) for compact mobile view.
+```
+
+#### Section 10: Testimonials
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Social proof. Build trust through real user experiences. |
+| **Layout** | `Container size="default"`. Carousel of testimonial cards. |
+| **Components** | `ProductCarousel` (as testimonial scroller), `Avatar`, `Rating` |
+| **Spacing** | `py-12` section padding, `bg-brand-ivory/10` section background |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│  What Our Customers Say                                      │
+│  ◄ ┌─────────────────┐ ┌─────────────────┐ ┌───────────┐ ►│
+│    │ [Avatar]         │ │ [Avatar]         │ │ [Avatar]   ││
+│    │ ★★★★★            │ │ ★★★★☆            │ │ ★★★★★      ││
+│    │                  │ │                  │ │            ││
+│    │ "Amazing quality │ │ "Rented a habesha│ │ "Custom    ││
+│    │  habesha dress.  │ │  dress for my    │ │  order was ││
+│    │  Fast delivery!" │ │  wedding. Save   │ │  perfect!" ││
+│    │                  │ │  so much!"       │ │            ││
+│    │ — Sara M.        │ │ — Helen T.       │ │ — Dani K.  ││
+│    │ Bought: Dress    │ │ Rented: Set      │ │ Custom: Suit││
+│    └─────────────────┘ └─────────────────┘ └───────────┘│
+└─────────────────────────────────────────────────────────────┘
+
+  Carousel: scroll-snap, min-w-[320px] per card, gap-6
+  Card: rounded-xl border bg-card p-6 shadow-sm
+  Quote: italic text-foreground/90
+  Attribution: text-sm font-semibold + text-xs muted (purchased/rented/custom type)
+  Background: bg-brand-ivory/10 for the full section
+
+Tablet:
+  2 cards visible in carousel.
+
+Mobile:
+  Single-card carousel with dot indicators.
+```
+
+#### Section 11: Newsletter
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Capture emails for marketing. Build long-term engagement. |
+| **Layout** | `Container size="narrow"`. Centered CTA with email input. |
+| **Components** | `Input`, `Button` (primary) |
+| **Spacing** | `py-16`, `bg-brand-gold/5` section background |
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│          Stay in the Loop                                   │
+│          Get the latest designs, exclusive rentals,         │
+│          and custom order inspiration.                      │
+│                                                             │
+│     ┌──────────────────────────────┐  ┌──────────┐         │
+│     │  your@email.com              │  │ Subscribe │         │
+│     └──────────────────────────────┘  └──────────┘         │
+│                                                             │
+│     No spam. Unsubscribe anytime.                           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+  Input: h-12, rounded-l-xl, max-w-md
+  Button: h-12, rounded-r-xl, bg-primary text-primary-foreground
+  Background: bg-brand-gold/5, rounded-2xl, p-10
+  Title: text-display-sm font-display
+  Fine print: text-xs text-muted-foreground
+
+Tablet:
+  Same layout, slightly reduced padding.
+
+Mobile:
+  Input and button stack vertically (full-width each, gap-3).
+```
+
+#### Section 12: Footer
+
+| Property | Value |
+|----------|-------|
+| **Goal** | Site-wide navigation, legal links, social presence. |
+| **Layout** | Full-width, `Container size="default"`. 5-column grid. |
+| **Components** | `Footer` component (existing), `Divider` |
+| **Spacing** | `py-12` top section, `py-6` bottom bar |
+
+The Footer already exists and is fully specified in Phase 20. Sections: Brand, Shop, For Sellers, Account, Support. Social icons: Instagram, Twitter/X, Telegram.
+
+---
+
+### 3. Information Architecture
+
+```
+Habesha Market
+│
+├── Homepage (/)
+│   ├── Hero + Search
+│   ├── Quick Category Pills
+│   ├── Categories (3 main)
+│   ├── Featured Listings
+│   ├── Trending Designers
+│   ├── New Arrivals
+│   ├── Rental Highlights
+│   ├── Custom Design Showcase
+│   ├── How It Works
+│   ├── Testimonials
+│   └── Newsletter
+│
+├── Search & Browse (/search)
+│   ├── Keyword search (q=...)
+│   ├── Category/subcategory filters
+│   ├── Buy/Rent/Custom filter (type=...)
+│   ├── Advanced filters (price, size, color, fabric, occasion, designer, location, availability)
+│   └── Sort (newest, trending, price-asc, price-desc, rating)
+│
+├── Category Landing (/categories/[slug])
+│   ├── Category hero (image + name + description)
+│   ├── Subcategory pills/tabs
+│   ├── Filtered listings grid
+│   └── Pagination
+│
+├── Product Detail (/listings/[id])
+│   ├── Image Gallery
+│   ├── Product Info (title, price, condition, badges, description)
+│   ├── Designer Info (avatar, name, rating, verified, link)
+│   ├── Buy Flow (Add to Cart / Buy Now)
+│   ├── Rent Flow (select dates, daily rate)
+│   ├── Custom Order Flow (measurements, fabric, color, notes, images)
+│   ├── Reviews (summary + list)
+│   ├── Similar Products (carousel)
+│   └── Wishlist & Share
+│
+├── Designer Profile (/sellers/[id])
+│   ├── Designer hero (avatar, name, bio, stats)
+│   ├── Designer listings (grid)
+│   └── Reviews
+│
+├── Auth (/login, /register, /forgot-password)
+│   └── AuthLayout (standalone)
+│
+└── Dashboard (/dashboard/*)
+    ├── Overview
+    ├── Saved Items
+    ├── Messages
+    ├── Notifications
+    ├── Seller (My Shop, Listings, Create, Orders)
+    ├── Account (Profile, Settings, Security, Notification Prefs)
+    └── Custom Orders (My Requests, tracking)
+```
+
+---
+
+### 4. Component List
+
+#### Existing Components (Reuse)
+
+| Component | Package | Variants | Used In |
+|-----------|---------|----------|----------|
+| `Button` | `@marketplace/ui` | default, buy, rent, custom, outline, ghost, xs/sm/md/lg | All CTAs |
+| `Badge` | `@marketplace/ui` | default, secondary, success, warning, destructive, new-arrival, featured, sold-out | Listing cards, PDP |
+| `Card` | `@marketplace/ui` | default, product, designer | Homepage sections, testimonials |
+| `PriceTag` | `@marketplace/ui` | buy, rent, custom (ETB/USD/EUR) | Listing cards, PDP, rental highlights |
+| `Tag` | `@marketplace/ui` | buy, rent, custom, outline (sm/md) | Listing type badges, filter pills |
+| `Avatar` | `@marketplace/ui` | xs/sm/md/lg/xl, verified badge | Designer cards, reviews, PDP |
+| `Rating` | `@marketplace/ui` | display, input, summary (sm/md) | Seller cards, reviews, PDP |
+| `Input` | `@marketplace/ui` | default, success (sm/md/lg) | Newsletter, forms, search |
+| `Select` | `@marketplace/ui` | default, success | Filter dropdowns, custom order forms |
+| `Textarea` | `@marketplace/ui` | default | Custom order notes, reviews |
+| `Checkbox` | `@marketplace/ui` | default | Filter checkboxes, form options |
+| `Radio`/`RadioGroup` | `@marketplace/ui` | default | Sort options, custom order choices |
+| `Tabs` | `@marketplace/ui` | underline, pills | PDP (Buy/Rent/Custom tabs), category subcategories |
+| `Modal` | `@marketplace/ui` | default, full, blurred | Custom order modal, image lightbox |
+| `Drawer` | `@marketplace/ui` | default, sm/md/lg/full, blurred | Mobile filter panel, mobile nav |
+| `Divider` | `@marketplace/ui` | default | Section separators |
+| `EmptyState` | `@marketplace/ui` | default | Empty search, no listings |
+| `Skeleton` | `@marketplace/ui` | default | Loading states |
+| `Spinner` | `@marketplace/ui` | default | Loading states |
+| `Tooltip` | `@marketplace/ui` | top/bottom/left/right | Badge explanations, info tips |
+| `Dropdown` | `@marketplace/ui` | default | User menu, sort dropdown |
+| `Alert` | `@marketplace/ui` | default, success, warning, destructive | Form feedback, notifications |
+| `Toast` | `@marketplace/ui` | default | Action confirmations |
+| `FormControl`/`FormInput`/`FormSelect`/`FormTextarea` | `@marketplace/ui` | default | Custom order form, newsletter |
+| `Pagination` | `@marketplace/ui` | default | Search results, category pages |
+| `Table` | `@marketplace/ui` | default | Dashboard orders, admin |
+| `SearchBar` | `apps/web` | compact, hero, filter | Hero, search page, filter panel |
+| `ListingCard` | `apps/web` | — | All product grids |
+| `CategoryCard` | `apps/web` | standard, wide, tall | Category grids |
+| `SellerCard` | `apps/web` | designer, tailor, boutique, rental-shop | Trending designers |
+| `ProductGrid` | `apps/web` | standard, compact, featured | All listing grids |
+| `ProductCarousel` | `apps/web` | standard, featured | Carousels, trending |
+| `FilterPanel` | `apps/web` | — | Search page sidebar/drawer |
+| `ActiveFilterPills` | `apps/web` | — | Above search results |
+| `ImageGallery` | `apps/web` | — | PDP image display |
+| `FavoriteButton` | `apps/web` | — | Listing cards, PDP |
+| `Review`/`ReviewList`/`ReviewSummary` | `apps/web` | — | PDP reviews section |
+| `ImageUploader` | `apps/web` | grid, single | Custom order reference images |
+
+#### New Components Needed
+
+| Component | Purpose | Key Props |
+|-----------|---------|-----------|
+| `TestimonialCard` | Homepage testimonial section | avatar, name, rating, quote, type (bought/rented/custom) |
+| `HowItWorksCard` | Homepage how-it-works section | icon, title, description, ctaLabel, variant (buy/rent/custom) |
+| `NewsletterForm` | Email capture with validation | onSubmit, placeholder, buttonLabel |
+| `RentDatePicker` | Rent flow date range picker | minDate, maxDate, pricePerDay, onChange |
+| `CustomOrderForm` | Multi-step custom order form | listingId, onSubmit, onChat |
+| `MeasurementForm` | Body measurements input form | fields (chest, waist, hips, etc.), unit (cm/in) |
+| `OrderChoiceModal` | Modal: "Buy As-Is" vs "Order Custom Made" | listing, onBuy, onCustom |
+| `BreadcrumbNav` | Enhanced breadcrumb with category hierarchy | items: {label, href}[] |
+| `ShareButton` | Share listing (native share API + clipboard) | url, title |
+| `PriceEstimator` | Shows estimated custom order price | basePrice, adjustments[] |
+| `DeliveryEstimate` | Shows estimated delivery timeline | leadTimeDays, shippingDays |
+| `ChatButton` | Initiates conversation with designer | listingId, sellerId, context |
+| `QuickCategoryBar` | Horizontal scrollable category pills below hero | categories: {slug, name, count}[] |
+
+---
+
+### 5. Responsive Rules
+
+#### Global Responsive Matrix
+
+| Breakpoint | Width | Layout Strategy |
+|-----------|-------|----------------|
+| Mobile | < 640px | Single column, full-width cards, BottomNav, hamburger menu |
+| fashion-sm | 640px | 2-3 col grids, still mobile nav |
+| Tablet | 768px (md) | Multi-col grids, desktop nav visible, no BottomNav |
+| fashion-md | 860px | 4-col product grid, side-by-side PDP layout, filter sidebar |
+| Desktop | 1024px (lg) | Full sidebar, all grids at max |
+| fashion-lg | 1100px | Wide content layouts |
+| Large desktop | 1280px (xl) | Max container width reached |
+| fashion-xl | 1400px | 5-col product grid |
+
+#### Section-Specific Responsive Rules
+
+| Homepage Section | Mobile | Tablet | Desktop |
+|-----------------|--------|--------|----------|
+| Hero | py-12, stacked CTAs, full-width search | py-16, inline CTAs | py-24, inline CTAs, centered |
+| Quick Category Pills | Horizontal scroll (snap-x) | Inline row | Inline row, centered |
+| Categories | 1-col or 2-col | 3-col | 3-col + subcategory tags |
+| Featured Listings | Carousel (touch swipe) | 3-col grid or carousel | 3-4 col grid |
+| Trending Designers | Vertical stack or carousel | Carousel (2 visible) | Carousel (3 visible, arrows) |
+| New Arrivals | 2-col grid | 4-col grid | 5-col grid |
+| Rental Highlights | Stacked: editorial + carousel | Stacked: editorial + grid | Split: editorial 40% + cards 60% |
+| Custom Showcase | Stacked: carousel + editorial | Stacked: cards + editorial | Split: cards 60% + editorial 40% |
+| How It Works | Vertical stack, horizontal cards | 3-col (reduced padding) | 3-col (full padding) |
+| Testimonials | Single-card carousel + dots | 2-card carousel | 3-card carousel + arrows |
+| Newsletter | Stacked input + button | Inline input + button | Inline, narrow container |
+| Footer | 2-col grid | 2-col grid | 5-col grid |
+
+#### Content Padding Rules
+
+| Context | Mobile | sm (640) | lg (1024) |
+|---------|--------|----------|------------|
+| Page horizontal | `px-4` | `px-6` | `px-8` |
+| Section vertical | `py-8` | `py-10` | `py-12` |
+| Hero vertical | `py-12` | `py-16` | `py-24` |
+| Card grid gap | `gap-3` | `gap-4` | `gap-4` (gap-6 featured) |
+
+---
+
+### 6. Search & Filter UX
+
+#### Search Entry Points
+
+| Entry Point | Component | Behavior |
+|-------------|-----------|----------|
+| Homepage hero | `SearchBar` variant="hero" | Full-width, prominent, navigates to `/search?q=...` |
+| Search page | `SearchBar` variant="compact" in header | Always accessible, updates results in-place |
+| Filter panel | `SearchBar` variant="filter" | Inside FilterPanel, narrow, filters results |
+| BottomNav | Search tab | Navigates to `/search` page |
+| MobileNav | "Shop All" link | Navigates to `/search` page |
+
+#### Filter Taxonomy
+
+| Filter | Type | UI Component | Source | API Param |
+|--------|------|-------------|--------|-----------|
+| Keyword | Text | SearchBar | User input | `q` |
+| Category/Subcategory | Tree | Select (cascading) | `GET /categories` | `categoryId`, `categorySlug` |
+| Buy/Rent/Custom | Multi-select | Tag toggles | Static options | `type` (new) |
+| Price Range | Range | Min/Max inputs | User input | `minPrice`, `maxPrice` |
+| Location | Select | Dropdown | Distinct cities | `city` |
+| Size | Multi-select | Button chips | Static sizes | `sizes` (new) |
+| Color | Multi-select | Color swatches | Static palette | `colors` (new) |
+| Fabric | Multi-select | Button chips | Dynamic from listings | `fabric` (new) |
+| Occasion | Multi-select | Button chips | Dynamic | `occasion` (new) |
+| Designer | Select | Dropdown | `GET /users?role=seller` | `designer` (new) |
+| Availability | Toggle | Checkbox | Static | `availability` (new) |
+| Condition | Select | Dropdown | Static | `condition` |
+| Sort | Radio | RadioGroup | Static | `sortBy` |
+
+#### Filter UX: Desktop (≥ fashion-md)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [SearchBar compact]                                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────┐  ┌──────────────────────────────────────┐   │
+│  │ Filters  │  │  [ActiveFilterPills]                 │   │
+│  │ (sticky  │  │  248 results for "habesha dress"     │   │
+│  │  sidebar)│  │  Sort: [Relevance ▾]                 │   │
+│  │          │  │                                      │   │
+│  │ Search   │  │  ProductGrid (3-col w/ sidebar)      │   │
+│  │ Type     │  │  ...                                 │   │
+│  │ Category │  │                                      │   │
+│  │ Price    │  │  Pagination                          │   │
+│  │ Size     │  │                                      │   │
+│  │ Color    │  └──────────────────────────────────────┘   │
+│  │ Fabric   │                                             │
+│  │ Occasion │                                             │
+│  │ Designer │                                             │
+│  │ Location │                                             │
+│  │ Condition│                                             │
+│  │ Avail.   │                                             │
+│  │ Sort     │                                             │
+│  │          │                                             │
+│  │ [Apply]  │                                             │
+│  │ [Reset]  │                                             │
+│  └──────────┘                                             │
+└─────────────────────────────────────────────────────────────┘
+
+  Filter sidebar: w-64, sticky top-20, max-h-[calc(100vh-5rem)] overflow-y-auto
+  Collapsible sections (FilterSection component): click to expand/collapse
+  Active filter count badge on "Filters" header
+  "Apply Filters" and "Reset" buttons at bottom
+  Results: flex-1, ProductGrid variant="standard"
+  ActiveFilterPills: horizontal row above results, removable tags
+```
+
+#### Filter UX: Mobile (< fashion-md)
+
+```
+┌──────────────────────────┐
+│  [SearchBar compact]     │
+│  [≡ Filters (3)] [Sort ▾]│  ← Filter count badge
+│                          │
+│  ProductGrid (2-col)     │
+│  ...                     │
+│  Pagination              │
+│                          │
+├──────────────────────────┤
+│  BottomNav               │
+└──────────────────────────┘
+
+  Filter Drawer (slide-up from bottom):
+  ┌──────────────────────────┐
+  │  Filters (3 active) [✕]  │
+  │  ─────────────────────── │
+  │  Same sections as desktop│
+  │  Scrollable content      │
+  │  ─────────────────────── │
+  │  [Apply Filters] [Reset] │
+  └──────────────────────────┘
+
+  Triggered by "Filters" button in toolbar
+  Sort: separate Dropdown (not in drawer)
+  ActiveFilterPills: horizontal scroll below toolbar
+  Drawer: z-modal(400), backdrop z-overlay(300)
+  Max height: 80vh, overflow-y-auto
+```
+
+#### Filter Interaction Patterns
+
+- **Instant apply (future)**: Filters apply immediately via URL params (currently "Apply" button)
+- **URL sync**: All active filters reflected in URL query params for shareability
+- **Active filter count**: Badge on Filter button and FilterPanel header shows count
+- **Clear individual**: ActiveFilterPills allow removing single filters with X button
+- **Clear all**: "Clear all" link in FilterPanel header and ActiveFilterPills
+- **Sort**: Independent of filters, accessible via Dropdown in results header
+- **Pagination**: Resets to page 1 when any filter changes
+
+---
+
+### 7. Product Detail Page Wireframe
+
+#### PDP: Desktop Layout (≥ fashion-md)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Header: solid]                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Home > Women's > Dresses > Habesha Kemis Dress            │  ← Breadcrumb
+│                                                             │
+│  ┌────────────────────────┐  ┌──────────────────────────┐  │
+│  │                        │  │                          │  │
+│  │  Image Gallery         │  │  Designer: Sara Designs  │  │  ← Designer link (top)
+│  │  (main 4:3 + thumbs)   │  │                          │  │
+│  │                        │  │  Habesha Kemis Dress     │  │  ← Title (text-2xl font-bold)
+│  │  3:4 or 4:3 aspect     │  │                          │  │
+│  │                        │  │  ★★★★★ 4.8 (24 reviews) │  │  ← Rating + count
+│  │  [Fullscreen ↗]        │  │                          │  │
+│  │                        │  │  ┌──────────────────────┐│  │
+│  │  ● ● ● ● ○            │  │  │ [Buy] [Rent] [Custom] ││  │  ← Availability badges
+│  │                        │  │  └──────────────────────┘│  │
+│  └────────────────────────┘  │                          │  │
+│  Left: 55% (col-span-3)     │  ETB 4,500               │  │  ← PriceTag (buy)
+│                              │  Rent: ETB 350/day       │  │  ← PriceTag (rent, if available)
+│                              │                          │  │
+│                              │  ──────────────────────  │  │  ← Divider
+│                              │                          │  │
+│                              │  Size: [S] [M] [L] [XL] │  │  ← Tag selectable chips
+│                              │  Color: [■] [■] [■]     │  │  ← Color swatches
+│                              │  Condition: New          │  │  ← Badge
+│                              │  Location: Addis Ababa   │  │
+│                              │                          │  │
+│                              │  ┌──────────────────────┐│  │
+│                              │  │     ORDER NOW        ││  │  ← Primary CTA
+│                              │  │  Opens choice modal   ││  │
+│                              │  └──────────────────────┘│  │
+│                              │                          │  │
+│                              │  [Buy Now]  [Rent This]  │  │  ← Direct action buttons
+│                              │  (green)    (gold)       │  │     (if available)
+│                              │                          │  │
+│                              │  [♥ Save] [↗ Share]     │  │  ← Secondary actions
+│                              │                          │  │
+│                              │  ──────────────────────  │  │
+│                              │  [Contact Designer 💬]   │  │  ← Chat CTA
+│                              │                          │  │
+│                              │  ┌──────────────────────┐│  │
+│                              │  │ [Avatar] Sara Designs││  │  ← Designer card
+│                              │  │ ★★★★★ · Verified     ││  │
+│                              │  │ [View Profile →]     ││  │
+│                              │  └──────────────────────┘│  │
+│                              │                          │  │
+│                              └──────────────────────────┘  │
+│                              Right: 45% (col-span-2)       │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Description                                        │   │  ← Tabs: Description | Details | Reviews
+│  │  Beautiful hand-woven habesha kemis...              │   │
+│  │  ...                                                │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Customer Reviews                                   │   │
+│  │  ┌──────────┐  ┌──────────────────────────────────┐│   │
+│  │  │  4.8     │  │  5 ████████████████████ 18      ││   │  ← ReviewSummary
+│  │  │  ★★★★★   │  │  4 ████████ 4                   ││   │
+│  │  │  24 rev. │  │  3 ██ 1                          ││   │
+│  │  └──────────┘  │  2 █ 1                           ││   │
+│  │                │  1 ░ 0                            ││   │
+│  │                └──────────────────────────────────┘│   │
+│  │                                                    │   │
+│  │  [Write a Review]                                  │   │  ← Button (if purchased)
+│  │                                                    │   │
+│  │  ┌──────────────────────────────────────────────┐ │   │
+│  │  │  [Avatar] Helen T.    ★★★★★   Dec 15, 2025  │ │   │  ← Review items
+│  │  │  "Amazing quality, fast delivery..."          │ │   │
+│  │  │  [📷] [📷]   Helpful (5)                     │ │   │
+│  │  └──────────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Similar Products                           See all │   │
+│  │  ◄ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ►         │   │  ← ProductCarousel
+│  │    │ Card │ │ Card │ │ Card │ │ Card │             │   │
+│  │    └──────┘ └──────┘ └──────┘ └──────┘             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│ [Footer]                                                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### PDP: Mobile Layout
+
+```
+┌──────────────────────────┐
+│ [Header: compact]        │
+├──────────────────────────┤
+│  ‹ Back                  │
+│                          │
+│  ┌──────────────────────┐│
+│  │  Image Gallery       ││  ← Full-width, swipeable
+│  │  ● ○ ○ ○ ○          ││     Aspect 3:4 or 4:3
+│  │  [Fullscreen ↗]      ││
+│  └──────────────────────┘│
+│                          │
+│  Designer: Sara Designs  │
+│  Habesha Kemis Dress     │
+│  ★★★★★ 4.8 (24)         │
+│                          │
+│  [Buy] [Rent] [Custom]   │  ← Availability badges
+│                          │
+│  ETB 4,500               │
+│  Rent: ETB 350/day       │
+│                          │
+│  Size: [S] [M] [L] [XL] │
+│  Color: [■] [■] [■]     │
+│  Condition: New          │
+│                          │
+│  ┌──────────────────────┐│
+│  │     ORDER NOW        ││  ← Primary CTA (full-width)
+│  │  Opens choice modal  ││     Opens OrderChoiceModal
+│  └──────────────────────┘│
+│                          │
+│  ┌────────┐ ┌──────────┐│
+│  │Buy Now │ │Rent This ││  ← Secondary buttons (2-col)
+│  │(green) │ │(gold)    ││     Full-width on mobile
+│  └────────┘ └──────────┘│
+│                          │
+│  [♥ Save] [↗ Share]     │  ← Inline actions
+│                          │
+│  ──────────────────────  │
+│                          │
+│  [Contact Designer 💬]   │
+│                          │
+│  ┌──────────────────────┐│
+│  │ [Avatar] Sara Designs││
+│  │ ★★★★★ · Verified     ││
+│  │ [View Profile →]     ││
+│  └──────────────────────┘│
+│                          │
+│  ──────────────────────  │
+│  ▼ Description           │  ← Collapsible sections
+│  Beautiful hand-woven... │
+│  ──────────────────────  │
+│  ▼ Details               │
+│  Fabric: Cotton          │
+│  ──────────────────────  │
+│  ▼ Reviews (24)          │
+│  [ReviewSummary]         │
+│  [ReviewList]            │
+│                          │
+│  Similar Products        │
+│  ┌────┐┌────┐            │  ← 2-col compact
+│  │Card││Card│            │
+│  └────┘└────┘            │
+│                          │
+├──────────────────────────┤
+│  BottomNav               │
+└──────────────────────────┘
+```
+
+#### PDP: "Order Now" Choice Modal
+
+When the buyer clicks "ORDER NOW", show a modal with two options:
+
+```
+┌────────────────────────────────────────────┐
+│  Choose Your Order Type            [✕]     │
+│  ─────────────────────────────────────     │
+│                                            │
+│  ┌──────────────────────────────────┐     │
+│  │  🛍 Buy As-Is                    │     │  ← Radio card 1
+│  │                                  │     │
+│  │  Purchase this exact product.    │     │
+│  │  ETB 4,500 · Ships in 3-5 days │     │
+│  │                                  │     │
+│  │  [Proceed to Buy →]             │     │  ← Button variant="buy"
+│  └──────────────────────────────────┘     │
+│                                            │
+│  ┌──────────────────────────────────┐     │
+│  │  ✂️ Order Custom Made             │     │  ← Radio card 2
+│  │                                  │     │
+│  │  Customize measurements, color,  │     │
+│  │  fabric, and design details.     │     │
+│  │  From ETB 5,000 · 14-21 days    │     │
+│  │                                  │     │
+│  │  [Start Custom Order →]          │     │  ← Button variant="custom"
+│  └──────────────────────────────────┘     │
+│                                            │
+│  💬 Not sure? Chat with the designer first │  ← Chat link
+│                                            │
+└────────────────────────────────────────────┘
+
+  Modal: z-modal(400), backdrop z-overlay(300), blurred
+  Only shown if customOrderAvailable = true
+  If custom NOT available: skip modal, go directly to buy flow
+  If buy NOT available: show only rent/custom options
+```
+
+---
+
+### 8. Buy Journey
+
+```
+Step 1: Product Detail Page
+  └── Click "Buy Now" or "ORDER NOW" → "Buy As-Is"
+
+Step 2: Order Summary
+  ┌────────────────────────────────────────────┐
+  │  Order Summary                             │
+  │  ┌──────────┐  Habesha Kemis Dress        │
+  │  │  Image   │  Size: M · Color: Ivory     │
+  │  │  64x64   │  Qty: 1                     │
+  │  └──────────┘  ETB 4,500                  │
+  │                                            │
+  │  ─────────────────────────────────────     │
+  │  Subtotal:               ETB 4,500        │
+  │  Shipping:               ETB 200          │
+  │  ─────────────────────────────────────     │
+  │  Total:                  ETB 4,700        │
+  │                                            │
+  │  [Proceed to Checkout →]                   │
+  └────────────────────────────────────────────┘
+
+Step 3: Checkout
+  ├── Shipping Address (form)
+  ├── Payment Method (form)
+  └── Review & Place Order
+
+Step 4: Confirmation
+  ├── Order number
+  ├── Estimated delivery
+  ├── [Track Order] [Continue Shopping]
+  └── Chat with seller (optional)
+```
+
+**Buy Flow Components:** `Button` (variant="buy"), `PriceTag`, order summary card, checkout form, confirmation page.
+
+---
+
+### 9. Rent Journey
+
+```
+Step 1: Product Detail Page
+  └── Click "Rent This" or "ORDER NOW" → "Buy As-Is" (rent tab)
+
+Step 2: Rental Configuration
+  ┌────────────────────────────────────────────┐
+  │  Rent This Item                            │
+  │  ┌──────────┐  Habesha Kemis Dress        │
+  │  │  Image   │  Daily Rate: ETB 350        │
+  │  │  64x64   │  Max Duration: 14 days      │
+  │  └──────────┘                             │
+  │                                            │
+  │  Rental Period:                            │
+  │  ┌────────────┐  →  ┌────────────┐        │  ← RentDatePicker
+  │  │ Start Date │     │ End Date   │        │
+  │  │ Jun 20     │     │ Jun 25     │        │
+  │  └────────────┘     └────────────┘        │
+  │                                            │
+  │  Duration: 5 days                          │
+  │  Daily Rate: ETB 350                       │
+  │  ─────────────────────────────────────     │
+  │  Rental Total:           ETB 1,750        │
+  │  Security Deposit:       ETB 2,000        │
+  │  ─────────────────────────────────────     │
+  │  Total Due:              ETB 3,750        │
+  │  (Deposit refunded on return)              │
+  │                                            │
+  │  [Proceed to Checkout →]                   │  ← Button variant="rent"
+  └────────────────────────────────────────────┘
+
+Step 3: Checkout (same as Buy, with rental terms)
+  ├── Shipping Address
+  ├── Payment Method
+  ├── Rental Agreement (checkbox: "I agree to return by [date]")
+  └── Review & Confirm
+
+Step 4: Confirmation
+  ├── Rental order number
+  ├── Pickup/delivery date
+  ├── Return date
+  ├── Return instructions
+  └── [Track Rental] [Chat with Owner]
+```
+
+**Rent Flow Components:** `Button` (variant="rent"), `RentDatePicker`, `PriceTag` (rent variant), rental agreement checkbox, deposit display.
+
+---
+
+### 10. Custom Order Journey
+
+```
+Step 1: Product Detail Page
+  └── Click "ORDER NOW" → "Order Custom Made"
+
+Step 2: Custom Order Form (multi-step)
+  ┌─────────────────────────────────────────────────────┐
+  │  Custom Order: Habesha Kemis Dress                  │
+  │  Step 1 of 4: Measurements          ● ● ○ ○        │  ← Progress indicator
+  │  ─────────────────────────────────────────────────  │
+  │                                                     │
+  │  ┌─ Measurements ──────────────────────────────┐   │
+  │  │  Unit: [Centimeters ●] [Inches ○]           │   │  ← RadioGroup
+  │  │                                             │   │
+  │  │  Chest:    [________] cm                    │   │  ← FormInput
+  │  │  Waist:    [________] cm                    │   │
+  │  │  Hips:     [________] cm                    │   │
+  │  │  Shoulder: [________] cm                    │   │
+  │  │  Sleeve:   [________] cm                    │   │
+  │  │  Length:   [________] cm                    │   │
+  │  │                                             │   │
+  │  │  💡 Not sure? [View Measurement Guide →]    │   │  ← Help link
+  │  └─────────────────────────────────────────────┘   │
+  │                                                     │
+  │  [← Back]                    [Continue to Step 2 →] │
+  └─────────────────────────────────────────────────────┘
+
+  Step 2 of 4: Fabric & Color
+  ┌─────────────────────────────────────────────────────┐
+  │  Step 2 of 4: Fabric & Color        ● ● ● ○        │
+  │  ─────────────────────────────────────────────────  │
+  │                                                     │
+  │  Fabric/Material:                                   │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+  │  │  Cotton  │ │  Silk    │ │  Linen   │           │  ← Selectable cards
+  │  │  [✓]     │ │          │ │          │           │
+  │  └──────────┘ └──────────┘ └──────────┘           │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐           │
+  │  │  Chiffon │ │  Satin   │ │  Other   │           │
+  │  └──────────┘ └──────────┘ └──────────┘           │
+  │                                                     │
+  │  Color:                                             │
+  │  [■ Ivory] [■ White] [■ Gold] [■ Green] [■ Custom]│  ← Color swatches
+  │                                                     │
+  │  If "Custom" selected:                              │
+  │  Describe desired color: [_______________]          │
+  │                                                     │
+  │  [← Back]                    [Continue to Step 3 →] │
+  └─────────────────────────────────────────────────────┘
+
+  Step 3 of 4: Design & Customization
+  ┌─────────────────────────────────────────────────────┐
+  │  Step 3 of 4: Design & Customization  ● ● ● ●      │
+  │  ─────────────────────────────────────────────────  │
+  │                                                     │
+  │  Embroidery/Customization:                          │
+  │  [✓] Traditional tibeb pattern                      │
+  │  [ ] Modern minimalist design                       │
+  │  [ ] Hand-beaded details                            │
+  │  [ ] Custom embroidery text                         │
+  │                                                     │
+  │  Design Notes:                                      │
+  │  ┌─────────────────────────────────────────┐       │
+  │  │  Describe your vision, preferred style, │       │  ← Textarea
+  │  │  any special requests...                │       │
+  │  │                                         │       │
+  │  └─────────────────────────────────────────┘       │
+  │                                                     │
+  │  Reference Images:                                  │
+  │  ┌────┐ ┌────┐ ┌────┐ ┌────────┐                  │
+  │  │ 📷 │ │ 📷 │ │ 📷 │ │  [+ ]  │                  │  ← ImageUploader
+  │  │  1 │ │  2 │ │  3 │ │  Add   │                  │
+  │  └────┘ └────┘ └────┘ └────────┘                  │
+  │  Max 5 images. JPG, PNG. Max 5MB each.             │
+  │                                                     │
+  │  Other Adjustments:                                 │
+  │  [✓] Longer length   [ ] Shorter sleeves           │
+  │  [ ] Add pockets     [ ] Lining                    │
+  │                                                     │
+  │  [← Back]                    [Continue to Step 4 →] │
+  └─────────────────────────────────────────────────────┘
+
+  Step 4 of 4: Review & Submit
+  ┌─────────────────────────────────────────────────────┐
+  │  Step 4 of 4: Review & Submit       ● ● ● ●        │
+  │  ─────────────────────────────────────────────────  │
+  │                                                     │
+  │  Order Summary:                                     │
+  │  ┌──────────┐  Habesha Kemis Dress (Custom)        │
+  │  │  Image   │  Based on: Sara Designs              │
+  │  │  64x64   │                                      │
+  │  └──────────┘                                      │
+  │                                                     │
+  │  ┌─ Your Specifications ──────────────────────┐    │
+  │  │  Measurements: Chest 90cm, Waist 70cm...    │    │
+  │  │  Fabric: Cotton, Color: Ivory               │    │
+  │  │  Customization: Traditional tibeb pattern    │    │
+  │  │  Notes: "Prefer gold thread for tibeb..."    │    │
+  │  │  Reference Images: 3 uploaded                │    │
+  │  └─────────────────────────────────────────────┘    │
+  │                                                     │
+  │  ┌─ Price Estimate ────────────────────────────┐   │
+  │  │  Base Price:                 ETB 4,500      │   │  ← PriceEstimator
+  │  │  Custom Adjustments:        + ETB 1,500     │   │
+  │  │  ─────────────────────────────────────       │   │
+  │  │  Estimated Total:            ETB 6,000      │   │
+  │  │  (Final price confirmed by designer)         │   │
+  │  └─────────────────────────────────────────────┘    │
+  │                                                     │
+  │  ┌─ Timeline ──────────────────────────────────┐   │
+  │  │  Production: 14-21 days                     │   │  ← DeliveryEstimate
+  │  │  Shipping:   3-5 days                       │   │
+  │  │  Estimated Delivery: Jul 5-12, 2026         │   │
+  │  └─────────────────────────────────────────────┘    │
+  │                                                     │
+  │  💬 Want to discuss first?                          │
+  │  [Chat with Designer →]                             │  ← ChatButton
+  │                                                     │
+  │  [← Back]              [Submit Custom Order Request] │  ← Button variant="custom"
+  └─────────────────────────────────────────────────────┘
+
+Step 3: After Submission
+  ├── Custom request sent to seller/designer
+  ├── Seller reviews request
+  ├── Seller confirms/adjusts price & timeline
+  ├── Optional: buyer-seller chat before confirmation
+  ├── Buyer receives notification with final price
+  ├── Buyer confirms & pays
+  └── Production begins → shipping → delivery
+
+Step 4: Tracking (in Dashboard)
+  ├── Order status: Submitted → Confirmed → In Production → Shipped → Delivered
+  ├── Chat thread with designer
+  └── Progress photos (optional, from designer)
+```
+
+**Custom Order Components:** `CustomOrderForm` (multi-step), `MeasurementForm`, `ImageUploader`, `PriceEstimator`, `DeliveryEstimate`, `OrderChoiceModal`, `ChatButton`.
+
+---
+
+### 11. Data Model Extensions Required
+
+The following schema additions are needed to support the three business models:
+
+#### Listing Model Additions
+
+```prisma
+// Add to existing Listing model:
+model Listing {
+  // ... existing fields ...
+
+  // Business model flags
+  availableForPurchase  Boolean   @default(true)  @map("available_for_purchase")
+  availableForRent      Boolean   @default(false) @map("available_for_rent")
+  rentalPricePerDay     Decimal?  @map("rental_price_per_day") @db.Decimal(12, 2)
+  maxRentalDays         Int?      @map("max_rental_days")
+  customOrderAvailable  Boolean   @default(false) @map("custom_order_available")
+  customOrderBasePrice  Decimal?  @map("custom_order_base_price") @db.Decimal(12, 2)
+  customOrderLeadTimeDays Int?    @map("custom_order_lead_time_days")
+
+  // Fashion-specific attributes (JSON for flexibility)
+  attributes            Json?     @db.JsonB  // { sizes: [], colors: [], fabrics: [], occasions: [] }
+
+  // Relations
+  customOrders          CustomOrder[]
+}
+```
+
+#### New Models
+
+```prisma
+model CustomOrder {
+  id                  String          @id @default(uuid()) @db.Uuid
+  listingId           String          @map("listing_id") @db.Uuid
+  buyerId             String          @map("buyer_id") @db.Uuid
+  status              CustomOrderStatus @default(submitted)
+  
+  // Buyer specifications
+  measurements        Json            @db.JsonB    // { chest, waist, hips, shoulder, sleeve, length, unit }
+  fabric              String?         @db.VarChar(100)
+  color               String?         @db.VarChar(100)
+  customizationNotes  String?         @map("customization_notes") @db.Text
+  designNotes         String?         @map("design_notes") @db.Text
+  referenceImages     Json?           @map("reference_images") @db.JsonB  // [urls]
+  adjustments         Json?           @db.JsonB  // [selected adjustment keys]
+  
+  // Pricing & timeline
+  estimatedPrice      Decimal?        @map("estimated_price") @db.Decimal(12, 2)
+  finalPrice          Decimal?        @map("final_price") @db.Decimal(12, 2)
+  estimatedDeliveryDays Int?          @map("estimated_delivery_days")
+  
+  // Lifecycle
+  submittedAt         DateTime        @default(now()) @map("submitted_at")
+  confirmedAt         DateTime?       @map("confirmed_at")
+  completedAt         DateTime?       @map("completed_at")
+  cancelledAt         DateTime?       @map("cancelled_at")
+  cancellationReason  String?         @map("cancellation_reason") @db.VarChar(500)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  listing   Listing   @relation(fields: [listingId], references: [id])
+  buyer     User      @relation(fields: [buyerId], references: [id])
+
+  @@index([listingId, status])
+  @@index([buyerId, status])
+  @@map("custom_orders")
+}
+
+enum CustomOrderStatus {
+  submitted
+  under_review
+  confirmed
+  in_production
+  shipped
+  delivered
+  cancelled
+}
+
+model Review {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  reviewerId  String   @map("reviewer_id") @db.Uuid
+  rating      Int      // 1-5
+  title       String?  @db.VarChar(200)
+  body        String?  @db.Text
+  images      Json?    @db.JsonB  // [image urls]
+  verified    Boolean  @default(false)  // verified purchase
+  helpfulCount Int     @default(0) @map("helpful_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  listing   Listing  @relation(fields: [listingId], references: [id])
+  reviewer  User     @relation(fields: [reviewerId], references: [id])
+
+  @@unique([listingId, reviewerId])  // one review per user per listing
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([reviewerId])
+  @@map("reviews")
+}
+```
+
+---
+
+### 12. Architecture Decisions (Phase 21)
+
+- **Custom Order is a listing capability, not a category:** The `customOrderAvailable` boolean on Listing controls visibility. The "Custom Order" filter in search uses this field, not a separate category tree. This preserves the existing Category model's simplicity.
+- **Three action buttons on PDP, not tabs:** The PDP shows Buy, Rent, and Custom as separate action buttons (with their action colors: green, gold, wine) rather than tabbed interfaces. This lets buyers see all available options at once. Buttons are only shown when their respective model is enabled on the listing.
+- **"Order Now" choice modal for Custom Order:** When a listing supports both Buy and Custom Order, the primary "ORDER NOW" CTA opens a modal letting the buyer choose between "Buy As-Is" and "Order Custom Made". This prevents confusion and makes the custom order flow discoverable.
+- **Multi-step Custom Order form:** The custom order form uses a 4-step wizard (Measurements → Fabric & Color → Design & Customization → Review & Submit) to reduce cognitive load. Each step is independently validatable. Progress indicator shows current step.
+- **Price estimation is advisory:** The custom order price estimator shows an approximate total based on base price + adjustments. The final price is confirmed by the designer before payment. This is clearly communicated with "Final price confirmed by designer" messaging.
+- **Chat-first for complex orders:** The custom order flow prominently features "Chat with Designer" at every step, encouraging pre-order communication. The existing Conversation/Message system handles this.
+- **Fashion attributes as JSON:** Size, color, fabric, and occasion are stored as a JSON `attributes` field on Listing rather than separate relation tables. This allows admin-managed dynamic values without schema migrations while supporting filter queries via JSON operators.
+- **Filter extensibility:** The FilterPanel component is designed with pluggable filter sections. New filters (fabric, occasion, availability) follow the same `FilterSection` pattern and feed into the `FilterValues` interface. The API's `SearchFilterDto` will be extended with new optional params.
+- **Homepage sections are server-rendered:** All homepage sections use SSR/ISR via `serverGet()` for data fetching. Static sections (How It Works, Newsletter) are purely server components. Dynamic sections (Featured, New Arrivals) use `revalidate` for ISR.
+- **No separate marketplace pages for Buy/Rent/Custom:** All three models coexist on the same listing cards, search results, and product detail page. The differentiation happens through badges, tags, and action buttons, not through separate page routes.
 
 

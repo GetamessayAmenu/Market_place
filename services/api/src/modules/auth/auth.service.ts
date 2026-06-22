@@ -29,6 +29,7 @@ import {
   AccountSuspendedException,
   EmailAlreadyRegisteredException,
   InvalidCredentialsException,
+  PhoneAlreadyRegisteredException,
   SessionInvalidException,
 } from './exceptions/auth.exceptions';
 import { TokenService } from './token.service';
@@ -63,6 +64,10 @@ export class AuthService {
   async register(dto: RegisterDto, ctx: RequestContext, res: Response): Promise<AuthResponseDto> {
     if (await this.authRepository.emailExists(dto.email)) {
       throw new EmailAlreadyRegisteredException();
+    }
+
+    if (dto.phone && (await this.authRepository.phoneExists(dto.phone))) {
+      throw new PhoneAlreadyRegisteredException();
     }
 
     const roleId = await this.rolesService.getRoleIdBySlug(DEFAULT_REGISTER_ROLE);

@@ -30,7 +30,8 @@ export async function serverGet<T = unknown>(path: string, options?: ServerGetOp
 
   const res = await fetch(url, fetchOpts)
   if (!res.ok) throw new Error(`Failed to fetch ${path}: ${String(res.status)}`)
-  return (await res.json()) as T
+  const body = (await res.json()) as { data: T }
+  return body.data
 }
 
 export default { serverGet }

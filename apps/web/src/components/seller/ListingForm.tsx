@@ -1,19 +1,29 @@
 "use client"
 import { Alert, Button, Card, CardContent, Checkbox, FormInput, FormSelect, FormTextarea, Select, Spinner } from '@marketplace/ui';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { useCategories, type Category } from '../../hooks/useCategories';
 import { useImageUpload, type UploadedImage } from '../../hooks/useSeller';
 
+import DeliveryOptions, { DEFAULT_DELIVERY, type DeliveryData } from './DeliveryOptions';
+import ListingReviewSummary from './ListingReviewSummary';
+import ListingStepper, { type StepDef } from './ListingStepper';
+import ListingTypeSelector, { type ListingType } from './ListingTypeSelector';
+import PricingSection, { DEFAULT_PRICING, type PricingData } from './PricingSection';
+import TagInput from './TagInput';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ListingFormData {
+  listingType: ListingType;
   title: string;
   description: string;
   price: string;
   categoryId: string;
+  categoryName: string;
   city: string;
   condition: string;
+  tags: string[];
   contactOptions: {
     showPhone: boolean;
     whatsapp: string;
@@ -21,10 +31,13 @@ export interface ListingFormData {
     inAppMessaging: boolean;
   };
   images: UploadedImage[];
+  pricing: PricingData;
+  delivery: DeliveryData;
 }
 
 interface ListingFormProps {
   initialData?: Partial<ListingFormData>;
+  initialListingType?: ListingType;
   onSubmit: (data: ListingFormData) => void;
   isSubmitting?: boolean;
   submitLabel?: string;
@@ -40,23 +53,61 @@ const CONDITIONS = [
   { value: 'poor', label: 'Poor' },
 ];
 
-const STEPS = ['Details', 'Photos', 'Contact', 'Review'] as const;
+// ─── Step Definitions ────────────────────────────────────────────────────────
+
+const STEP_ICONS = {
+  info: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+    </svg>
+  ),
+  image: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+    </svg>
+  ),
+  pricing: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  delivery: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.079-.504 1.042-1.123l-.314-5.267A2.25 2.25 0 0018.14 10.5H15M2.25 14.25V5.625c0-.621.504-1.125 1.125-1.125h8.25M2.25 14.25h8.25m0 0V4.5h4.5v6h-4.5z" />
+    </svg>
+  ),
+  review: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+};
+
+function getSteps(type: ListingType | null): StepDef[] {
+  return [
+    { id: 'info', label: 'Basic Information', description: 'Title, description, category', icon: STEP_ICONS.info },
+    { id: 'images', label: 'Photos', description: 'Upload up to 10 photos', icon: STEP_ICONS.image },
+    { id: 'pricing', label: 'Pricing', description: type === 'rent' ? 'Rental rates & deposit' : type === 'custom' ? 'Service pricing' : 'Set your price', icon: STEP_ICONS.pricing },
+    { id: 'delivery', label: 'Delivery & Availability', description: 'How buyers receive the item', icon: STEP_ICONS.delivery },
+    { id: 'review', label: 'Review & Publish', description: 'Confirm all details', icon: STEP_ICONS.review },
+  ];
+}
 
 // ─── Image Upload Section ────────────────────────────────────────────────────
 
 interface ImageUploadSectionProps {
   images: UploadedImage[];
   onImagesChange: (images: UploadedImage[]) => void;
+  error?: string;
 }
 
-function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps) {
+function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectionProps) {
   const { uploadImage, isUploading, uploadError, clearError } = useImageUpload();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-
     for (const file of Array.from(files)) {
       if (images.length >= 10) break;
       const result = await uploadImage(file);
@@ -65,10 +116,7 @@ function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps)
         onImagesChange(updated);
       }
     }
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function handleRemove(index: number) {
@@ -81,10 +129,7 @@ function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps)
     const updated = [...images];
     const a = updated[index - 1];
     const b = updated[index];
-    if (a && b) {
-      updated[index - 1] = b;
-      updated[index] = a;
-    }
+    if (a && b) { updated[index - 1] = b; updated[index] = a; }
     onImagesChange(updated.map((img, i) => ({ ...img, sortOrder: i })));
   }
 
@@ -93,10 +138,7 @@ function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps)
     const updated = [...images];
     const a = updated[index];
     const b = updated[index + 1];
-    if (a && b) {
-      updated[index + 1] = a;
-      updated[index] = b;
-    }
+    if (a && b) { updated[index + 1] = a; updated[index] = b; }
     onImagesChange(updated.map((img, i) => ({ ...img, sortOrder: i })));
   }
 
@@ -107,56 +149,26 @@ function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps)
         <p className="text-sm text-muted-foreground">Upload up to 10 photos. The first photo will be the primary image.</p>
       </div>
 
-      {uploadError && (
-        <Alert variant="error" onDismiss={clearError}>
-          {uploadError}
-        </Alert>
-      )}
+      {uploadError && <Alert variant="error" onDismiss={clearError}>{uploadError}</Alert>}
+      {error !== undefined && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* Upload button */}
       <div className="flex items-center gap-3">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          onChange={(e) => { void handleFileSelect(e); }}
-          className="hidden"
-          id="listing-images-input"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => { fileInputRef.current?.click(); }}
-          disabled={isUploading || images.length >= 10}
-        >
-          {isUploading ? (
-            <span className="flex items-center gap-2">
-              <Spinner size="sm" /> Uploading...
-            </span>
-          ) : (
-            'Add Photos'
-          )}
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { void handleFileSelect(e); }} className="hidden" id="listing-images-input" />
+        <Button type="button" variant="outline" onClick={() => { fileInputRef.current?.click(); }} disabled={isUploading || images.length >= 10}>
+          {isUploading ? <span className="flex items-center gap-2"><Spinner size="sm" /> Uploading...</span> : 'Add Photos'}
         </Button>
         <span className="text-xs text-muted-foreground">{images.length}/10 photos</span>
       </div>
 
-      {/* Image grid */}
       {images.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {images.map((img, index) => (
             <div key={img.cloudinaryPublicId} className="group relative overflow-hidden rounded-lg border bg-muted">
               <div className="aspect-square">
-                <img
-                  src={img.url}
-                  alt={'Photo ' + String(index + 1)}
-                  className="h-full w-full object-cover"
-                />
+                <img src={img.url} alt={'Photo ' + String(index + 1)} className="h-full w-full object-cover" />
               </div>
               {index === 0 && (
-                <div className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-                  Primary
-                </div>
+                <div className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">Primary</div>
               )}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="flex gap-0.5">
@@ -187,7 +199,7 @@ function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps)
 
 interface CategoryPickerProps {
   value: string;
-  onChange: (id: string) => void;
+  onChange: (id: string, name: string) => void;
   error?: string;
 }
 
@@ -195,12 +207,13 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
   const { data: catData, isLoading } = useCategories();
   const categories = catData?.data ?? [];
 
-  // Flatten categories for select
   const options: { value: string; label: string }[] = [{ value: '', label: 'Select a category' }];
+  const nameMap = useMemo(() => new Map<string, string>(), []);
 
   function addCats(cats: Category[], prefix = '') {
     for (const cat of cats) {
       options.push({ value: cat.id, label: prefix + cat.name });
+      nameMap.set(cat.id, prefix + cat.name);
       if (cat.children && cat.children.length > 0) {
         addCats(cat.children, prefix + cat.name + ' > ');
       }
@@ -224,7 +237,10 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
       label="Category"
       options={options}
       value={value}
-      onChange={(e) => { onChange(e.target.value); }}
+      onChange={(e) => {
+        const id = e.target.value;
+        onChange(id, nameMap.get(id) ?? '');
+      }}
       {...(error !== undefined && { error })}
     />
   );
@@ -232,65 +248,92 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
 
 // ─── Main Form ───────────────────────────────────────────────────────────────
 
-export default function ListingForm({ initialData, onSubmit, isSubmitting, submitLabel = 'Create Listing', error }: ListingFormProps) {
+export default function ListingForm({ initialData, initialListingType, onSubmit, isSubmitting, submitLabel = 'Publish Listing', error }: ListingFormProps) {
+  const [listingType, setListingType] = useState<ListingType | null>(initialListingType ?? initialData?.listingType ?? null);
   const [step, setStep] = useState(0);
-  const [formData, setFormData] = useState<ListingFormData>({
-    title: initialData?.title ?? '',
-    description: initialData?.description ?? '',
-    price: initialData?.price ?? '',
-    categoryId: initialData?.categoryId ?? '',
-    city: initialData?.city ?? '',
-    condition: initialData?.condition ?? '',
-    contactOptions: initialData?.contactOptions ?? {
-      showPhone: false,
-      whatsapp: '',
-      telegram: '',
-      inAppMessaging: true,
-    },
-    images: initialData?.images ?? [],
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+
+  // Form state
+  const [title, setTitle] = useState(initialData?.title ?? '');
+  const [description, setDescription] = useState(initialData?.description ?? '');
+  const [categoryId, setCategoryId] = useState(initialData?.categoryId ?? '');
+  const [categoryName, setCategoryName] = useState(initialData?.categoryName ?? '');
+  const [city, setCity] = useState(initialData?.city ?? '');
+  const [condition, setCondition] = useState(initialData?.condition ?? '');
+  const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
+  const [images, setImages] = useState<UploadedImage[]>(initialData?.images ?? []);
+  const [pricing, setPricing] = useState<PricingData>(initialData?.pricing ?? { ...DEFAULT_PRICING, price: initialData?.price ?? '' });
+  const [delivery, setDelivery] = useState<DeliveryData>(initialData?.delivery ?? { ...DEFAULT_DELIVERY });
+  const [contactOptions, setContactOptions] = useState(initialData?.contactOptions ?? {
+    showPhone: false,
+    whatsapp: '',
+    telegram: '',
+    inAppMessaging: true,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateField = useCallback(<K extends keyof ListingFormData>(key: K, value: ListingFormData[K]) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => {
-      return Object.fromEntries(
-        Object.entries(prev).filter(([k]) => k !== key)
-      );
-    });
+  const steps = useMemo(() => getSteps(listingType), [listingType]);
+
+  const clearField = useCallback((field: string) => {
+    setErrors((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([k]) => k !== field))
+    );
   }, []);
 
-  const updateContact = useCallback(<K extends keyof ListingFormData['contactOptions']>(key: K, value: ListingFormData['contactOptions'][K]) => {
-    setFormData((prev) => ({
-      ...prev,
-      contactOptions: { ...prev.contactOptions, [key]: value },
-    }));
+  const updateContact = useCallback(<K extends keyof typeof contactOptions>(key: K, value: (typeof contactOptions)[K]) => {
+    setContactOptions((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // ─── Validation ──────────────────────────────────────────────────────────
 
   function validateStep(stepIndex: number): boolean {
     const errs: Record<string, string> = {};
 
     if (stepIndex === 0) {
-      if (!formData.title || formData.title.length < 3) errs.title = 'Title must be at least 3 characters';
-      if (!formData.description || formData.description.length < 10) errs.description = 'Description must be at least 10 characters';
-      if (!formData.price || Number(formData.price) < 0) errs.price = 'Price must be 0 or more';
-      if (!formData.categoryId) errs.categoryId = 'Please select a category';
-      if (!formData.condition) errs.condition = 'Please select a condition';
-      if (!formData.city || formData.city.length < 2) errs.city = 'City is required';
+      // Basic Info
+      if (!title || title.length < 3) errs.title = 'Title must be at least 3 characters';
+      if (title.length > 200) errs.title = 'Title must be 200 characters or less';
+      if (!description || description.length < 10) errs.description = 'Description must be at least 10 characters';
+      if (!categoryId) errs.categoryId = 'Please select a category';
+      if (!condition) errs.condition = 'Please select a condition';
+      if (!city || city.length < 2) errs.city = 'City is required';
     }
 
     if (stepIndex === 1) {
-      if (formData.images.length === 0) errs.images = 'At least one image is required';
+      // Images
+      if (images.length === 0) errs.images = 'At least one image is required';
+    }
+
+    if (stepIndex === 2) {
+      // Pricing
+      if (!pricing.price || Number(pricing.price) < 0) errs.price = 'Price must be 0 or more';
+      if (listingType === 'rent') {
+        if (!pricing.rentalPricePerDay || Number(pricing.rentalPricePerDay) <= 0) errs.rentalPricePerDay = 'Rental price per day is required';
+        if (!pricing.rentalDeposit || Number(pricing.rentalDeposit) < 0) errs.rentalDeposit = 'Security deposit is required';
+      }
+    }
+
+    if (stepIndex === 3) {
+      // Delivery
+      if (!delivery.availableForPurchase && !delivery.availableForRent && !delivery.customOrderAvailable) {
+        errs.availability = 'Select at least one availability option';
+      }
+      if ((delivery.deliveryMethod === 'delivery' || delivery.deliveryMethod === 'both') && !delivery.deliveryFee) {
+        errs.deliveryFee = 'Delivery fee is required when delivery is selected';
+      }
     }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
+  // ─── Navigation ──────────────────────────────────────────────────────────
+
   function handleNext() {
     if (validateStep(step)) {
-      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+      setCompletedSteps((prev) => new Set([...prev, step]));
+      setStep((s) => Math.min(s + 1, steps.length - 1));
     }
   }
 
@@ -298,247 +341,264 @@ export default function ListingForm({ initialData, onSubmit, isSubmitting, submi
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  function handleSubmit() {
+  function handleStepClick(index: number) {
+    if (index < step || completedSteps.has(index)) {
+      setStep(index);
+    }
+  }
+
+  function handlePublish() {
     // Validate all steps
-    for (let i = 0; i < STEPS.length - 1; i++) {
+    for (let i = 0; i < steps.length - 1; i++) {
       if (!validateStep(i)) {
         setStep(i);
         return;
       }
     }
-    onSubmit(formData);
+
+    const effectiveType = listingType ?? 'sale';
+
+    onSubmit({
+      listingType: effectiveType,
+      title,
+      description,
+      price: pricing.price,
+      categoryId,
+      categoryName,
+      city,
+      condition,
+      tags,
+      contactOptions,
+      images,
+      pricing,
+      delivery,
+    });
   }
+
+  // ─── Type selector (pre-step, not in stepper) ─────────────────────────
+
+  if (!listingType) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <ListingTypeSelector
+            value={listingType}
+            onChange={(type) => {
+              setListingType(type);
+              // Set type-appropriate defaults
+              if (type === 'rent') {
+                setDelivery((prev) => ({ ...prev, availableForRent: true, availableForPurchase: false }));
+              } else if (type === 'custom') {
+                setDelivery((prev) => ({ ...prev, customOrderAvailable: true, availableForRent: false }));
+              }
+            }}
+          />
+          {error && <Alert variant="error" className="mt-4">{error}</Alert>}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {/* Step Indicator */}
-      <div className="flex items-center gap-2">
-        {STEPS.map((label, index) => (
-          <React.Fragment key={label}>
+      {/* Mobile stepper */}
+      <ListingStepper
+        steps={steps}
+        currentStep={step}
+        completedSteps={completedSteps}
+        onStepClick={handleStepClick}
+        listingType={listingType}
+      />
+
+      {error && <Alert variant="error" onDismiss={() => { /* parent controls */ }}>{error}</Alert>}
+
+      {/* Desktop layout: sidebar + form */}
+      <div className="flex gap-8">
+        {/* Desktop stepper sidebar */}
+        <div className="hidden w-64 shrink-0 fashion-lg:block">
+          <div className="sticky top-24">
+            <ListingStepper
+              steps={steps}
+              currentStep={step}
+              completedSteps={completedSteps}
+              onStepClick={handleStepClick}
+              listingType={listingType}
+            />
             <button
               type="button"
-              onClick={() => { if (index < step) setStep(index); }}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                index === step
-                  ? 'bg-primary text-primary-foreground'
-                  : index < step
-                  ? 'bg-primary/10 text-primary cursor-pointer hover:bg-primary/20'
-                  : 'bg-muted text-muted-foreground'
-              }`}
+              onClick={() => { setListingType(null); setStep(0); setCompletedSteps(new Set()); }}
+              className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-current/10 text-[10px]">
-                {index + 1}
-              </span>
-              {label}
+              Change listing type
             </button>
-            {index < STEPS.length - 1 && (
-              <div className={`h-px flex-1 ${index < step ? 'bg-primary' : 'bg-border'}`} />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+          </div>
+        </div>
 
-      {error && (
-        <Alert variant="error">{error}</Alert>
-      )}
+        {/* Form card */}
+        <div className="flex-1 min-w-0">
+          <Card>
+            <CardContent className="p-6">
+              {/* Step 0: Basic Information */}
+              {step === 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Basic Information</h3>
 
-      {/* Step 0: Details */}
-      {step === 0 && (
-        <Card>
-          <CardContent className="space-y-4 p-6">
-            <h3 className="text-lg font-semibold">Listing Details</h3>
+                  <FormInput
+                    label="Title"
+                    placeholder="e.g. Handwoven Ethiopian Cotton Dress"
+                    value={title}
+                    onChange={(e) => { setTitle(e.target.value); clearField('title'); }}
+                    {...(errors.title !== undefined && { error: errors.title })}
+                  />
 
-            <FormInput
-              label="Title"
-              placeholder="e.g. iPhone 15 Pro Max 256GB"
-              value={formData.title}
-              onChange={(e) => { updateField('title', e.target.value); }}
-              {...(errors.title !== undefined && { error: errors.title })}
-            />
+                  <FormTextarea
+                    label="Description"
+                    placeholder="Describe your item in detail — materials, craftsmanship, dimensions..."
+                    rows={6}
+                    value={description}
+                    onChange={(e) => { setDescription(e.target.value); clearField('description'); }}
+                    {...(errors.description !== undefined && { error: errors.description })}
+                  />
 
-            <FormTextarea
-              label="Description"
-              placeholder="Describe your item in detail..."
-              rows={6}
-              value={formData.description}
-              onChange={(e) => { updateField('description', e.target.value); }}
-              {...(errors.description !== undefined && { error: errors.description })}
-            />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <CategoryPicker
+                      value={categoryId}
+                      onChange={(id, name) => { setCategoryId(id); setCategoryName(name); clearField('categoryId'); }}
+                      {...(errors.categoryId !== undefined && { error: errors.categoryId })}
+                    />
+                    <FormSelect
+                      label="Condition"
+                      options={CONDITIONS}
+                      value={condition}
+                      onChange={(e) => { setCondition(e.target.value); clearField('condition'); }}
+                      {...(errors.condition !== undefined && { error: errors.condition })}
+                    />
+                  </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormInput
-                label="Price ($)"
-                type="number"
-                placeholder="0.00"
-                value={formData.price}
-                onChange={(e) => { updateField('price', e.target.value); }}
-                {...(errors.price !== undefined && { error: errors.price })}
-              />
+                  <FormInput
+                    label="City"
+                    placeholder="e.g. Addis Ababa"
+                    value={city}
+                    onChange={(e) => { setCity(e.target.value); clearField('city'); }}
+                    {...(errors.city !== undefined && { error: errors.city })}
+                  />
 
-              <FormInput
-                label="City"
-                placeholder="e.g. New York"
-                value={formData.city}
-                onChange={(e) => { updateField('city', e.target.value); }}
-                {...(errors.city !== undefined && { error: errors.city })}
-              />
-            </div>
+                  <TagInput
+                    label="Tags"
+                    description="Add keywords to help buyers find your listing"
+                    value={tags}
+                    onChange={setTags}
+                    maxTags={10}
+                    placeholder="Type and press Enter"
+                  />
+                </div>
+              )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <CategoryPicker
-                  value={formData.categoryId}
-                  onChange={(id) => { updateField('categoryId', id); }}
-                  {...(errors.categoryId !== undefined && { error: errors.categoryId })}
+              {/* Step 1: Images */}
+              {step === 1 && (
+                <ImageUploadSection
+                  images={images}
+                  onImagesChange={setImages}
+                  {...(errors.images !== undefined && { error: errors.images })}
                 />
-              </div>
+              )}
 
-              <FormSelect
-                label="Condition"
-                options={CONDITIONS}
-                value={formData.condition}
-                onChange={(e) => { updateField('condition', e.target.value); }}
-                {...(errors.condition !== undefined && { error: errors.condition })}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 1: Photos */}
-      {step === 1 && (
-        <Card>
-          <CardContent className="p-6">
-            <ImageUploadSection
-              images={formData.images}
-              onImagesChange={(imgs) => { updateField('images', imgs); }}
-            />
-            {errors.images !== undefined && (
-              <p className="mt-2 text-sm text-destructive">{errors.images}</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 2: Contact Options */}
-      {step === 2 && (
-        <Card>
-          <CardContent className="space-y-4 p-6">
-            <h3 className="text-lg font-semibold">Contact Options</h3>
-            <p className="text-sm text-muted-foreground">Choose how buyers can reach you.</p>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-3">
-                <Checkbox
-                  checked={formData.contactOptions.showPhone}
-                  onChange={(e) => { updateContact('showPhone', e.target.checked); }}
+              {/* Step 2: Pricing */}
+              {step === 2 && (
+                <PricingSection
+                  listingType={listingType}
+                  data={pricing}
+                  onChange={setPricing}
+                  errors={errors}
                 />
-                <span className="text-sm">Show my phone number on the listing</span>
-              </label>
+              )}
 
-              <label className="flex items-center gap-3">
-                <Checkbox
-                  checked={formData.contactOptions.inAppMessaging}
-                  onChange={(e) => { updateContact('inAppMessaging', e.target.checked); }}
+              {/* Step 3: Delivery & Availability */}
+              {step === 3 && (
+                <DeliveryOptions
+                  listingType={listingType}
+                  data={delivery}
+                  onChange={setDelivery}
+                  errors={errors}
                 />
-                <span className="text-sm">Enable in-app messaging</span>
-              </label>
-            </div>
+              )}
 
-            <FormInput
-              label="WhatsApp Number"
-              placeholder="+1234567890"
-              value={formData.contactOptions.whatsapp}
-              onChange={(e) => { updateContact('whatsapp', e.target.value); }}
-            />
+              {/* Step 4: Review & Publish */}
+              {step === 4 && (
+                <ListingReviewSummary
+                  data={{
+                    listingType,
+                    title,
+                    description,
+                    categoryId,
+                    categoryName,
+                    condition,
+                    city,
+                    tags,
+                    images,
+                    pricing,
+                    delivery,
+                    contactOptions,
+                  }}
+                />
+              )}
 
-            <FormInput
-              label="Telegram Username"
-              placeholder="@username"
-              value={formData.contactOptions.telegram}
-              onChange={(e) => { updateContact('telegram', e.target.value); }}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 3: Review */}
-      {step === 3 && (
-        <Card>
-          <CardContent className="space-y-6 p-6">
-            <h3 className="text-lg font-semibold">Review Your Listing</h3>
-
-            <div className="space-y-3">
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Title</span>
-                <p className="text-sm font-medium">{formData.title}</p>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Description</span>
-                <p className="text-sm whitespace-pre-wrap">{formData.description}</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Price</span>
-                  <p className="text-sm font-medium">${Number(formData.price).toLocaleString()}</p>
+              {/* Contact options (shown in basic info step for compactness) */}
+              {step === 0 && (
+                <div className="mt-6 border-t pt-5">
+                  <h4 className="text-sm font-medium text-foreground mb-3">Contact Options</h4>
+                  <div className="space-y-2.5">
+                    <label className="flex items-center gap-3">
+                      <Checkbox checked={contactOptions.showPhone} onChange={(e) => { updateContact('showPhone', e.target.checked); }} />
+                      <span className="text-sm">Show my phone number</span>
+                    </label>
+                    <label className="flex items-center gap-3">
+                      <Checkbox checked={contactOptions.inAppMessaging} onChange={(e) => { updateContact('inAppMessaging', e.target.checked); }} />
+                      <span className="text-sm">Enable in-app messaging</span>
+                    </label>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <FormInput
+                      label="WhatsApp Number"
+                      placeholder="+251..."
+                      value={contactOptions.whatsapp}
+                      onChange={(e) => { updateContact('whatsapp', e.target.value); }}
+                    />
+                    <FormInput
+                      label="Telegram Username"
+                      placeholder="@username"
+                      value={contactOptions.telegram}
+                      onChange={(e) => { updateContact('telegram', e.target.value); }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Condition</span>
-                  <p className="text-sm font-medium capitalize">{formData.condition.replace('_', ' ')}</p>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">City</span>
-                  <p className="text-sm font-medium">{formData.city}</p>
-                </div>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Photos</span>
-                <p className="text-sm">{formData.images.length} photo{formData.images.length !== 1 ? 's' : ''} uploaded</p>
-              </div>
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Contact Options</span>
-                <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                  {formData.contactOptions.showPhone && <span className="rounded bg-muted px-2 py-1">Phone</span>}
-                  {formData.contactOptions.inAppMessaging && <span className="rounded bg-muted px-2 py-1">In-App Messaging</span>}
-                  {formData.contactOptions.whatsapp && <span className="rounded bg-muted px-2 py-1">WhatsApp</span>}
-                  {formData.contactOptions.telegram && <span className="rounded bg-muted px-2 py-1">Telegram</span>}
-                </div>
-              </div>
-            </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <Alert variant="info">
-              After submission, your listing will be reviewed before going live. This usually takes less than 24 hours.
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
+          {/* Navigation */}
+          <div className="mt-4 flex items-center justify-between">
+            <Button type="button" variant="outline" onClick={handleBack} disabled={step === 0}>
+              Back
+            </Button>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleBack}
-          disabled={step === 0}
-        >
-          Back
-        </Button>
-
-        {step < STEPS.length - 1 ? (
-          <Button type="button" onClick={handleNext}>
-            Next
-          </Button>
-        ) : (
-          <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <Spinner size="sm" /> Submitting...
-              </span>
+            {step < steps.length - 1 ? (
+              <Button type="button" onClick={handleNext}>
+                Next
+              </Button>
             ) : (
-              submitLabel
+              <Button type="button" onClick={handlePublish} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2"><Spinner size="sm" /> Publishing...</span>
+                ) : (
+                  submitLabel
+                )}
+              </Button>
             )}
-          </Button>
-        )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ export async function register(data: {
   password: string
   displayName: string
   phone?: string
+  userType?: 'buyer' | 'seller'
 }): Promise<AuthResponse> {
   return apiPost<AuthResponse>('/auth/register', data)
 }
@@ -57,4 +58,8 @@ export async function updateProfile(data: {
   return apiPatch<AuthUser>('/users/me', data)
 }
 
-export default { login, register, logout, me, forgotPassword, resetPassword, changePassword, updateProfile }
+export async function resendVerificationEmail(email?: string): Promise<SuccessResponse> {
+  return apiPost<SuccessResponse>('/auth/verify/resend', email != null ? { email } : {})
+}
+
+export default { login, register, logout, me, forgotPassword, resetPassword, changePassword, updateProfile, resendVerificationEmail }

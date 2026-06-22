@@ -62,4 +62,23 @@ export class ListingFilterDto extends PaginationQueryDto {
   @Min(0)
   @Max(99_999_999.99)
   maxPrice?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  availableForPurchase?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  availableForRent?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  customOrderAvailable?: boolean;
+
+  @IsOptional()
+  @IsIn(['buy', 'rent', 'custom'])
+  type?: 'buy' | 'rent' | 'custom';
 }

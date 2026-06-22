@@ -13,6 +13,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
+    userType: z.enum(['buyer', 'seller']).default('buyer'),
     displayName: z.string().min(2, 'Name must be at least 2 characters').max(100),
     email: z.string().email('Invalid email address'),
     password: z
@@ -21,7 +22,8 @@ export const registerSchema = z
       .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
       .regex(/[0-9]/, 'Password must contain at least one number'),
     confirmPassword: z.string(),
-    phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number').optional().or(z.literal('')),
+    phone: z.string().regex(/^(\+251|0)(9|7)\d{8}$/, 'Enter a valid Ethiopian phone number (e.g. 09XXXXXXXX or +2519XXXXXXXX)').optional().or(z.literal('')),
+    termsAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms' }) }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -65,7 +67,7 @@ export const changePasswordSchema = z
 // Profile schemas
 export const profileUpdateSchema = z.object({
   displayName: z.string().min(2, 'Name must be at least 2 characters').max(100),
-  phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number').optional().or(z.literal('')),
+  phone: z.string().regex(/^(\+251|0)(9|7)\d{8}$/, 'Enter a valid Ethiopian phone number (e.g. 09XXXXXXXX or +2519XXXXXXXX)').optional().or(z.literal('')),
 });
 
 // Notification preferences schema
@@ -103,6 +105,13 @@ export const listingCreateSchema = z.object({
   }),
   contactOptions: contactOptionsSchema.optional(),
   images: z.array(listingImageSchema).min(1, 'At least one image is required').max(10, 'Maximum 10 images allowed'),
+  // Type-specific fields
+  availableForPurchase: z.boolean().optional(),
+  availableForRent: z.boolean().optional(),
+  customOrderAvailable: z.boolean().optional(),
+  rentalPricePerDay: z.coerce.number().min(0).max(9999999).optional(),
+  rentalDeposit: z.coerce.number().min(0).max(9999999).optional(),
+  attributes: z.record(z.unknown()).optional(),
 });
 
 export const listingUpdateSchema = z.object({
@@ -116,6 +125,13 @@ export const listingUpdateSchema = z.object({
   }).optional(),
   contactOptions: contactOptionsSchema.optional(),
   images: z.array(listingImageSchema).min(1, 'At least one image is required').max(10, 'Maximum 10 images allowed').optional(),
+  // Type-specific fields
+  availableForPurchase: z.boolean().optional(),
+  availableForRent: z.boolean().optional(),
+  customOrderAvailable: z.boolean().optional(),
+  rentalPricePerDay: z.coerce.number().min(0).max(9999999).optional(),
+  rentalDeposit: z.coerce.number().min(0).max(9999999).optional(),
+  attributes: z.record(z.unknown()).optional(),
 });
 
 // Report schema

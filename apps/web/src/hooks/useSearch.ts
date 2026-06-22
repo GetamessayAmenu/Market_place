@@ -15,6 +15,7 @@ interface UseSearchParams {
   sortBy?: string | undefined
   featured?: string | undefined
   verified?: string | undefined
+  type?: string | undefined
   page?: number | undefined
   limit?: number | undefined
 }
@@ -26,7 +27,7 @@ export function useSearch(params?: UseSearchParams) {
       const res = await apiGet<PaginatedResponse<Listing>>('/search', params as Record<string, string | number | boolean | undefined>)
       return res
     },
-    enabled: !!params?.q,
+    enabled: true,
     keepPreviousData: true,
   })
 }

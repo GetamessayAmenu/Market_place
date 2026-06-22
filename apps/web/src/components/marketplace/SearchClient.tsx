@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCategories } from '../../hooks/useCategories'
 import { useSearch } from '../../hooks/useSearch'
 import Container from '../Container'
+
 import FilterPanel, { type FilterValues } from './FilterPanel'
 import ListingCard from './ListingCard'
 import ListingCardSkeleton from './ListingCardSkeleton'
@@ -32,6 +33,7 @@ export default function SearchClient() {
   const initialMinPrice = searchParams.get('minPrice') ?? ''
   const initialMaxPrice = searchParams.get('maxPrice') ?? ''
   const initialCity = searchParams.get('city') ?? ''
+  const initialType = searchParams.get('type') ?? ''
 
   const [query, setQuery] = useState(initialQ)
   const [page, setPage] = useState(initialPage)
@@ -64,8 +66,9 @@ export default function SearchClient() {
       minPrice: initialMinPrice || undefined,
       maxPrice: initialMaxPrice || undefined,
       city: initialCity || undefined,
+      type: initialType || undefined,
     }),
-    [query, sortBy, page, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity]
+    [query, sortBy, page, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity, initialType]
   )
 
   const { data, isLoading, isError, refetch } = useSearch(searchParamsObj)
@@ -81,10 +84,11 @@ export default function SearchClient() {
     if (initialMinPrice) params.set('minPrice', initialMinPrice)
     if (initialMaxPrice) params.set('maxPrice', initialMaxPrice)
     if (initialCity) params.set('city', initialCity)
+    if (initialType) params.set('type', initialType)
 
     const newUrl = params.toString() ? `/search?${params.toString()}` : '/search'
     router.replace(newUrl, { scroll: false })
-  }, [query, page, sortBy, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity, router])
+  }, [query, page, sortBy, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity, initialType, router])
 
   const handleSearch = useCallback((q: string) => {
     setQuery(q)
@@ -105,6 +109,8 @@ export default function SearchClient() {
       if (values.minPrice) params.set('minPrice', values.minPrice)
       if (values.maxPrice) params.set('maxPrice', values.maxPrice)
       if (values.city) params.set('city', values.city)
+      const typeFilter = (values.listingTypes ?? [])[0]
+      if (typeFilter) params.set('type', typeFilter)
       router.push(`/search?${params.toString()}`)
       setFiltersOpen(false)
     },

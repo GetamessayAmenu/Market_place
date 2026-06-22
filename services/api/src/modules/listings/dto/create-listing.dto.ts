@@ -1,11 +1,14 @@
+import { MAX_LISTING_IMAGES } from '@marketplace/config';
 import { LISTING_CONDITIONS } from '@marketplace/types';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -15,7 +18,6 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { MAX_LISTING_IMAGES } from '@marketplace/config';
 
 import { ContactOptionsDto } from './contact-options.dto';
 import { ListingImageInputDto } from './listing-image-input.dto';
@@ -77,6 +79,36 @@ export class CreateListingDto {
   @ValidateNested()
   @Type(() => ContactOptionsDto)
   contactOptions?: ContactOptionsDto;
+
+  @IsOptional()
+  @IsBoolean()
+  availableForPurchase?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  availableForRent?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  customOrderAvailable?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(99_999_999.99)
+  rentalPricePerDay?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(99_999_999.99)
+  rentalDeposit?: number;
+
+  @IsOptional()
+  @IsObject()
+  attributes?: Record<string, unknown>;
 
   @IsArray()
   @ArrayMinSize(1)

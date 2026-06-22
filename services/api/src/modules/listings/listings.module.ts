@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AdminLogsModule } from '../admin-logs/admin-logs.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { FavoritesModule } from '../favorites/favorites.module';
 import { UploadsModule } from '../uploads/uploads.module';
@@ -16,7 +17,7 @@ import { ListingsService } from './listings.service';
 import { UserListingsController } from './user-listings.controller';
 
 @Module({
-  imports: [CategoriesModule, UploadsModule, forwardRef(() => FavoritesModule)],
+  imports: [CategoriesModule, UploadsModule, forwardRef(() => FavoritesModule), AdminLogsModule],
   controllers: [ListingsController, UserListingsController, AdminListingsController],
   providers: [
     ListingsRepository,

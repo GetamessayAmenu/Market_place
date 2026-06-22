@@ -20,9 +20,12 @@ const shopLinks = [
 ];
 
 const accountLinks = [
-  { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/seller', label: 'Seller Hub' },
+  { href: '/dashboard/seller/listings', label: 'My Listings' },
+  { href: '/dashboard/seller/orders', label: 'Custom Orders' },
+  { href: '/dashboard/seller/analytics', label: 'Analytics' },
   { href: '/dashboard/saved', label: 'Saved Items' },
-  { href: '/dashboard/messages', label: 'Messages' },
+  { href: '/dashboard/seller/messages', label: 'Messages' },
   { href: '/dashboard/notifications', label: 'Notifications' },
 ];
 

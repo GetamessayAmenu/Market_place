@@ -38,6 +38,12 @@ export interface SellerListing {
     slug: string;
   } | null;
   contactOptions?: ContactOptions | null;
+  availableForPurchase?: boolean | null;
+  availableForRent?: boolean | null;
+  customOrderAvailable?: boolean | null;
+  rentalPricePerDay?: number | null;
+  rentalDeposit?: number | null;
+  attributes?: Record<string, unknown> | null;
   _count?: {
     favorites: number;
   };

@@ -1,3 +1,5 @@
+"use client"
+
 import { Avatar, Badge, cn, PriceTag, Tag } from '@marketplace/ui';
 import Link from 'next/link';
 import React from 'react';

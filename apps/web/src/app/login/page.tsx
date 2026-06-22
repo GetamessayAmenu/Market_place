@@ -1,24 +1,35 @@
 "use client"
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, FormInput, Spinner } from '@marketplace/ui';
+import { Alert, Button, Checkbox, Spinner } from '@marketplace/ui';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
+import PasswordInput from '../../components/auth/PasswordInput';
 import AuthLayout from '../../components/layouts/AuthLayout';
 import useAuth from '../../hooks/useAuth';
 import { login as clientLogin } from '../../lib/authClient';
 import { loginSchema, type LoginInput } from '../../lib/validation';
 
-export default function LoginPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') ?? '/dashboard';
+  const showResetSuccess = searchParams.get('reset') === 'success';
+
+  const { register, handleSubmit, formState: { errors }, setFocus } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
   const router = useRouter();
   const setUser = useAuth((s) => s.setUser);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetBanner, setResetBanner] = useState(showResetSuccess);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    setFocus('email');
+  }, [setFocus]);
 
   async function onSubmit(data: LoginInput) {
     setError(null);
@@ -26,7 +37,7 @@ export default function LoginPage() {
     try {
       const res = await clientLogin(data.email, data.password);
       setUser(res.user);
-      router.push('/dashboard');
+      router.push(redirect);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setError(err.response?.data?.message ?? 'Invalid email or password. Please try again.');
@@ -38,30 +49,56 @@ export default function LoginPage() {
     void handleSubmit(onSubmit)(e);
   };
 
+  const registerLink = redirect !== '/dashboard'
+    ? `/register?redirect=${encodeURIComponent(redirect)}`
+    : '/register';
+
+  const forgotLink = redirect !== '/dashboard'
+    ? `/forgot-password?redirect=${encodeURIComponent(redirect)}`
+    : '/forgot-password';
+
   return (
-    <AuthLayout title="Sign in" subtitle="Welcome back to Marketplace">
+    <AuthLayout title="Sign in" subtitle="Welcome back to Habesha Market">
       <form onSubmit={onFormSubmit} className="space-y-4">
+        {resetBanner && (
+          <Alert variant="success" onDismiss={() => { setResetBanner(false) }}>
+            Your password has been reset successfully. Please sign in with your new password.
+          </Alert>
+        )}
         {error && (
           <Alert variant="error" onDismiss={() => { setError(null) }}>
             {error}
           </Alert>
         )}
-        <FormInput
-          label="Email"
-          type="email"
-          autoComplete="email"
-          {...register('email')}
-          {...(errors.email?.message !== undefined && { error: errors.email.message })}
-        />
-        <FormInput
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-sm font-medium text-foreground">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            {...register('email')}
+            className={`w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50 ${errors.email ? 'border-destructive' : 'border-input'}`}
+            aria-invalid={!!errors.email}
+            {...(errors.email?.message !== undefined && { 'aria-describedby': 'email-error' })}
+          />
+          {errors.email?.message !== undefined && (
+            <p id="email-error" className="text-xs text-destructive" role="alert">
+              {errors.email.message}
+            </p>
+          )}
+        </div>
+        <PasswordInput
           label="Password"
-          type="password"
           autoComplete="current-password"
           {...register('password')}
           {...(errors.password?.message !== undefined && { error: errors.password.message })}
         />
-        <div className="flex items-center justify-end">
-          <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+        <div className="flex items-center justify-between">
+          <Checkbox label="Remember me" checked={rememberMe} onChange={(e) => { setRememberMe(e.target.checked) }} />
+          <Link href={forgotLink} className="text-sm text-primary hover:underline">
             Forgot password?
           </Link>
         </div>
@@ -76,11 +113,19 @@ export default function LoginPage() {
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
+          <Link href={registerLink} className="font-medium text-primary hover:underline">
             Create account
           </Link>
         </p>
       </form>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

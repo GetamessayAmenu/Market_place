@@ -13,15 +13,9 @@ interface FavoriteItem {
   }
 }
 
-interface FavoritesResponse {
-  success: boolean
-  data: FavoriteItem[]
-}
-
 export default async function SavedListingsPage() {
   const user = await requireUser()
-  const res = await serverGet<FavoritesResponse>('/favorites')
-  const items = res.data
+  const items = await serverGet<FavoriteItem[]>('/favorites')
 
   return (
     <Container>

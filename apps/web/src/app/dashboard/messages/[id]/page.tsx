@@ -1,43 +1,59 @@
-import React from 'react'
+import React from 'react';
 
-import Container from '../../../../components/Container'
-import MessageThread from '../../../../components/dashboard/MessageThread'
-import { requireUser } from '../../../../lib/authServer'
-import { serverGet } from '../../../../lib/serverApi'
+import MessageThread from '../../../../components/chat/MessageThread';
+import { requireUser } from '../../../../lib/authServer';
+import type { ChatConversation, MessagesResponse } from '../../../../lib/chatApi';
+import { serverGet } from '../../../../lib/serverApi';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Props {
-  params: { id: string }
+  params: { id: string };
 }
 
-interface ConversationResponse {
-  success: boolean
-  data: { id: string; title?: string }
-}
-
-interface MessagesResponse {
-  success: boolean
-  data: { id: string; content: string }[]
-}
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export function generateMetadata({ params }: Props) {
-  return { title: `Conversation ${params.id}` }
+  return { title: `Conversation ${params.id}` };
 }
 
 export default async function ConversationPage({ params }: Props) {
-  await requireUser()
-  const convRes = await serverGet<ConversationResponse>(`/conversations/${params.id}`)
-  const msgsRes = await serverGet<MessagesResponse>(`/conversations/${params.id}/messages`)
-  const conversation = convRes.data
-  const messages = msgsRes.data
+  const user = await requireUser();
+  if (!user) return null;
+
+  let conversation: ChatConversation | null = null;
+  let messages: MessagesResponse['data'] = [];
+  let totalPages = 1;
+
+  try {
+    const convRes = await serverGet<ChatConversation>(`/conversations/${params.id}`);
+    conversation = convRes;
+  } catch {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <p className="text-sm text-muted-foreground">Conversation not found.</p>
+      </div>
+    );
+  }
+
+  try {
+    const msgRes = await serverGet<MessagesResponse>(`/conversations/${params.id}/messages`, {
+      params: { limit: 50 },
+    });
+    messages = msgRes.data;
+    totalPages = msgRes.meta.totalPages;
+  } catch {
+    // Show empty thread
+  }
 
   return (
-    <Container>
-      <section className="py-8">
-        <h2 className="text-2xl font-semibold">{conversation.title ?? 'Conversation'}</h2>
-        <div className="mt-6">
-          <MessageThread conversation={conversation} initialMessages={messages} />
-        </div>
-      </section>
-    </Container>
-  )
+    <div className="h-[calc(100vh-4rem)]">
+      <MessageThread
+        conversation={conversation}
+        currentUserId={user.id}
+        initialMessages={messages}
+        totalPages={totalPages}
+      />
+    </div>
+  );
 }

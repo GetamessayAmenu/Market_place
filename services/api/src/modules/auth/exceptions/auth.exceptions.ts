@@ -36,6 +36,12 @@ export class EmailAlreadyRegisteredException extends ForbiddenException {
   }
 }
 
+export class PhoneAlreadyRegisteredException extends ForbiddenException {
+  constructor(message = 'Phone number is already registered') {
+    super({ code: 'PHONE_ALREADY_REGISTERED', message });
+  }
+}
+
 export class SessionInvalidException extends UnauthorizedException {
   constructor(message = 'Session is invalid or expired') {
     super({ code: 'SESSION_INVALID', message });

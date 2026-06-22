@@ -40,6 +40,12 @@ export interface CreateListingData {
   readonly latitude?: Prisma.Decimal;
   readonly longitude?: Prisma.Decimal;
   readonly contactOptions?: Prisma.InputJsonValue;
+  readonly availableForPurchase?: boolean;
+  readonly availableForRent?: boolean;
+  readonly customOrderAvailable?: boolean;
+  readonly rentalPricePerDay?: Prisma.Decimal;
+  readonly rentalDeposit?: Prisma.Decimal;
+  readonly attributes?: Prisma.InputJsonValue;
   readonly publishedAt?: Date;
   readonly expiresAt?: Date;
   readonly images: readonly {

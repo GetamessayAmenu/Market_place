@@ -62,7 +62,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         details?: Record<string, unknown>;
       } = {
         status,
-        code: String(payload.error ?? HttpStatus[status] ?? 'HTTP_EXCEPTION'),
+        code: String(payload.code ?? payload.error ?? HttpStatus[status] ?? 'HTTP_EXCEPTION'),
         message,
       };
 

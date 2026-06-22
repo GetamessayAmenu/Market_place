@@ -3,9 +3,13 @@ import Link from 'next/link'
 import React from 'react'
 
 import Container from '../../../components/Container'
+import ChatButton from '../../../components/marketplace/ChatButton'
 import FavoriteButton from '../../../components/marketplace/FavoriteButton'
 import ImageGallery from '../../../components/marketplace/ImageGallery'
+import ListingActions from '../../../components/marketplace/ListingActions'
 import ListingCard from '../../../components/marketplace/ListingCard'
+import ReviewSection from '../../../components/marketplace/ReviewSection'
+import ShareButton from '../../../components/marketplace/ShareButton'
 import { serverGet } from '../../../lib/serverApi'
 
 interface ListingImage {
@@ -19,6 +23,7 @@ interface ListingData {
   slug: string
   description: string
   price: number
+  currency: string
   condition: string
   city: string
   location?: string
@@ -47,6 +52,11 @@ interface ListingData {
   _count?: {
     favorites: number
   }
+  availableForPurchase?: boolean
+  availableForRent?: boolean
+  customOrderAvailable?: boolean
+  rentalPricePerDay?: number | null
+  rentalDeposit?: number | null
   createdAt: string
 }
 
@@ -56,10 +66,10 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   try {
-    const res = await serverGet<{ success: boolean; data: ListingData }>(`/listings/${params.id}`, {
+    const res = await serverGet<ListingData>(`/listings/${params.id}`, {
       revalidate: 60,
     })
-    const listing = res.data
+    const listing = res
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
       title: `${listing.title} — Marketplace`,
@@ -68,7 +78,7 @@ export async function generateMetadata({ params }: Props) {
         title: `${listing.title} — Marketplace`,
         description: listing.description.slice(0, 160),
         url: `${siteUrl}/listings/${listing.id}`,
-        ...(listing.primaryImageUrl && { images: [listing.primaryImageUrl] }),
+        ...(listing.primaryImageUrl ? { images: [listing.primaryImageUrl] } : {}),
         type: 'website',
       },
       alternates: {
@@ -88,24 +98,21 @@ export default async function ListingPage({ params }: Props) {
   let relatedListings: { id: string; title: string; price: number; condition: string; city: string; primaryImageUrl?: string | null }[] = []
 
   try {
-    const listingRes = await serverGet<{ success: boolean; data: ListingData }>(`/listings/${id}`, {
+    const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
       revalidate: 60,
     })
-    listing = listingRes.data
+    listing = listingRes
   } catch {
     listing = null
   }
 
   if (listing?.category?.id) {
     try {
-      const relatedRes = await serverGet<{
-        success: boolean
-        data: typeof relatedListings
-      }>('/listings', {
+      const relatedRes = await serverGet<typeof relatedListings>('/listings', {
         revalidate: 60,
         params: { categoryId: listing.category.id, limit: 4 },
       })
-      relatedListings = relatedRes.data.filter((l) => l.id !== listing.id)
+      relatedListings = relatedRes.filter((l) => l.id !== listing.id)
     } catch {
       // Graceful fallback
     }
@@ -143,7 +150,7 @@ export default async function ListingPage({ params }: Props) {
     '@type': 'Product',
     name: listing.title,
     description: listing.description,
-    ...(listing.primaryImageUrl && { image: [listing.primaryImageUrl] }),
+    ...(listing.primaryImageUrl ? { image: [listing.primaryImageUrl] } : {}),
     url: `${siteUrl}/listings/${listing.id}`,
     offers: {
       '@type': 'Offer',
@@ -151,14 +158,16 @@ export default async function ListingPage({ params }: Props) {
       priceCurrency: 'USD',
       availability: listing.status === 'active' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     },
-    ...(listing.seller && {
+    ...(listing.seller ? {
       seller: {
         '@type': 'Person',
         name: listing.seller.name,
         url: `${siteUrl}/sellers/${listing.seller.id}`,
       },
-    }),
+    } : {}),
   }
+
+  const hasActions = (listing.availableForPurchase ?? false) || (listing.availableForRent ?? false) || (listing.customOrderAvailable ?? false)
 
   return (
     <Container>
@@ -168,14 +177,14 @@ export default async function ListingPage({ params }: Props) {
           <Link href="/" className="hover:text-foreground transition-colors">
             Home
           </Link>
-          {listing.category && (
+          {listing.category ? (
             <>
               <span className="mx-2">/</span>
               <Link href={`/categories/${listing.category.slug}`} className="hover:text-foreground transition-colors">
                 {listing.category.name}
               </Link>
             </>
-          )}
+          ) : null}
           <span className="mx-2">/</span>
           <span className="text-foreground">{listing.title}</span>
         </nav>
@@ -192,25 +201,48 @@ export default async function ListingPage({ params }: Props) {
             <div>
               <div className="flex items-start justify-between gap-4">
                 <h1 className="text-2xl font-bold text-foreground">{listing.title}</h1>
-                <FavoriteButton listingId={listing.id} />
+                <div className="flex items-center gap-2">
+                  <ShareButton title={listing.title} />
+                  <FavoriteButton listingId={listing.id} />
+                </div>
               </div>
-              <p className="mt-2 text-3xl font-bold text-primary">${listing.price.toLocaleString()}</p>
+              <p className="mt-2 text-3xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
+              {listing.availableForRent && listing.rentalPricePerDay != null && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  or rent for {listing.currency}{listing.rentalPricePerDay.toLocaleString()}/day
+                </p>
+              )}
             </div>
 
             {/* Badges */}
             <div className="flex flex-wrap gap-2">
-              {listing.condition && (
+              {listing.condition ? (
                 <Badge variant={conditionVariant[listing.condition] ?? 'default'}>
                   {listing.condition.replace('_', ' ')}
                 </Badge>
-              )}
-              {listing.isFeatured && <Badge variant="warning">Featured</Badge>}
-              {listing.status && <Badge variant="info">{listing.status}</Badge>}
+              ) : null}
+              {listing.isFeatured ? <Badge variant="warning">Featured</Badge> : null}
+              {listing.status ? <Badge variant="info">{listing.status}</Badge> : null}
             </div>
+
+            {/* Buy / Rent / Custom Order actions */}
+            {hasActions && listing.seller && (
+              <ListingActions
+                listingId={listing.id}
+                price={listing.price}
+                currency={listing.currency}
+                availableForPurchase={listing.availableForPurchase ?? false}
+                availableForRent={listing.availableForRent ?? false}
+                customOrderAvailable={listing.customOrderAvailable ?? false}
+                {...(listing.rentalPricePerDay !== undefined ? { rentalPricePerDay: listing.rentalPricePerDay ?? null } : { rentalPricePerDay: null })}
+                {...(listing.rentalDeposit !== undefined ? { rentalDeposit: listing.rentalDeposit ?? null } : { rentalDeposit: null })}
+                sellerId={listing.seller.id}
+              />
+            )}
 
             {/* Location and date */}
             <div className="space-y-2 text-sm text-muted-foreground">
-              {listing.city && (
+              {listing.city ? (
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path
@@ -228,7 +260,7 @@ export default async function ListingPage({ params }: Props) {
                   </svg>
                   <span>{listing.location ?? listing.city}</span>
                 </div>
-              )}
+              ) : null}
               <div className="flex items-center gap-2">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path
@@ -240,7 +272,7 @@ export default async function ListingPage({ params }: Props) {
                 </svg>
                 <span>Posted {new Date(listing.createdAt).toLocaleDateString()}</span>
               </div>
-              {listing._count?.favorites !== undefined && (
+              {listing._count?.favorites !== undefined ? (
                 <div className="flex items-center gap-2">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path
@@ -252,15 +284,15 @@ export default async function ListingPage({ params }: Props) {
                   </svg>
                   <span>{String(listing._count.favorites)} saved</span>
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Contact actions */}
-            {listing.contactOptions && (
+            {listing.contactOptions ? (
               <div className="space-y-3">
                 <h3 className="font-semibold text-foreground">Contact Seller</h3>
                 <div className="flex flex-wrap gap-2">
-                  {listing.contactOptions.showPhone && (
+                  {listing.contactOptions.showPhone ? (
                     <a
                       href="tel:"
                       className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
@@ -275,8 +307,8 @@ export default async function ListingPage({ params }: Props) {
                       </svg>
                       Call
                     </a>
-                  )}
-                  {listing.contactOptions.whatsapp && (
+                  ) : null}
+                  {listing.contactOptions.whatsapp ? (
                     <a
                       href={`https://wa.me/${listing.contactOptions.whatsapp}`}
                       target="_blank"
@@ -285,8 +317,8 @@ export default async function ListingPage({ params }: Props) {
                     >
                       WhatsApp
                     </a>
-                  )}
-                  {listing.contactOptions.telegram && (
+                  ) : null}
+                  {listing.contactOptions.telegram ? (
                     <a
                       href={`https://t.me/${listing.contactOptions.telegram}`}
                       target="_blank"
@@ -295,26 +327,27 @@ export default async function ListingPage({ params }: Props) {
                     >
                       Telegram
                     </a>
-                  )}
-                  {listing.contactOptions.inAppMessaging && listing.seller && (
+                  ) : null}
+                  {listing.contactOptions.inAppMessaging && listing.seller ? (
                     <Link
                       href={`/dashboard/messages?listing=${listing.id}&seller=${listing.seller.id}`}
                       className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent"
                     >
                       Send Message
                     </Link>
-                  )}
+                  ) : null}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Seller info */}
-            {listing.seller && (
-              <div className="rounded-lg border bg-card p-4">
-                <Link href={`/sellers/${listing.seller.id}`} className="flex items-center gap-3 group">
+            {listing.seller ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border bg-card p-4">
+                  <Link href={`/sellers/${listing.seller.id}`} className="flex items-center gap-3 group">
                   <Avatar
                     name={listing.seller.name}
-                    {...(listing.seller.avatarUrl !== undefined && { src: listing.seller.avatarUrl })}
+                    {...(listing.seller.avatarUrl !== undefined ? { src: listing.seller.avatarUrl } : {})}
                     size="lg"
                   />
                   <div>
@@ -322,15 +355,21 @@ export default async function ListingPage({ params }: Props) {
                       <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
                         {listing.seller.name}
                       </h3>
-                      {(listing.seller.emailVerifiedAt ?? listing.seller.phoneVerifiedAt) && (
+                      {(listing.seller.emailVerifiedAt ?? listing.seller.phoneVerifiedAt) ? (
                         <Badge variant="success">Verified</Badge>
-                      )}
+                      ) : null}
                     </div>
                     <p className="text-sm text-muted-foreground">View profile</p>
                   </div>
                 </Link>
+                </div>
+                <ChatButton
+                  listingId={listing.id}
+                  sellerId={listing.seller.id}
+                  sellerName={listing.seller.name}
+                />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -342,8 +381,18 @@ export default async function ListingPage({ params }: Props) {
           <div className="prose prose-sm max-w-none text-muted-foreground whitespace-pre-wrap">{listing.description}</div>
         </section>
 
+        {/* Reviews */}
+        {listing.seller && (
+          <section className="mt-10" aria-labelledby="reviews-heading">
+            <h2 id="reviews-heading" className="text-xl font-bold text-foreground mb-4">
+              Reviews
+            </h2>
+            <ReviewSection listingId={listing.id} sellerId={listing.seller.id} />
+          </section>
+        )}
+
         {/* Related listings */}
-        {relatedListings.length > 0 && (
+        {relatedListings.length > 0 ? (
           <section className="mt-12" aria-labelledby="related-heading">
             <h2 id="related-heading" className="text-xl font-bold text-foreground mb-6">
               Similar Listings
@@ -355,12 +404,12 @@ export default async function ListingPage({ params }: Props) {
                   id={rel.id}
                   title={rel.title}
                   price={rel.price}
-                  {...(rel.primaryImageUrl !== undefined && { imageUrl: rel.primaryImageUrl })}
+                  {...(rel.primaryImageUrl !== undefined ? { imageUrl: rel.primaryImageUrl } : {})}
                 />
               ))}
             </div>
           </section>
-        )}
+        ) : null}
 
         {/* JSON-LD */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

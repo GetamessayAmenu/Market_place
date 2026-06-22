@@ -1,34 +1,55 @@
-import { Avatar, Badge } from '@marketplace/ui'
+import { cn } from '@marketplace/ui'
 import Link from 'next/link'
 import React from 'react'
 
 import Container from '../../../components/Container'
-import ListingCard from '../../../components/marketplace/ListingCard'
+import BreadcrumbNav from '../../../components/marketplace/BreadcrumbNav'
+import ReviewSection from '../../../components/marketplace/ReviewSection'
+import SellerAbout, { type SocialLinks } from '../../../components/marketplace/SellerAbout'
+import SellerContact from '../../../components/marketplace/SellerContact'
+import SellerCover, { type SellerType } from '../../../components/marketplace/SellerCover'
+import SellerListings, { type SellerListing } from '../../../components/marketplace/SellerListings'
+import SellerProfileCard from '../../../components/marketplace/SellerProfileCard'
+import SellerStats, { type SellerStatsData } from '../../../components/marketplace/SellerStats'
+import TrustBadges from '../../../components/marketplace/TrustBadges'
 import { serverGet } from '../../../lib/serverApi'
 
 interface SellerData {
   id: string
-  name: string
+  displayName: string
   email?: string
-  bio?: string | null
-  avatarUrl?: string | null
   phone?: string | null
+  bio?: string | null
   location?: string | null
+  avatarUrl?: string | null
+  sellerType?: string | null
+  coverImageUrl?: string | null
+  specialties?: string[]
+  socialLinks?: SocialLinks | null
+  responseRate?: number | null
+  responseTimeHours?: number | null
+  totalSales?: number | null
   emailVerifiedAt?: string | null
   phoneVerifiedAt?: string | null
   createdAt: string
   _count?: {
     listings: number
+    followers?: number
   }
 }
 
-interface ListingData {
+interface ListingRaw {
   id: string
   title: string
   price: number
   condition: string
   city: string
   primaryImageUrl?: string | null
+  availableForPurchase?: boolean
+  availableForRent?: boolean
+  customOrderAvailable?: boolean
+  rentalPricePerDay?: number | null
+  createdAt: string
 }
 
 interface PaginatedResponse<T> {
@@ -49,19 +70,19 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   try {
-    const res = await serverGet<{ success: boolean; data: SellerData }>(`/users/${params.id}`, {
+    const res = await serverGet<SellerData>(`/users/${params.id}`, {
       revalidate: 120,
     })
-    const u = res.data
+    const u = res
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
-      title: `${u.name} — Marketplace`,
-      description: u.bio?.slice(0, 160) ?? `View ${u.name}'s profile and listings.`,
+      title: `${u.displayName} — Marketplace`,
+      description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings.`,
       openGraph: {
-        title: `${u.name} — Marketplace`,
-        description: u.bio?.slice(0, 160) ?? `View ${u.name}'s profile and listings.`,
+        title: `${u.displayName} — Marketplace`,
+        description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings.`,
         url: `${siteUrl}/sellers/${u.id}`,
-        ...(u.avatarUrl && { images: [u.avatarUrl] }),
+        ...(u.avatarUrl != null && { images: [u.avatarUrl] }),
         type: 'profile',
       },
     }
@@ -70,35 +91,32 @@ export async function generateMetadata({ params }: Props) {
   }
 }
 
-export default async function SellerPage({ params, searchParams }: Props) {
+export default async function SellerPage({ params, searchParams: _searchParams }: Props) {
   const { id } = params
-  const currentPage = Number(searchParams.page ?? '1')
 
   let seller: SellerData | null = null
-  let listings: ListingData[] = []
-  let totalPages = 1
+  let listings: ListingRaw[] = []
 
   try {
     const [sellerRes, listingsRes] = await Promise.allSettled([
-      serverGet<{ success: boolean; data: SellerData }>(`/users/${id}`, { revalidate: 120 }),
-      serverGet<PaginatedResponse<ListingData>>(`/users/${id}/listings`, {
+      serverGet<SellerData>(`/users/${id}`, { revalidate: 120 }),
+      serverGet<PaginatedResponse<ListingRaw>>(`/users/${id}/listings`, {
         revalidate: 60,
-        params: { page: currentPage, limit: 12 },
+        params: { page: 1, limit: 50 },
       }),
     ])
 
     if (sellerRes.status === 'fulfilled') {
-      seller = sellerRes.value.data
+      seller = sellerRes.value
     }
     if (listingsRes.status === 'fulfilled') {
       listings = listingsRes.value.data
-      totalPages = listingsRes.value.meta.totalPages
     }
   } catch {
     // Graceful fallback
   }
 
-  if (!seller) {
+  if (seller == null) {
     return (
       <Container>
         <section className="py-16 text-center">
@@ -117,152 +135,111 @@ export default async function SellerPage({ params, searchParams }: Props) {
     month: 'long',
   })
 
+  const sellerType = (seller.sellerType?.replace('_', '-') ?? 'designer') as SellerType
+
+  const stats: SellerStatsData = {
+    listingCount: seller._count?.listings ?? 0,
+    ...(seller.totalSales != null && { totalSales: seller.totalSales }),
+    ...(seller.responseRate != null && { responseRate: seller.responseRate }),
+    ...(seller.responseTimeHours != null && { responseTimeHours: seller.responseTimeHours }),
+  }
+
+  const sellerListings: SellerListing[] = listings.map((l) => ({
+    id: l.id,
+    title: l.title,
+    price: l.price,
+    createdAt: l.createdAt,
+    ...(l.primaryImageUrl !== undefined && { imageUrl: l.primaryImageUrl }),
+    ...(l.availableForPurchase !== undefined && { availableForPurchase: l.availableForPurchase }),
+    ...(l.availableForRent !== undefined && { availableForRent: l.availableForRent }),
+    ...(l.customOrderAvailable !== undefined && { customOrderAvailable: l.customOrderAvailable }),
+  }))
+
+  const fastResponder = (seller.responseTimeHours ?? Infinity) <= 2
+  const topRated = stats.totalSales != null && stats.totalSales > 10
+
   return (
-    <Container>
-      <section className="py-8">
-        {/* Breadcrumb */}
-        <nav className="text-sm text-muted-foreground mb-6" aria-label="Breadcrumb">
-          <Link href="/" className="hover:text-foreground transition-colors">
-            Home
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">{seller.name}</span>
-        </nav>
+    <div className="min-h-screen bg-background">
+      {/* Breadcrumb */}
+      <Container className="pt-4 pb-2">
+        <BreadcrumbNav
+          items={[
+            { label: 'Home', href: '/' },
+            { label: 'Sellers', href: '/sellers' },
+            { label: seller.displayName },
+          ]}
+        />
+      </Container>
 
-        {/* Seller header */}
-        <div className="rounded-lg border bg-card p-6 mb-8">
-          <div className="flex flex-col sm:flex-row items-start gap-6">
-            <Avatar
-              name={seller.name}
-              {...(seller.avatarUrl !== undefined && { src: seller.avatarUrl })}
-              size="lg"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold text-card-foreground">{seller.name}</h1>
-                {(seller.emailVerifiedAt ?? seller.phoneVerifiedAt) && (
-                  <Badge variant="success">Verified</Badge>
-                )}
-              </div>
+      {/* Cover section - full bleed */}
+      <SellerCover
+        {...(seller.coverImageUrl !== undefined && { coverImageUrl: seller.coverImageUrl })}
+        sellerType={sellerType}
+      />
 
-              {seller.bio && <p className="mt-2 text-muted-foreground">{seller.bio}</p>}
+      {/* Profile card - overlaps cover */}
+      <SellerProfileCard
+        seller={{
+          ...seller,
+          sellerType,
+        }}
+      />
 
-              <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                {seller.location && (
-                  <span className="flex items-center gap-1">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                    {seller.location}
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  Member since {memberSince}
-                </span>
-              </div>
+      {/* Main content */}
+      <Container className="py-10 space-y-12">
+        {/* Trust indicators */}
+        <TrustBadges
+          emailVerified={seller.emailVerifiedAt != null}
+          phoneVerified={seller.phoneVerifiedAt != null}
+          topRated={topRated}
+          fastResponder={fastResponder}
+          memberSince={memberSince}
+        />
 
-              {/* Verification badges */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {seller.emailVerifiedAt && <Badge variant="info">Email Verified</Badge>}
-                {seller.phoneVerifiedAt && <Badge variant="info">Phone Verified</Badge>}
-              </div>
-            </div>
-          </div>
+        {/* Stats */}
+        <SellerStats stats={stats} />
+
+        {/* Divider */}
+        <hr className="border-border/50" />
+
+        {/* Listings */}
+        <SellerListings listings={sellerListings} sellerName={seller.displayName} />
+
+        {/* Divider */}
+        <hr className="border-border/50" />
+
+        {/* Reviews section */}
+        <section aria-labelledby="seller-reviews-heading">
+          <h2
+            id="seller-reviews-heading"
+            className="text-lg font-display font-bold text-foreground mb-6"
+          >
+            Customer Reviews
+          </h2>
+          <ReviewSection listingId="" sellerId={seller.id} />
+        </section>
+
+        {/* Divider */}
+        <hr className="border-border/50" />
+
+        {/* Two-column: About + Contact */}
+        <div className={cn('grid gap-12 lg:grid-cols-2')}>
+          <SellerAbout
+            {...(seller.bio !== undefined && { bio: seller.bio })}
+            {...(seller.specialties !== undefined && { specialties: seller.specialties })}
+            {...(seller.location !== undefined && { location: seller.location })}
+            memberSince={memberSince}
+            {...(seller.socialLinks !== undefined && { socialLinks: seller.socialLinks })}
+          />
+          <SellerContact
+            sellerId={seller.id}
+            sellerName={seller.displayName}
+            {...(seller.phone !== undefined && { phone: seller.phone })}
+            {...(seller.email !== undefined && { email: seller.email })}
+            {...(seller.location !== undefined && { location: seller.location })}
+          />
         </div>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-card-foreground">{String(seller._count?.listings ?? 0)}</p>
-            <p className="text-sm text-muted-foreground">Listings</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-card-foreground">
-              {(seller.emailVerifiedAt ?? seller.phoneVerifiedAt) ? 'Yes' : 'No'}
-            </p>
-            <p className="text-sm text-muted-foreground">Verified</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-card-foreground">
-              {memberSince.split(' ')[1]?.slice(0, 3) ?? '—'}
-            </p>
-            <p className="text-sm text-muted-foreground">Since</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <p className="text-2xl font-bold text-card-foreground">—</p>
-            <p className="text-sm text-muted-foreground">Response Rate</p>
-          </div>
-        </div>
-
-        {/* Seller listings */}
-        <div>
-          <h2 className="text-xl font-bold text-foreground mb-6">{seller.name}&apos;s Listings</h2>
-
-          {listings.length > 0 ? (
-            <>
-              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {listings.map((listing) => (
-                  <ListingCard
-                    key={listing.id}
-                    id={listing.id}
-                    title={listing.title}
-                    price={listing.price}
-                    {...(listing.primaryImageUrl !== undefined && { imageUrl: listing.primaryImageUrl })}
-                  />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <nav className="mt-8 flex items-center justify-center gap-1" aria-label="Pagination">
-                  {currentPage > 1 && (
-                    <Link
-                      href={`/sellers/${id}?page=${String(currentPage - 1)}`}
-                      className="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm transition-colors hover:bg-accent"
-                    >
-                      Previous
-                    </Link>
-                  )}
-                  <span className="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm bg-primary text-primary-foreground">
-                    Page {String(currentPage)} of {String(totalPages)}
-                  </span>
-                  {currentPage < totalPages && (
-                    <Link
-                      href={`/sellers/${id}?page=${String(currentPage + 1)}`}
-                      className="inline-flex items-center justify-center h-9 px-3 rounded-md text-sm transition-colors hover:bg-accent"
-                    >
-                      Next
-                    </Link>
-                  )}
-                </nav>
-              )}
-            </>
-          ) : (
-            <div className="rounded-lg border bg-card p-12 text-center">
-              <p className="text-muted-foreground">This seller has no active listings.</p>
-            </div>
-          )}
-        </div>
-      </section>
-    </Container>
+      </Container>
+    </div>
   )
 }

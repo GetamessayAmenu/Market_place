@@ -17,7 +17,7 @@ export default function CreateListingPage() {
       const payload: Record<string, unknown> = {
         title: data.title,
         description: data.description,
-        price: Number(data.price),
+        price: Number(data.pricing.price),
         categoryId: data.categoryId,
         city: data.city,
         condition: data.condition,
@@ -35,6 +35,62 @@ export default function CreateListingPage() {
         },
       };
 
+      // Type-specific availability flags
+      payload.availableForPurchase = data.delivery.availableForPurchase;
+      payload.availableForRent = data.delivery.availableForRent;
+      payload.customOrderAvailable = data.delivery.customOrderAvailable;
+
+      // Rent-specific fields
+      if (data.listingType === 'rent' && data.delivery.availableForRent) {
+        if (data.pricing.rentalPricePerDay) {
+          payload.rentalPricePerDay = Number(data.pricing.rentalPricePerDay);
+        }
+        if (data.pricing.rentalDeposit) {
+          payload.rentalDeposit = Number(data.pricing.rentalDeposit);
+        }
+      }
+
+      // Build attributes object (tags, delivery info, pricing extras)
+      const attributes: Record<string, unknown> = {};
+
+      if (data.tags.length > 0) {
+        attributes.tags = data.tags;
+      }
+
+      // Delivery info
+      attributes.deliveryMethod = data.delivery.deliveryMethod;
+      if (data.delivery.deliveryFee) {
+        attributes.deliveryFee = Number(data.delivery.deliveryFee);
+      }
+      attributes.processingDays = Number(data.delivery.processingDays);
+
+      // Sale-specific extras
+      if (data.listingType === 'sale') {
+        if (data.pricing.compareAtPrice) {
+          attributes.compareAtPrice = Number(data.pricing.compareAtPrice);
+        }
+        if (data.pricing.sku) {
+          attributes.sku = data.pricing.sku;
+        }
+      }
+
+      // Rent-specific extras
+      if (data.listingType === 'rent' && data.pricing.minimumRentalDays) {
+        attributes.minimumRentalDays = Number(data.pricing.minimumRentalDays);
+      }
+
+      // Custom-specific extras
+      if (data.listingType === 'custom') {
+        if (data.pricing.estimatedDays) {
+          attributes.estimatedDays = Number(data.pricing.estimatedDays);
+        }
+        if (data.pricing.customizationNotes) {
+          attributes.customizationNotes = data.pricing.customizationNotes;
+        }
+      }
+
+      payload.attributes = attributes;
+
       await createMutation.mutateAsync(payload);
       router.push('/dashboard/seller/listings');
       return;
@@ -47,7 +103,7 @@ export default function CreateListingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Create Listing</h1>
+        <h1 className="text-2xl font-display font-bold tracking-tight">Create Listing</h1>
         <p className="text-muted-foreground">Fill in the details to create a new listing.</p>
       </div>
 
@@ -60,7 +116,7 @@ export default function CreateListingPage() {
       <ListingForm
         onSubmit={(data) => { void handleSubmit(data); }}
         isSubmitting={createMutation.isPending}
-        submitLabel="Create Listing"
+        submitLabel="Publish Listing"
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AdminLogsModule } from '../admin-logs/admin-logs.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { RolesModule } from '../roles/roles.module';
 
@@ -10,7 +11,7 @@ import { UsersRepository } from './users.repository';
 import { UsersService } from './users.service';
 
 @Module({
-  imports: [PermissionsModule, RolesModule],
+  imports: [PermissionsModule, RolesModule, AdminLogsModule],
   controllers: [AdminUsersController, ProfileController],
   providers: [UsersRepository, UsersService, RolesGuard],
   exports: [UsersService, UsersRepository],

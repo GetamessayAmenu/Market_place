@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
+import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { ApiConfigService } from '../../infrastructure/config/api-config.service';
+import { AdminLogsModule } from '../admin-logs/admin-logs.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { RolesModule } from '../roles/roles.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { UsersModule } from '../users/users.module';
-import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
+
 import { AuthController } from './auth.controller';
 import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
@@ -24,6 +26,7 @@ import { VerificationService } from './verification/verification.service';
     RolesModule,
     SessionsModule,
     PermissionsModule,
+    AdminLogsModule,
     PassportModule.register({ defaultStrategy: JWT_ACCESS_STRATEGY }),
     JwtModule.registerAsync({
       inject: [ApiConfigService],

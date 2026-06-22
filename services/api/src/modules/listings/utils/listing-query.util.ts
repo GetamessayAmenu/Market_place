@@ -75,6 +75,32 @@ export function buildListingWhere(
     };
   }
 
+  if (query.availableForPurchase === true) {
+    where.availableForPurchase = true;
+  }
+
+  if (query.availableForRent === true) {
+    where.availableForRent = true;
+  }
+
+  if (query.customOrderAvailable === true) {
+    where.customOrderAvailable = true;
+  }
+
+  if (query.type) {
+    switch (query.type) {
+      case 'buy':
+        where.availableForPurchase = true;
+        break;
+      case 'rent':
+        where.availableForRent = true;
+        break;
+      case 'custom':
+        where.customOrderAvailable = true;
+        break;
+    }
+  }
+
   if (query.search?.trim()) {
     const term = query.search.trim();
     where.AND = [

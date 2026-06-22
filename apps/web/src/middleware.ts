@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 /**
- * Next.js middleware for basic route protection.
+ * Next.js middleware for route protection.
  * Checks for an access_token cookie on protected paths.
- * For full auth validation, server components use requireUser().
+ * Preserves ?redirect= param through the auth flow chain.
  */
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   // Protected paths that require authentication
   const protectedPaths = ['/dashboard'];
@@ -34,7 +34,9 @@ export function middleware(request: NextRequest) {
       request.cookies.get('Authentication')?.value;
 
     if (token) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      const redirect = searchParams.get('redirect');
+      const target = redirect ?? '/dashboard';
+      return NextResponse.redirect(new URL(target, request.url));
     }
   }
 
