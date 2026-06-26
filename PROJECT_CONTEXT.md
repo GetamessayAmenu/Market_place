@@ -2,7 +2,7 @@
 
 Living record of implementation progress. Updated after each phase.
 
-**Last updated:** Phase 21 — UX Wireframe Specification (Ethiopian Fashion Marketplace) (2026-06-16)
+**Last updated:** Phase 22 — Seller Landing Page (2026-06-22)
 
 ---
 
@@ -23,8 +23,9 @@ Living record of implementation progress. Updated after each phase.
 | Admin Experience & Moderation UX | Complete admin platform with moderation, verification, analytics, audit (Phase 19) |
 | Global Application Layout | Responsive layout system: Public, Dashboard, Auth layouts with comprehensive wireframe specs, component specifications, interaction states, and responsive behavior matrix (Phase 20) |
 | UX Wireframe Specification | Complete UX spec for Ethiopian Fashion Marketplace: 12 homepage sections, search & filter UX, product detail page with Buy/Rent/Custom Order flows, responsive rules, component catalog, and data model extensions (Phase 21) |
+| Seller Landing Page | Comprehensive /sell page with 14 conversion-optimized sections: Hero, How It Works, Dashboard Preview, Why Sell Here, Sell Products, Rent Products, Custom Orders, Tips for Success, Success Stories, Earnings Calculator, Seller Protection, Verification Process, FAQ, Final CTA (Phase 22) |
 
-**Next:** Phase 22 — Implementation (Marketplace Pages + Custom Order Flow)
+**Next:** Phase 22 continued — Implementation (Marketplace Pages + Custom Order Flow)
 
 ---
 
@@ -3467,4 +3468,84 @@ model Review {
 - **Homepage sections are server-rendered:** All homepage sections use SSR/ISR via `serverGet()` for data fetching. Static sections (How It Works, Newsletter) are purely server components. Dynamic sections (Featured, New Arrivals) use `revalidate` for ISR.
 - **No separate marketplace pages for Buy/Rent/Custom:** All three models coexist on the same listing cards, search results, and product detail page. The differentiation happens through badges, tags, and action buttons, not through separate page routes.
 
+---
 
+## Phase 22 — Seller Landing Page (`/sell`)
+
+### Summary
+Designed and implemented a comprehensive, conversion-optimized Seller Landing Page at `/sell` to drive seller registrations for the Ethiopian Fashion Marketplace. The page targets fashion designers, tailors, boutiques, wedding dress shops, traditional clothing sellers, shoe makers, jewelry makers, and rental shops.
+
+### Page Sections (14 sections in order)
+
+1. **Hero Section** — Full-bleed gradient background (primary → gold), bold headline ("Turn Your Craft Into a Thriving Business"), Amharic subtitle (ጥበብዎን ወደ ንግድ ይቀይሩ), primary CTA ("Start Selling Free"), secondary CTA ("See How It Works"), trust indicators row (free to join, no monthly fees, 10% commission, Telebirr/CBE Birr payouts). Decorative cross-hatch pattern overlay.
+
+2. **How It Works** — 3-step card grid: Create Your Shop (store icon, <5 min setup), List Your Products (camera icon, snap & upload), Get Orders & Earn (cash icon, 7-day payouts). Numbered step badges, hover shadow transitions.
+
+3. **Seller Dashboard Preview** — 6-card grid showing sellers what tools they'll have access to: Manage Listings (create/edit/toggle models), Track Orders & Custom Requests (notifications/workflow), Chat With Buyers (messaging), Analytics & Insights (charts/stats), Product Image Upload (drag-and-drop, 10 photos), Earnings & Payouts (real-time tracking, Telebirr/CBE Birr). Each card has descriptive bullets. Links to /dashboard/seller for preview.
+
+4. **Why Sell Here** — 6-card grid showcasing platform advantages: Built-In Buyer Audience (local + diaspora), Seller Protection Program, Fast Local Payouts (Telebirr/CBE Birr), Direct Buyer Communication (chat), Powerful Seller Analytics, Multi-Model Selling (sell/rent/custom).
+
+5. **Sell Products** (green accent, --buy) — Split layout with feature list and visual listing mock. Features: unlimited listings, smart pricing, inventory tracking, featured options, shipping labels. Example listing card showing Habesha Kemis at 4,500 ETB.
+
+6. **Rent Products** (gold accent, --rent) — Reversed split layout with rental calendar mock. Features: daily rates, calendar management, automatic deposits, damage claims, return logistics. Example showing wedding suit at 800 ETB/day.
+
+7. **Custom-Made Orders** (wine accent, --custom) — Split layout with 4-step flow visualization. Features: measurement form, fabric/color swatches, reference images, price estimator, production tracking, direct chat. Addresses the Ethiopian market norm of custom-made clothing.
+
+8. **Tips for Success** — 6 practical seller tips in a 2-column grid: Take Great Photos (lighting, angles, backgrounds), Write Clear Descriptions (fabric, measurements, care), Price Competitively (research, factor time), Respond Quickly (1-hour target, notifications), Complete Your Seller Profile (logo, bio, verify), Use All Three Selling Models (sell + rent + custom). Each tip has icon, description, and actionable pill tags.
+
+9. **Success Stories** — 3-column testimonial grid with star ratings, growth metrics, and diverse seller types: Tigist Bekele (Fashion Designer, Addis Ababa — 3× revenue growth), Yohannes Tesfaye (Rental Shop Owner, Bahir Dar — 50+ items monthly), Meron Alemu (Tailor, Hawassa — 40+ custom orders/month).
+
+10. **Earnings Calculator** — Interactive client component with seller type selector, price slider (200–25,000 ETB), monthly sales slider (1–100), optional rental toggle, and real-time earnings calculation. Displays monthly sales revenue, rental revenue, 10% platform fee, monthly earnings, and yearly potential. All values in ETB.
+
+11. **Seller Protection Guarantee** — 4-card grid: Payment Protection (escrow), Rental Deposits, Dispute Resolution (evidence-based), Seller Guarantee (up to 50,000 ETB coverage for verified sellers).
+
+12. **Verification Process** — Split layout with 3-step verification flow (email/phone → ID submission → blue badge) and visual badge mockup with stats (3× more orders, 24h review, higher ranking). References Kebele ID and trade license for Ethiopian context.
+
+13. **FAQ** — Interactive accordion with 10 questions covering: pricing/commission, payments (Telebirr/CBE Birr), multi-model selling, rental damage, custom orders, business registration, shipping, disputes, international selling, verification process.
+
+14. **Final CTA** — Full-bleed gradient card with "Your Craft Deserves a Bigger Stage" headline, dual CTAs ("Create Free Seller Account" + "View Seller Dashboard"), trust indicators (no credit card, 5-minute setup, cancel anytime).
+
+### Files Created/Modified
+
+- `apps/web/src/app/sell/page.tsx` — Main seller landing page (server component, SEO metadata, all 14 sections)
+- `apps/web/src/components/seller-landing/EarningsCalculator.tsx` — Interactive earnings calculator (client component, sliders, toggle, real-time calculation)
+- `apps/web/src/components/seller-landing/SellerFAQ.tsx` — FAQ accordion (client component, expand/collapse, 10 Q&A items)
+
+### Ethiopian Market Considerations
+
+- Amharic subtitle in hero section (ጥበብዎን ወደ ንግድ ይቀይሩ)
+- ETB currency throughout (calculator, example listings, protection guarantee)
+- Local payment methods prominently featured (Telebirr, CBE Birr)
+- Government ID types referenced (Kebele ID, passport, driver's license)
+- City names from across Ethiopia (Addis Ababa, Bahir Dar, Hawassa)
+- Seller types reflecting Ethiopian market (traditional clothing, wedding shops, tailors)
+- Emphasis on simplicity for first-time online sellers
+- Diaspora reach highlighted as a key benefit
+- Custom-made orders framed around Ethiopian tailoring culture
+
+### Conversion & Trust Patterns Applied
+
+- Social proof (2,000+ sellers, star ratings, success stories with metrics)
+- Risk reversal (free to join, no monthly fees, cancel anytime)
+- Authority (verified badge, seller protection, structured process)
+- Urgency/benefit framing ("3× more orders" for verified sellers)
+- Interactive engagement (earnings calculator with real-time feedback)
+- Objection handling (comprehensive FAQ addressing all common concerns)
+- Progressive disclosure (3-step How It Works before detailed sections)
+- Visual hierarchy (action colors: green for Buy, gold for Rent, wine for Custom)
+
+### Architecture Decisions
+
+- **Server component for SEO:** The main page is a server component with `generateMetadata()` for SEO. Only the EarningsCalculator and FAQ sections are client components.
+- **No external dependencies:** All icons use inline SVG helpers. No icon library imports needed.
+- **Design system compliance:** Uses existing tokens (--brand-gold, --brand-wine, --brand-green, font-display, --buy/--rent/--custom action colors), Container component for responsive width, and existing color utilities.
+- **Accessibility:** All sections have `aria-labelledby` with hidden headings where needed. Interactive elements use proper ARIA attributes (aria-expanded, role="switch", aria-checked).
+- **Responsive:** Mobile-first design. Grid layouts transition from 1 → 2 → 3 columns. Split layouts stack vertically on mobile with visual order adjustments.
+
+### Validation
+
+- `turbo run typecheck --filter=@marketplace/web`: PASSED (all 5 tasks successful)
+- TypeScript strict mode: No errors
+- Linting: All arrow function void expressions use braces per project convention
+
+**Next:** Continue Phase 22 — Implement remaining marketplace pages and custom order flow

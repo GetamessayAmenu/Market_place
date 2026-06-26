@@ -290,18 +290,29 @@ function OfflineBanner() {
 /*  Register Form                                                      */
 /* ------------------------------------------------------------------ */
 
+type Step = 'account' | 'success';
+
 function RegisterForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
 
+  const router = useRouter();
+  const setUser = useAuth((s) => s.setUser);
+
+  const [step, setStep] = useState<Step>('account');
+  const [regError, setRegError] = useState<RegisterError | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsError, setTermsError] = useState(false);
+
   const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    setError,
-    clearErrors,
-    formState: { errors },
+    register: registerBuyer,
+    handleSubmit: handleSubmitBuyer,
+    setValue: setValueBuyer,
+    watch: watchBuyer,
+    setError: setErrorBuyer,
+    clearErrors: clearErrorsBuyer,
+    setFocus,
+    formState: { errors: buyerErrors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -310,21 +321,14 @@ function RegisterForm() {
     },
   });
 
-  const router = useRouter();
-  const setUser = useAuth((s) => s.setUser);
+  const [userType, setUserType] = useState<UserType>('buyer');
+  const passwordValue = watchBuyer('password');
 
-  const [regError, setRegError] = useState<RegisterError | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [termsError, setTermsError] = useState(false);
-
-  const passwordValue = watch('password');
-  const userTypeValue = watch('userType');
-
-  /** Core submit handler — called by form submit AND retry button. */
-  const onSubmit = useCallback(
+  /** Buyer registration submit handler */
+  const onBuyerSubmit = useCallback(
     async (data: RegisterInput) => {
       setRegError(null);
-      clearErrors();
+      clearErrorsBuyer();
       setIsSubmitting(true);
 
       try {
@@ -345,37 +349,90 @@ function RegisterForm() {
         }
         const res = await clientRegister(payload);
         setUser(res.user);
-        router.push('/verify-email');
+        setStep('success');
       } catch (e: unknown) {
         const parsed = parseRegisterError(e);
         setRegError(parsed);
 
-        // Propagate field-level errors into react-hook-form so inputs
-        // get highlighted with the red ring + inline message.
         for (const [field, msg] of Object.entries(parsed.fieldErrors)) {
           if (msg) {
-            setError(field as RegisterFieldName, { type: 'server', message: msg });
+            setErrorBuyer(field as RegisterFieldName, { type: 'server', message: msg });
           }
         }
 
         setIsSubmitting(false);
       }
     },
-    [clearErrors, router, setError, setUser],
+    [clearErrorsBuyer, setErrorBuyer, setUser],
   );
 
+  /** Seller registration submit handler */
+  const onSellerSubmit = async (data: RegisterInput) => {
+    setRegError(null);
+    setIsSubmitting(true);
+    try {
+      const payload: {
+        email: string;
+        password: string;
+        displayName: string;
+        phone?: string;
+        userType?: 'buyer' | 'seller';
+      } = {
+        userType: 'seller',
+        displayName: data.displayName,
+        email: data.email,
+        password: data.password,
+      };
+      if (data.phone) {
+        payload.phone = data.phone;
+      }
+      const res = await clientRegister(payload);
+      setUser(res.user);
+      setStep('success');
+    } catch (e: unknown) {
+      const parsed = parseRegisterError(e);
+      setRegError(parsed);
+
+      for (const [field, msg] of Object.entries(parsed.fieldErrors)) {
+        if (msg) {
+          setErrorBuyer(field as RegisterFieldName, { type: 'server', message: msg });
+        }
+      }
+
+      setIsSubmitting(false);
+    }
+  };
+
   const onFormSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
-    void handleSubmit(onSubmit)(e);
+    e.preventDefault();
+    if (userType === 'seller') {
+      void handleSubmitBuyer(onSellerSubmit)(e);
+    } else {
+      void handleSubmitBuyer(onBuyerSubmit)(e);
+    }
   };
 
   /** Retry using current form values. */
   const handleRetry = useCallback(() => {
-    void handleSubmit(onSubmit)();
-  }, [handleSubmit, onSubmit]);
+    if (userType === 'seller') {
+      void handleSubmitBuyer(onSellerSubmit)();
+    } else {
+      void handleSubmitBuyer(onBuyerSubmit)();
+    }
+  }, [userType, handleSubmitBuyer, onBuyerSubmit, onSellerSubmit]);
 
   const loginLink = redirect
     ? `/login?redirect=${encodeURIComponent(redirect)}`
     : '/login';
+
+  const handleUserTypeChange = (type: UserType) => {
+    setUserType(type);
+    setValueBuyer('userType', type);
+  };
+
+  useEffect(() => {
+    setFocus('displayName');
+  }, [setFocus]);
 
   return (
     <AuthLayout title="Create account" subtitle="Join Habesha Market to buy and sell locally">
@@ -395,95 +452,176 @@ function RegisterForm() {
         )}
 
         <UserTypeSelector
-          value={userTypeValue}
-          onChange={(type: UserType) => { setValue('userType', type) }}
+          value={userType}
+          onChange={handleUserTypeChange}
           disabled={isSubmitting}
         />
 
-        <FormInput
-          label="Full Name"
-          autoComplete="name"
-          {...register('displayName')}
-          {...(errors.displayName?.message !== undefined && { error: errors.displayName.message })}
-        />
-
-        <FormInput
-          label="Email"
-          type="email"
-          autoComplete="email"
-          {...register('email')}
-          {...(errors.email?.message !== undefined && { error: errors.email.message })}
-        />
-
-        <FormInput
-          label="Phone (optional)"
-          type="tel"
-          autoComplete="tel"
-          placeholder="09XXXXXXXX or +2519XXXXXXXX"
-          {...register('phone')}
-          {...(errors.phone?.message !== undefined && { error: errors.phone.message })}
-        />
-
-        <div className="space-y-2">
-          <PasswordInput
-            label="Password"
-            autoComplete="new-password"
-            {...register('password')}
-            {...(errors.password?.message !== undefined && { error: errors.password.message })}
-          />
-          <PasswordStrength password={passwordValue} />
-        </div>
-
-        <PasswordInput
-          label="Confirm Password"
-          autoComplete="new-password"
-          {...register('confirmPassword')}
-          {...(errors.confirmPassword?.message !== undefined && { error: errors.confirmPassword.message })}
-        />
-
-        <div className="flex items-start gap-2 pt-1">
-          <input
-            id="terms"
-            type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            onChange={(e) => {
-              setTermsError(!e.target.checked);
-              setValue('termsAccepted', e.target.checked as true, { shouldValidate: true });
-            }}
-          />
-          <label htmlFor="terms" className="text-sm text-foreground cursor-pointer select-none">
-            I agree to the{' '}
-            <Link href="/terms" className="text-primary hover:underline" target="_blank">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link href="/privacy" className="text-primary hover:underline" target="_blank">
-              Privacy Policy
-            </Link>
-          </label>
-        </div>
-        {termsError && (
-          <p className="text-xs text-destructive -mt-2" role="alert">
-            You must accept the terms to continue
-          </p>
+        {userType === 'seller' && (
+          <div className="bg-brand-gold/5 border border-brand-gold/20 rounded-lg p-3 text-sm">
+            <p className="font-medium text-foreground mb-1">📋 Seller Requirements</p>
+            <ul className="text-xs text-muted-foreground space-y-0.5">
+              <li>• Your name must match your government-issued ID</li>
+              <li>• Phone number will be used for verification</li>
+              <li>• You'll need to complete ID verification before selling</li>
+            </ul>
+          </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <Spinner size="sm" /> Creating account...
-            </span>
-          ) : (
-            'Create account'
-          )}
-        </Button>
+        {step === 'account' && (
+          <>
+            <FormInput
+              label="Full Name"
+              autoComplete="name"
+              {...registerBuyer('displayName')}
+              {...(buyerErrors.displayName?.message !== undefined && { error: buyerErrors.displayName.message })}
+            />
+            {userType === 'seller' && (
+              <p className="text-xs text-muted-foreground -mt-2">
+                Enter your legal name as it appears on your ID card
+              </p>
+            )}
 
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link href={loginLink} className="font-medium text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
+            <FormInput
+              label="Email"
+              type="email"
+              autoComplete="email"
+              {...registerBuyer('email')}
+              {...(buyerErrors.email?.message !== undefined && { error: buyerErrors.email.message })}
+            />
+
+            <FormInput
+              label={userType === 'seller' ? 'Phone Number' : 'Phone (optional)'}
+              type="tel"
+              autoComplete="tel"
+              placeholder="09XXXXXXXX or +2519XXXXXXXX"
+              {...registerBuyer('phone')}
+              {...(buyerErrors.phone?.message !== undefined && { error: buyerErrors.phone.message })}
+            />
+
+            <div className="space-y-2">
+              <PasswordInput
+                label="Password"
+                autoComplete="new-password"
+                {...registerBuyer('password')}
+                {...(buyerErrors.password?.message !== undefined && { error: buyerErrors.password.message })}
+              />
+              <PasswordStrength password={passwordValue} />
+              {userType === 'seller' && (
+                <p className="text-xs text-muted-foreground">
+                  Use a strong password to protect your seller account and earnings
+                </p>
+              )}
+            </div>
+
+            <PasswordInput
+              label="Confirm Password"
+              autoComplete="new-password"
+              {...registerBuyer('confirmPassword')}
+              {...(buyerErrors.confirmPassword?.message !== undefined && { error: buyerErrors.confirmPassword.message })}
+            />
+
+            <div className="flex items-start gap-2 pt-1">
+              <input
+                id="terms"
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-input text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                onChange={(e) => {
+                  setTermsError(!e.target.checked);
+                  setValueBuyer('termsAccepted', e.target.checked as true, { shouldValidate: true });
+                }}
+              />
+              <label htmlFor="terms" className="text-sm text-foreground cursor-pointer select-none">
+                I agree to the{' '}
+                <Link href="/terms" className="text-primary hover:underline" target="_blank">
+                  Terms of Service
+                </Link>
+                {userType === 'seller' && (
+                  <>
+                    {' '}
+                    and{' '}
+                    <Link href="/seller-agreement" className="text-primary hover:underline" target="_blank">
+                      Seller Agreement
+                    </Link>
+                  </>
+                )}
+                {' '}and{' '}
+                <Link href="/privacy" className="text-primary hover:underline" target="_blank">
+                  Privacy Policy
+                </Link>
+              </label>
+            </div>
+            {termsError && (
+              <p className="text-xs text-destructive -mt-2" role="alert">
+                You must accept the terms to continue
+              </p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Spinner size="sm" /> Creating account...
+                </span>
+              ) : (
+                'Create account'
+              )}
+            </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Already have an account?{' '}
+              <Link href={loginLink} className="font-medium text-primary hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </>
+        )}
+
+        {step === 'success' && (
+          <div className="text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-success/10 flex items-center justify-center">
+              <svg className="w-10 h-10 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-2">You're all set!</h2>
+              <p className="text-muted-foreground">
+                {userType === 'seller' 
+                  ? 'Your seller account is ready. Start listing your first item.' 
+                  : 'Your account has been created successfully.'}
+              </p>
+            </div>
+            <div className="space-y-3">
+              {userType === 'seller' ? (
+                <>
+                  <Button onClick={() => router.push('/setup/seller-type')} className="w-full">
+                    Set Up Seller Account
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push('/search')} className="w-full">
+                    Skip & Explore
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={() => router.push('/search')} className="w-full">
+                    Start Exploring
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push('/dashboard')} className="w-full">
+                    Go to Dashboard
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4 text-sm">
+              <p className="font-medium mb-1">💡 Tip</p>
+              <p className="text-muted-foreground">
+                {userType === 'seller' 
+                  ? 'Complete your profile to boost buyer trust and sell faster.' 
+                  : 'Complete your profile to get personalized recommendations.'}
+              </p>
+            </div>
+          </div>
+        )}
       </form>
     </AuthLayout>
   );
