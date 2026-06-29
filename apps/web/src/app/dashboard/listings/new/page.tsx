@@ -665,7 +665,7 @@ export default function NewListingPage() {
             <div className="space-y-6">
               <div className="bg-muted/50 rounded-lg p-6 space-y-4">
                 <div className="aspect-video bg-background rounded-lg overflow-hidden">
-                  {imageFiles.length > 0 ? (
+                  {imageFiles.length > 0 && imageFiles[coverImageIndex] ? (
                     <img
                       src={URL.createObjectURL(imageFiles[coverImageIndex])}
                       alt="Product preview"
