@@ -83,6 +83,7 @@ const strings = {
   // ─── Notifications ──────────────────────────────────────────────────────────
   notif_title: { en: 'Notifications', am: 'ማሳወቂያዎች' },
   notif_mark_read: { en: 'Mark as read', am: 'እንደተነበበ ምልክት አድርግ' },
+  notif_mark_unread: { en: 'Mark as unread', am: 'ያልተነበበ ምልክት አድርግ' },
   notif_clear_all: { en: 'Clear all', am: 'ሁሉንም አጽዳ' },
   notif_preferences: { en: 'Notification Preferences', am: 'የማሳወቂያ ምርጫዎች' },
 

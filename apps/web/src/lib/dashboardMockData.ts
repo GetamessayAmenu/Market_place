@@ -57,6 +57,21 @@ export interface MessagePreview {
   type: 'inquiry' | 'order' | 'rental' | 'custom';
 }
 
+export interface ConversationMessage {
+  id: string;
+  sender: 'buyer' | 'seller';
+  text: string;
+  createdAt: string;
+}
+
+export interface MessageConversation {
+  conversationId: string;
+  customerName: string;
+  listingTitle: string;
+  messages: ConversationMessage[];
+  unreadCount: number;
+}
+
 export interface RentalItem {
   id: string;
   title: string;
@@ -133,6 +148,7 @@ export interface RevenueChartPoint {
   label: string;
   value: number;
   date: string;
+  category: 'sale' | 'rent' | 'custom';
 }
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
@@ -299,6 +315,63 @@ export const MOCK_MESSAGES: MessagePreview[] = [
     timestamp: hoursAgo(14),
     isUnread: true,
     type: 'custom',
+  },
+];
+
+export const MOCK_MESSAGE_CONVERSATIONS: MessageConversation[] = [
+  {
+    conversationId: 'conv-001',
+    customerName: maskName('Hirut Tadesse'),
+    listingTitle: 'Habesha Kemis – Green Embroidery',
+    unreadCount: 1,
+    messages: [
+      {
+        id: 'mconv-001-1',
+        sender: 'buyer',
+        text: 'Is this dress available in size M?',
+        createdAt: hoursAgo(2),
+      },
+      {
+        id: 'mconv-001-2',
+        sender: 'seller',
+        text: 'Yes, we have size M available. Would you like measurements too?',
+        createdAt: hoursAgo(1),
+      },
+    ],
+  },
+  {
+    conversationId: 'conv-002',
+    customerName: maskName('Abebe Kebede'),
+    listingTitle: 'Men’s Traditional Suit',
+    unreadCount: 1,
+    messages: [
+      {
+        id: 'mconv-002-1',
+        sender: 'seller',
+        text: 'Your item is ready for shipping.',
+        createdAt: hoursAgo(8),
+      },
+      {
+        id: 'mconv-002-2',
+        sender: 'buyer',
+        text: 'Thank you! Can you ship to Mekelle?',
+        createdAt: hoursAgo(5),
+      },
+    ],
+  },
+  {
+    conversationId: 'conv-003',
+    customerName: maskName('Selam Bekele'),
+    listingTitle: 'Custom Bridesmaid Dress – Ivory',
+    unreadCount: 1,
+    messages: [
+      {
+        id: 'mconv-003-1',
+        sender: 'buyer',
+        text: 'I want measurements for the kemis please',
+        createdAt: hoursAgo(14),
+      },
+    ],
   },
 ];
 

@@ -14,6 +14,7 @@ interface MessagesModuleProps {
   lang: Lang;
   avgResponseHours: number;
   onOpenConversation: (conversationId: string) => void;
+  onQuickReply: () => void;
   activeFilter: 'all' | 'inquiry' | 'order' | 'rental' | 'custom';
   onFilterChange: (f: 'all' | 'inquiry' | 'order' | 'rental' | 'custom') => void;
 }
@@ -62,6 +63,7 @@ export default function MessagesModule({
   lang,
   avgResponseHours,
   onOpenConversation,
+  onQuickReply,
   activeFilter,
   onFilterChange,
 }: MessagesModuleProps) {
@@ -167,15 +169,16 @@ export default function MessagesModule({
 
         {/* Quick reply CTA */}
         {unreadCount > 0 && !isLoading && (
-          <a
-            href="/dashboard/messages"
-            className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-primary/5 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10 active:scale-[0.99]"
+          <button
+            type="button"
+            onClick={onQuickReply}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary/5 py-2.5 text-sm font-medium text-primary transition-all hover:bg-primary/10 active:scale-[0.99]"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
             </svg>
-            Reply now to stay responsive
-          </a>
+            {t('messages_quick_reply', lang)}
+          </button>
         )}
       </CardContent>
     </Card>

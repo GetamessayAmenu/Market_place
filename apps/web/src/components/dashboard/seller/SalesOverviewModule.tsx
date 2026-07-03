@@ -27,7 +27,24 @@ export default function SalesOverviewModule({
 }: SalesOverviewModuleProps) {
   const [productFilter, setProductFilter] = useState<'all' | 'sale' | 'rent' | 'custom'>('all');
 
-  const totalRevenue = (chartData ?? []).reduce((acc, p) => acc + p.value, 0);
+  const filteredData = (chartData ?? []).filter(
+    (point) => productFilter === 'all' || point.category === productFilter
+  );
+  const totalRevenue = filteredData.reduce((acc, p) => acc + p.value, 0);
+  const totalPoints = filteredData.length;
+  const avgOrderValue = totalPoints > 0 ? Math.round(totalRevenue / totalPoints) : 0;
+  const categoryCounts = (chartData ?? []).reduce(
+    (acc, point) => {
+      acc[point.category] += 1;
+      return acc;
+    },
+    { sale: 0, rent: 0, custom: 0 } as Record<'sale' | 'rent' | 'custom', number>
+  );
+  const breakdownLabel =
+    productFilter === 'all'
+      ? `${categoryCounts.sale} sales · ${categoryCounts.rent} rentals · ${categoryCounts.custom} custom`
+      : `${productFilter === 'sale' ? 'Sales' : productFilter === 'rent' ? 'Rentals' : 'Custom'} only`;
+  const pendingPayments = Math.round(totalRevenue * 0.22);
 
   return (
     <Card>
@@ -78,7 +95,11 @@ export default function SalesOverviewModule({
             <Skeleton className="h-full w-full" />
           ) : (
             <React.Suspense fallback={<Skeleton className="h-full w-full" />}>
-              <MiniBarChart data={chartData ?? []} height={128} color="bg-primary/80 hover:bg-primary" />
+              <MiniBarChart
+                data={filteredData.length > 0 ? filteredData : chartData ?? []}
+                height={128}
+                color="bg-primary/80 hover:bg-primary"
+              />
             </React.Suspense>
           )}
         </div>
@@ -88,20 +109,25 @@ export default function SalesOverviewModule({
           <div className="mt-6 grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4">
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Top Category</p>
-              <p className="mt-1 font-semibold text-foreground">Habesha Kemis</p>
+              <p className="mt-1 font-semibold text-foreground">{productFilter === 'all' ? 'Habesha Kemis' : productFilter === 'sale' ? 'Kemis' : productFilter === 'rent' ? 'Rental Dresses' : 'Custom Orders'}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Avg Order Value</p>
-              <p className="mt-1 font-semibold text-foreground">{formatETB(1850)}</p>
+              <p className="mt-1 font-semibold text-foreground">{formatETB(avgOrderValue)}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Conversion Rate</p>
-              <p className="mt-1 font-semibold text-brand-green">4.2%</p>
+              <p className="mt-1 font-semibold text-brand-green">{productFilter === 'sale' ? '5.1%' : productFilter === 'rent' ? '3.6%' : productFilter === 'custom' ? '2.9%' : '4.2%'}</p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-muted-foreground">Pending Payments</p>
-              <p className="mt-1 font-semibold text-warning">{formatETB(2400)}</p>
+              <p className="mt-1 font-semibold text-warning">{formatETB(pendingPayments)}</p>
             </div>
+          </div>
+        )}
+        {!isLoading && (
+          <div className="mt-4 rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground">
+            {breakdownLabel}
           </div>
         )}
       </CardContent>

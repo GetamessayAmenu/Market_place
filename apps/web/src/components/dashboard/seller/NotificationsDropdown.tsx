@@ -13,6 +13,7 @@ interface NotificationsDropdownProps {
   isLoading: boolean;
   lang: Lang;
   onMarkRead: (id: string) => void;
+  onMarkUnread: (id: string) => void;
   onMarkAllRead: () => void;
 }
 
@@ -59,6 +60,7 @@ export default function NotificationsDropdown({
   isLoading,
   lang,
   onMarkRead,
+  onMarkUnread,
   onMarkAllRead,
 }: NotificationsDropdownProps) {
   const [open, setOpen] = useState(false);
@@ -158,7 +160,21 @@ export default function NotificationsDropdown({
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{notif.body}</p>
-                    <p className="mt-1 text-[10px] text-muted-foreground/60">{formatRelativeTime(notif.createdAt)}</p>
+                    <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/60">
+                      <span>{formatRelativeTime(notif.createdAt)}</span>
+                      {notif.isRead && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMarkUnread(notif.id);
+                          }}
+                          className="text-primary hover:underline"
+                        >
+                          {t('notif_mark_unread', lang)}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))

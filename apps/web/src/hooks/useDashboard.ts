@@ -12,6 +12,7 @@ import {
   fetchDashboardKpis,
   fetchGrowthRecommendations,
   fetchInventoryAlerts,
+  fetchMessageConversation,
   fetchMessages,
   fetchNotifications,
   fetchPendingActions,
@@ -21,7 +22,9 @@ import {
   fetchRevenueChart,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationUnread,
   markRentalCondition,
+  sendMessageInConversation,
   snoozePendingAction,
   updateOrderStatus,
 } from '../lib/dashboardApi';
@@ -214,12 +217,45 @@ export function useMarkNotificationRead() {
   });
 }
 
+export function useMarkNotificationUnread() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (notifId: string) => markNotificationUnread(notifId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
 export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sellerId: string) => markAllNotificationsRead(sellerId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+// ─── Message Conversations ───────────────────────────────────────────────────
+
+export function useMessageConversation(sellerId: string, conversationId: string | null) {
+  return useQuery({
+    queryKey: ['message-conversation', sellerId, conversationId],
+    queryFn: () => fetchMessageConversation(sellerId, conversationId ?? ''),
+    staleTime: ONE_MIN,
+    enabled: !!sellerId && !!conversationId,
+  });
+}
+
+export function useSendMessageToConversation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sellerId, conversationId, text }: { sellerId: string; conversationId: string; text: string }) =>
+      sendMessageInConversation(sellerId, conversationId, text),
+    onSuccess: (_, variables) => {
+      void qc.invalidateQueries({ queryKey: ['message-conversation', variables.sellerId, variables.conversationId] });
+      void qc.invalidateQueries({ queryKey: ['messages-preview', variables.sellerId] });
     },
   });
 }

@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import type { AuthUser } from '../hooks/useAuth'
@@ -15,7 +16,9 @@ export type { AuthUser }
  */
 export async function requireUser(): Promise<AuthUser | undefined> {
   try {
-    const res = await serverGet<MeResponse>('/auth/me')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+    const res = await serverGet<MeResponse>('/auth/me', { cookieHeader })
     return res.user
   } catch {
     redirect('/login')
@@ -29,7 +32,9 @@ export async function requireUser(): Promise<AuthUser | undefined> {
  */
 export async function optionalUser(): Promise<AuthUser | null> {
   try {
-    const res = await serverGet<MeResponse>('/auth/me')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+    const res = await serverGet<MeResponse>('/auth/me', { cookieHeader })
     return res.user
   } catch {
     return null

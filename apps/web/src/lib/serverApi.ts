@@ -3,6 +3,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v
 interface ServerGetOptions {
   revalidate?: number
   params?: Record<string, string | number | boolean | undefined>
+  cookieHeader?: string
 }
 
 export async function serverGet<T = unknown>(path: string, options?: ServerGetOptions) {
@@ -19,7 +20,12 @@ export async function serverGet<T = unknown>(path: string, options?: ServerGetOp
     if (qs) url += `?${qs}`
   }
 
-  const fetchOpts: RequestInit = { credentials: 'include' }
+  const fetchOpts: RequestInit = {}
+  if (options?.cookieHeader) {
+    fetchOpts.headers = {
+      Cookie: options.cookieHeader,
+    }
+  }
   if (options?.revalidate !== undefined) {
     // ISR via Next.js fetch option
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any

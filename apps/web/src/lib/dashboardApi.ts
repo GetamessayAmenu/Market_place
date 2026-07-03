@@ -9,6 +9,7 @@ import {
   MOCK_GROWTH_RECOMMENDATIONS,
   MOCK_INVENTORY_ALERTS,
   MOCK_KPIS,
+  MOCK_MESSAGE_CONVERSATIONS,
   MOCK_MESSAGES,
   MOCK_NOTIFICATIONS,
   MOCK_PENDING_ACTIONS,
@@ -20,6 +21,7 @@ import {
   type DashboardKpis,
   type GrowthRecommendation,
   type InventoryAlert,
+  type MessageConversation,
   type MessagePreview,
   type Notification,
   type PendingAction,
@@ -28,6 +30,13 @@ import {
   type RentalItem,
   type RevenueChartPoint,
 } from './dashboardMockData';
+
+// Live in-memory data stores for mock API behavior.
+let livePendingActions = [...MOCK_PENDING_ACTIONS];
+let liveNotifications = [...MOCK_NOTIFICATIONS];
+let liveRecentOrders = [...MOCK_RECENT_ORDERS];
+let liveInventoryAlerts = [...MOCK_INVENTORY_ALERTS];
+let liveMessageConversations = [...MOCK_MESSAGE_CONVERSATIONS];
 
 // Simulated network delay for realistic UX testing
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -43,19 +52,48 @@ export async function fetchDashboardKpis(_sellerId: string): Promise<DashboardKp
 export async function fetchRecentOrders(_sellerId: string): Promise<RecentOrder[]> {
   await delay(350);
   // TODO: return apiGet<RecentOrder[]>(`/seller/${_sellerId}/orders/recent`);
-  return [...MOCK_RECENT_ORDERS];
+  return [...liveRecentOrders];
 }
 
 export async function fetchPendingActions(_sellerId: string): Promise<PendingAction[]> {
   await delay(250);
   // TODO: return apiGet<PendingAction[]>(`/seller/${_sellerId}/pending-actions`);
-  return [...MOCK_PENDING_ACTIONS];
+  return [...livePendingActions];
 }
 
 export async function fetchMessages(_sellerId: string): Promise<MessagePreview[]> {
   await delay(300);
   // TODO: return apiGet<MessagePreview[]>(`/seller/${_sellerId}/messages/preview`);
   return [...MOCK_MESSAGES];
+}
+
+export async function fetchMessageConversation(
+  _sellerId: string,
+  conversationId: string,
+): Promise<MessageConversation | null> {
+  await delay(250);
+  const conversation = liveMessageConversations.find((conv) => conv.conversationId === conversationId);
+  return conversation ? { ...conversation, messages: [...conversation.messages] } : null;
+}
+
+export async function sendMessageInConversation(
+  _sellerId: string,
+  conversationId: string,
+  text: string,
+): Promise<void> {
+  await delay(200);
+  const now = new Date().toISOString();
+  const newMessage = {
+    id: `msg-${Date.now()}`,
+    sender: 'seller' as const,
+    text,
+    createdAt: now,
+  };
+  liveMessageConversations = liveMessageConversations.map((conv) =>
+    conv.conversationId === conversationId
+      ? { ...conv, messages: [...conv.messages, newMessage], unreadCount: 0 }
+      : conv,
+  );
 }
 
 export async function fetchRentalOverview(_sellerId: string): Promise<RentalItem[]> {
@@ -105,22 +143,31 @@ export async function fetchRevenueChart(
 
 export async function dismissPendingAction(_actionId: string): Promise<void> {
   await delay(200);
-  // TODO: await apiPost(`/seller/pending-actions/${_actionId}/dismiss`);
+  livePendingActions = livePendingActions.filter((action) => action.id !== _actionId);
 }
 
 export async function snoozePendingAction(_actionId: string, _hours: number): Promise<void> {
   await delay(200);
-  // TODO: await apiPost(`/seller/pending-actions/${_actionId}/snooze`, { hours: _hours });
+  livePendingActions = livePendingActions.filter((action) => action.id !== _actionId);
 }
 
 export async function markNotificationRead(_notifId: string): Promise<void> {
   await delay(150);
-  // TODO: await apiPost(`/notifications/${_notifId}/read`);
+  liveNotifications = liveNotifications.map((notif) =>
+    notif.id === _notifId ? { ...notif, isRead: true } : notif
+  );
+}
+
+export async function markNotificationUnread(_notifId: string): Promise<void> {
+  await delay(150);
+  liveNotifications = liveNotifications.map((notif) =>
+    notif.id === _notifId ? { ...notif, isRead: false } : notif
+  );
 }
 
 export async function markAllNotificationsRead(_sellerId: string): Promise<void> {
   await delay(200);
-  // TODO: await apiPost(`/seller/${_sellerId}/notifications/read-all`);
+  liveNotifications = liveNotifications.map((notif) => ({ ...notif, isRead: true }));
 }
 
 export async function dismissGrowthRecommendation(_recId: string): Promise<void> {
@@ -130,8 +177,9 @@ export async function dismissGrowthRecommendation(_recId: string): Promise<void>
 
 export async function updateOrderStatus(orderId: string, status: string): Promise<void> {
   await delay(300);
-  // TODO: await apiPatch(`/orders/${orderId}`, { status });
-  console.info('Order status updated:', orderId, status);
+  liveRecentOrders = liveRecentOrders.map((order) =>
+    order.id === orderId ? { ...order, status: status as any } : order
+  );
 }
 
 export async function markRentalCondition(
@@ -146,9 +194,11 @@ export async function markRentalCondition(
 // Re-export types for convenience
 export type {
   CustomOrderPipeline,
+  ConversationMessage,
   DashboardKpis,
   GrowthRecommendation,
   InventoryAlert,
+  MessageConversation,
   MessagePreview,
   Notification,
   PendingAction,

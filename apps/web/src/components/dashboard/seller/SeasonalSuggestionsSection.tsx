@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@marketplace/ui';
 import React, { useEffect, useState } from 'react';
 
-import { getUpcomingEthiopianEvents } from '../../../lib/ethiopianCalendar';
+import { getUpcomingEthiopianEvents, toEthiopianDateString } from '../../../lib/ethiopianCalendar';
 import type { Lang } from '../../../lib/i18n';
 import { t } from '../../../lib/i18n';
 
@@ -48,7 +48,9 @@ export default function SeasonalSuggestionsSection({
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {event.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    {event.gregorianDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    {' • '}
+                    {toEthiopianDateString(event.gregorianDate)}
                   </p>
                   <p className="mt-2 text-sm font-medium text-foreground">
                     💡 Suggestion: <span className="font-normal text-muted-foreground">{event.suggestion}</span>

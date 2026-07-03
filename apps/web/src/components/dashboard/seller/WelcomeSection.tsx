@@ -104,30 +104,19 @@ export default function WelcomeSection({
   const hasPending = pendingActionsCount > 0;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          {greeting}, {displayName} 👋
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {t('dashboard_subtitle', lang)}
-        </p>
-        {hasPending && (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
-            You have {pendingActionsCount} urgent action{pendingActionsCount !== 1 ? 's' : ''} requiring attention
-          </div>
-        )}
-      </div>
-      <a
-        href="/dashboard/seller/listings/create"
-        className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98]"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        {t('qa_new_listing', lang)}
-      </a>
+    <div>
+      <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+        {greeting}, {displayName} 👋
+      </h1>
+      <p className="mt-1 text-muted-foreground">
+        {t('dashboard_subtitle', lang)}
+      </p>
+      {hasPending && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-destructive" />
+          You have {pendingActionsCount} urgent action{pendingActionsCount !== 1 ? 's' : ''} requiring attention
+        </div>
+      )}
     </div>
   );
 }

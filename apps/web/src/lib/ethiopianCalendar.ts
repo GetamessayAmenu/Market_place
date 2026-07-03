@@ -12,6 +12,7 @@
  */
 
 export interface EthiopianEvent {
+  id: string;
   name: string;
   nameAmharic: string;
   gregorianDate: Date; // approximate Gregorian date this year
@@ -120,7 +121,8 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   const enkDays = daysUntil(enkDate, new Date(from));
   if (enkDays >= 0 && enkDays <= 14) {
     events.push({
-      name: 'Ethiopian New Year (Enkutatash)',
+      id: 'enkutatash',
+      name: 'Ethiopian New Year',
       nameAmharic: 'እንቁጣጣሽ',
       gregorianDate: enkDate,
       daysUntil: enkDays,
@@ -137,7 +139,8 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   const timkatDays = daysUntil(timkatDate, new Date(from));
   if (timkatDays >= 0 && timkatDays <= 30) {
     events.push({
-      name: 'Timkat (Epiphany)',
+      id: 'timkat',
+      name: 'Timkat',
       nameAmharic: 'ጥምቀት',
       gregorianDate: timkatDate,
       daysUntil: timkatDays,
@@ -153,7 +156,8 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   const fasikaDays = daysUntil(fasikaDate, new Date(from));
   if (fasikaDays >= 0 && fasikaDays <= 45) {
     events.push({
-      name: 'Fasika (Ethiopian Easter)',
+      id: 'fasika',
+      name: 'Fasika',
       nameAmharic: 'ፋሲካ',
       gregorianDate: fasikaDate,
       daysUntil: fasikaDays,
@@ -166,6 +170,7 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   // Wedding season – June, July, August
   if (month >= 6 && month <= 8) {
     events.push({
+      id: 'wedding-season',
       name: 'Wedding Season',
       nameAmharic: 'የሠርግ ወቅት',
       gregorianDate: new Date(year, 7, 31), // end of August
@@ -179,6 +184,7 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   // Rainy season – June to September (suggest jackets, sweaters)
   if (month >= 6 && month <= 9) {
     events.push({
+      id: 'rainy-season',
       name: 'Rainy Season',
       nameAmharic: 'ክረምት',
       gregorianDate: new Date(year, 8, 30),
@@ -194,6 +200,7 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   const bfDays = daysUntil(blackFriday, new Date(from));
   if (bfDays >= 0 && bfDays <= 30) {
     events.push({
+      id: 'black-friday',
       name: 'Black Friday',
       nameAmharic: 'ብላክ ፍራይዴይ',
       gregorianDate: blackFriday,
@@ -208,6 +215,7 @@ export function getUpcomingEthiopianEvents(from: Date = new Date()): EthiopianEv
   const xmasDays = daysUntil(christmas, new Date(from));
   if (xmasDays >= 0 && xmasDays <= 30) {
     events.push({
+      id: 'christmas',
       name: 'Christmas',
       nameAmharic: 'ገና',
       gregorianDate: christmas,

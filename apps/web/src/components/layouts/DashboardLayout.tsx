@@ -9,13 +9,15 @@ interface DashboardLayoutProps {
   user?: AuthUser | null;
   /** Suppress the welcome banner */
   hideWelcome?: boolean;
+  /** Suppress the header */
+  hideHeader?: boolean;
 }
 
-export default function DashboardLayout({ children, user, hideWelcome }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, user, hideWelcome, hideHeader }: DashboardLayoutProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* ── Sticky Header ───────────────────────────────────── */}
-      <Header />
+      {!hideHeader && <Header />}
 
       {/* ── Sidebar + Main Content ──────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
