@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string
   email: string
   role: string
+  roles?: string[]
   displayName: string
   avatarUrl: string | null
   emailVerified: boolean

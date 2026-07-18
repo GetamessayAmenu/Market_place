@@ -52,6 +52,7 @@ export interface SerializedListing {
   readonly attributes: Record<string, unknown> | null;
   readonly publishedAt: string | null;
   readonly expiresAt: string | null;
+  readonly rejectedReason: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly seller: SerializedListingSeller;
@@ -109,6 +110,7 @@ export function serializeListing(
     attributes: parseAttributes(listing.attributes),
     publishedAt: listing.publishedAt?.toISOString() ?? null,
     expiresAt: listing.expiresAt?.toISOString() ?? null,
+    rejectedReason: listing.rejectedReason,
     createdAt: listing.createdAt.toISOString(),
     updatedAt: listing.updatedAt.toISOString(),
     seller: {
@@ -157,6 +159,12 @@ export function serializeListingSummary(
   | 'seller'
   | 'category'
   | 'isFavorited'
+  | 'availableForPurchase'
+  | 'availableForRent'
+  | 'customOrderAvailable'
+  | 'rentalPricePerDay'
+  | 'rentalDeposit'
+  | 'rejectedReason'
 > {
   const full = serializeListing(listing);
   return {
@@ -175,5 +183,11 @@ export function serializeListingSummary(
     images: full.images,
     seller: full.seller,
     category: full.category,
+    availableForPurchase: full.availableForPurchase,
+    availableForRent: full.availableForRent,
+    customOrderAvailable: full.customOrderAvailable,
+    rentalPricePerDay: full.rentalPricePerDay,
+    rentalDeposit: full.rentalDeposit,
+    rejectedReason: full.rejectedReason,
   };
 }

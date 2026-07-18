@@ -1,26 +1,42 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { serverGet } from './serverApi'
+import { ADMIN_ROLES, type AdminRole } from './adminRoles'
 
-export interface AdminUser { id: string; name?: string; email?: string; roles?: string[] }
+export interface AdminUser {
+  id: string
+  email: string
+  displayName?: string
+  role?: AdminRole
+  roles?: AdminRole[]
+}
 
-const DEFAULT_ALLOWED = ['admin', 'super_admin', 'moderator', 'customer_support']
+const DEFAULT_ALLOWED: AdminRole[] = ['admin', 'super_admin', 'moderator', 'support']
 
-export async function requireAdmin(allowedRoles: string[] = DEFAULT_ALLOWED): Promise<AdminUser | undefined> {
+export async function requireAdmin(allowedRoles: AdminRole[] = DEFAULT_ALLOWED): Promise<AdminUser | null> {
   try {
-    const res = await serverGet<{ data: AdminUser }>('/auth/me')
-    const user = res.data
-    const userRoles: string[] = user.roles ?? []
-    const allowed = allowedRoles.some(r => userRoles.includes(r))
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+    const res = await serverGet<{ success: boolean; data: { user: AdminUser } }>('/auth/me', { cookieHeader })
+    const user = res.data.user
+    const userRoles: AdminRole[] = user.roles ?? (user.role ? [user.role] : [])
+    const allowed = allowedRoles.some((role) => userRoles.includes(role))
+
     if (!allowed) {
-      redirect('/')
-      return undefined
+      redirect('/admin/forbidden')
+      return null
     }
+
     return user
   } catch {
-    redirect('/login')
-    return undefined
+    redirect('/admin')
+    return null
   }
 }
 
-export default { requireAdmin }
+export function isAdminRole(role: string | undefined): boolean {
+  return ADMIN_ROLES.includes(role as AdminRole)
+}
+
+export default { requireAdmin, isAdminRole }

@@ -14,7 +14,7 @@ export type { AuthUser }
 /**
  * Server-side auth guard. Redirects to /login if not authenticated.
  */
-export async function requireUser(): Promise<AuthUser | undefined> {
+export async function requireUser(): Promise<AuthUser> {
   try {
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.toString()
@@ -22,7 +22,6 @@ export async function requireUser(): Promise<AuthUser | undefined> {
     return res.user
   } catch {
     redirect('/login')
-    return undefined
   }
 }
 

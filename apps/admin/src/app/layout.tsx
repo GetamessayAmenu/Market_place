@@ -3,8 +3,7 @@ import React from 'react'
 
 import '../styles/globals.css'
 
-import AdminHeader from '../components/AdminHeader'
-import AdminSidebar from '../components/AdminSidebar'
+import AppLayoutWrapper from '../components/AppLayoutWrapper'
 import Providers from '../providers/Providers'
 
 const inter = Inter({
@@ -30,15 +29,7 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body className={inter.className}>
         <Providers>
-          <div className="flex h-screen overflow-hidden">
-            <AdminSidebar />
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <AdminHeader />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6">
-                {children}
-              </main>
-            </div>
-          </div>
+          <AppLayoutWrapper>{children}</AppLayoutWrapper>
         </Providers>
       </body>
     </html>

@@ -38,6 +38,7 @@
     "@marketplace/typescript-config": "*",
     "eslint": "^9.18.0",
     "husky": "^9.1.7",
+    "playwright": "^1.61.1",
     "prettier": "^3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "prisma": "^6.3.0",

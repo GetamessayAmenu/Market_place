@@ -1,4 +1,4 @@
-import { Avatar, Badge } from '@marketplace/ui'
+import { Badge } from '@marketplace/ui'
 import Link from 'next/link'
 import React from 'react'
 
@@ -8,8 +8,16 @@ import FavoriteButton from '../../../components/marketplace/FavoriteButton'
 import ImageGallery from '../../../components/marketplace/ImageGallery'
 import ListingActions from '../../../components/marketplace/ListingActions'
 import ListingCard from '../../../components/marketplace/ListingCard'
+import MarkUnavailableButton from '../../../components/marketplace/MarkUnavailableButton'
+import PostSimilarAdButton from '../../../components/marketplace/PostSimilarAdButton'
+import PriceHistoryButton from '../../../components/marketplace/PriceHistoryButton'
+import ReportAbuseButton from '../../../components/marketplace/ReportAbuseButton'
+import RequestCallbackButton from '../../../components/marketplace/RequestCallbackButton'
 import ReviewSection from '../../../components/marketplace/ReviewSection'
+import SafetyTips from '../../../components/marketplace/SafetyTips'
+import SellerInfoCard from '../../../components/marketplace/SellerInfoCard'
 import ShareButton from '../../../components/marketplace/ShareButton'
+import ShopLocationMap from '../../../components/marketplace/ShopLocationMap'
 import { serverGet } from '../../../lib/serverApi'
 
 interface ListingImage {
@@ -39,10 +47,12 @@ interface ListingData {
   }
   seller?: {
     id: string
-    name: string
+    displayName: string
     avatarUrl?: string | null
     emailVerifiedAt?: string | null
     phoneVerifiedAt?: string | null
+    location?: string | null
+    createdAt?: string
   }
   category?: {
     id: string
@@ -161,13 +171,16 @@ export default async function ListingPage({ params }: Props) {
     ...(listing.seller ? {
       seller: {
         '@type': 'Person',
-        name: listing.seller.name,
+        name: listing.seller.displayName,
         url: `${siteUrl}/sellers/${listing.seller.id}`,
       },
     } : {}),
   }
 
   const hasActions = (listing.availableForPurchase ?? false) || (listing.availableForRent ?? false) || (listing.customOrderAvailable ?? false)
+
+  // TODO: Replace with actual auth check
+  const isOwner = false // Check if current user is the listing owner
 
   return (
     <Container>
@@ -206,9 +219,16 @@ export default async function ListingPage({ params }: Props) {
                   <FavoriteButton listingId={listing.id} />
                 </div>
               </div>
-              <p className="mt-2 text-3xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
+              <div className="mt-3 flex items-baseline gap-3 flex-wrap">
+                <p className="text-3xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
+                <PriceHistoryButton 
+                  listingId={listing.id} 
+                  currentPrice={listing.price}
+                  currency={listing.currency}
+                />
+              </div>
               {listing.availableForRent && listing.rentalPricePerDay != null && (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   or rent for {listing.currency}{listing.rentalPricePerDay.toLocaleString()}/day
                 </p>
               )}
@@ -237,6 +257,15 @@ export default async function ListingPage({ params }: Props) {
                 {...(listing.rentalPricePerDay !== undefined ? { rentalPricePerDay: listing.rentalPricePerDay ?? null } : { rentalPricePerDay: null })}
                 {...(listing.rentalDeposit !== undefined ? { rentalDeposit: listing.rentalDeposit ?? null } : { rentalDeposit: null })}
                 sellerId={listing.seller.id}
+              />
+            )}
+
+            {/* Request Callback */}
+            {listing.seller && (
+              <RequestCallbackButton 
+                listingId={listing.id}
+                sellerId={listing.seller.id}
+                listingTitle={listing.title}
               />
             )}
 
@@ -305,7 +334,7 @@ export default async function ListingPage({ params }: Props) {
                           d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
                         />
                       </svg>
-                      Call
+                      Show Contact
                     </a>
                   ) : null}
                   {listing.contactOptions.whatsapp ? (
@@ -329,47 +358,49 @@ export default async function ListingPage({ params }: Props) {
                     </a>
                   ) : null}
                   {listing.contactOptions.inAppMessaging && listing.seller ? (
-                    <Link
-                      href={`/dashboard/messages?listing=${listing.id}&seller=${listing.seller.id}`}
-                      className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent"
-                    >
-                      Send Message
-                    </Link>
+                    <>
+                      <ChatButton
+                        listingId={listing.id}
+                        sellerId={listing.seller.id}
+                        sellerName={listing.seller.displayName}
+                      />
+                    </>
                   ) : null}
                 </div>
               </div>
             ) : null}
 
-            {/* Seller info */}
+            {/* Enhanced Seller info card */}
             {listing.seller ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border bg-card p-4">
-                  <Link href={`/sellers/${listing.seller.id}`} className="flex items-center gap-3 group">
-                  <Avatar
-                    name={listing.seller.name}
-                    {...(listing.seller.avatarUrl !== undefined ? { src: listing.seller.avatarUrl } : {})}
-                    size="lg"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
-                        {listing.seller.name}
-                      </h3>
-                      {(listing.seller.emailVerifiedAt ?? listing.seller.phoneVerifiedAt) ? (
-                        <Badge variant="success">Verified</Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-muted-foreground">View profile</p>
-                  </div>
-                </Link>
-                </div>
-                <ChatButton
-                  listingId={listing.id}
-                  sellerId={listing.seller.id}
-                  sellerName={listing.seller.name}
-                />
-              </div>
+              <SellerInfoCard 
+                seller={listing.seller}
+                responseTime="Typically replies within minutes"
+              />
             ) : null}
+
+            {/* Shop Location Map */}
+            {listing.seller?.location ? (
+              <ShopLocationMap 
+                sellerName={listing.seller.displayName}
+                location={listing.seller.location}
+              />
+            ) : null}
+
+            {/* Safety Tips */}
+            <SafetyTips />
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2">
+              <MarkUnavailableButton 
+                listingId={listing.id}
+                listingTitle={listing.title}
+                isOwner={isOwner}
+              />
+              <ReportAbuseButton 
+                listingId={listing.id}
+                listingTitle={listing.title}
+              />
+            </div>
           </div>
         </div>
 
@@ -410,6 +441,19 @@ export default async function ListingPage({ params }: Props) {
             </div>
           </section>
         ) : null}
+
+        {/* Post Similar Ad CTA */}
+        <section className="mt-12" aria-labelledby="post-ad-heading">
+          <div className="rounded-lg border bg-gradient-to-br from-primary/5 to-primary/10 p-8 text-center">
+            <h2 id="post-ad-heading" className="text-2xl font-bold text-foreground mb-2">
+              Have something similar to sell?
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              Create your listing in minutes and reach thousands of buyers
+            </p>
+            <PostSimilarAdButton categorySlug={listing.category?.slug} className="w-full sm:w-auto" />
+          </div>
+        </section>
 
         {/* JSON-LD */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />

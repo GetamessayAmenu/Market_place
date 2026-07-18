@@ -1,0 +1,114 @@
+# Implementation Plan
+
+- [ ] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - API Proxy Environment Configuration
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the hardcoded rewrite configuration fails in different environments
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases: API requests with different BACKEND_API_URL values
+  - Test that requests to `/api/v1/auth/login` are proxied to `${BACKEND_API_URL}/api/v1/auth/login` for various BACKEND_API_URL values (from Bug Condition in design)
+  - Test with BACKEND_API_URL set to `http://api.staging.com` - expect failure because rewrites use hardcoded `http://localhost:3001`
+  - Test with BACKEND_API_URL set to `http://api.production.com` - expect failure for same reason
+  - Test that request headers and cookies are properly forwarded through the proxy
+  - Test that response cookies from backend are set as HttpOnly cookies in the response
+  - Run test on UNFIXED code (current rewrite-based approach)
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists because rewrites use hardcoded URLs)
+  - Document counterexamples found:
+    - Rewrites always use `http://localhost:3001` regardless of BACKEND_API_URL
+    - Cookies may not be properly forwarded through rewrites
+    - Headers may not be properly preserved
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.4_
+
+- [ ] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Non-API Request Behavior
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-API requests:
+    - Middleware redirects unauthenticated users to /login
+    - Public paths (/login, /admin, etc.) are accessible without authentication
+    - Protected routes check for access_token cookie
+    - Login form renders and validates properly
+    - Static assets are served correctly
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements
+  - Test 1: Middleware authentication checking
+    - For all protected route requests without access_token cookie, verify redirect to /login
+    - For all requests to public paths, verify no authentication required
+  - Test 2: Login form behavior
+    - Verify login form renders correctly
+    - Verify client-side validation works without API calls
+  - Test 3: Static asset serving
+    - For all requests to /_next/*, /static/*, /favicon.ico, verify they are served without interference
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+- [ ] 3. Implement API proxy fix
+
+  - [ ] 3.1 Add BACKEND_API_URL to environment configuration
+    - Add `BACKEND_API_URL=http://localhost:3001` to `apps/admin/.env.example`
+    - Document that this variable is required for API proxy to work
+    - _Requirements: 2.1, 2.2, 2.4_
+
+  - [ ] 3.2 Remove hardcoded rewrites from next.config.js
+    - Remove the static rewrites configuration that uses hardcoded `http://localhost:3001`
+    - Keep other Next.js configuration intact
+    - _Requirements: 2.1, 2.2, 2.4_
+
+  - [ ] 3.3 Create API proxy route handler
+    - Create file `apps/admin/src/app/api/v1/[...path]/route.ts`
+    - Implement catch-all route handler for all `/api/v1/*` requests
+    - Read `BACKEND_API_URL` from `process.env.BACKEND_API_URL`
+    - Handle all HTTP methods: GET, POST, PATCH, PUT, DELETE
+    - Extract request method, headers, cookies, body, and query parameters
+    - Reconstruct full backend URL: `${BACKEND_API_URL}/api/v1/${params.path.join('/')}`
+    - Include query parameters in backend request URL
+    - Forward relevant headers to backend (Content-Type, Authorization, etc.)
+    - Forward cookies from incoming request to backend request
+    - Make HTTP request to backend using fetch or similar
+    - Extract response from backend including status, headers, body
+    - Parse Set-Cookie headers from backend response
+    - Set cookies in Next.js response as HttpOnly cookies
+    - Return backend response body and status code to client
+    - Add error handling for missing BACKEND_API_URL (return 500 with error message)
+    - Add error handling for network failures (return 502 Bad Gateway)
+    - _Bug_Condition: isBugCondition(request) where request.path starts with '/api/v1/'_
+    - _Expected_Behavior: Forward to ${BACKEND_API_URL}/api/v1/* with headers, cookies, proper response handling_
+    - _Preservation: Non-API requests (middleware, login form, static assets) remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+  - [ ] 3.4 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - API Proxy Environment Configuration
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - Verify requests with different BACKEND_API_URL values are correctly proxied
+    - Verify headers and cookies are properly forwarded
+    - Verify response cookies are set as HttpOnly cookies
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed - proxy now uses environment-configured URLs)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
+
+  - [ ] 3.5 Verify preservation tests still pass
+    - **Property 2: Preservation** - Non-API Request Behavior
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - Verify middleware authentication checking still works
+    - Verify public routes remain accessible
+    - Verify login form behavior is unchanged
+    - Verify static assets are served correctly
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions - all non-API behavior preserved)
+    - Confirm all tests still pass after fix (no regressions)
+
+- [ ] 4. Checkpoint - Ensure all tests pass and authentication works
+  - Run all unit tests and property-based tests
+  - Manually test login flow: navigate to /login, enter credentials, verify successful authentication
+  - Verify access_token cookie is set after successful login
+  - Verify protected routes are accessible after authentication
+  - Verify /api/v1/auth/me returns user data when authenticated
+  - Verify logout clears the access_token cookie
+  - Test in local environment (BACKEND_API_URL=http://localhost:3001)
+  - Document any issues that arise and ask user for guidance
+  - Ensure all tests pass - ask the user if questions arise

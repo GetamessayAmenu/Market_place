@@ -1,10 +1,23 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'
 
-interface ServerGetOptions { revalidate?: number }
+interface ServerGetOptions {
+  revalidate?: number
+  cookieHeader?: string
+}
 
 export async function serverGet<T = unknown>(path: string, options?: ServerGetOptions) {
   const url = `${API_BASE}${path}`
   const fetchOpts: RequestInit = { credentials: 'include' }
+  
+  // Always include cookies for server-side calls
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+  
+  if (cookieHeader) {
+    fetchOpts.headers = { Cookie: cookieHeader }
+  }
+  
   if (options?.revalidate !== undefined) {
     // @ts-expect-error Next.js extends RequestInit with `next` property
     fetchOpts.next = { revalidate: options.revalidate }
@@ -18,11 +31,20 @@ export async function serverGet<T = unknown>(path: string, options?: ServerGetOp
 }
 
 export async function serverPost<T = unknown>(path: string, body?: Record<string, unknown>) {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+  
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader
+  }
+  
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     credentials: 'include',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
   if (!res.ok) throw new Error('POST ' + path + ' failed: ' + String(res.status))
@@ -30,11 +52,20 @@ export async function serverPost<T = unknown>(path: string, body?: Record<string
 }
 
 export async function serverPatch<T = unknown>(path: string, body?: Record<string, unknown>) {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+  
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader
+  }
+  
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
     credentials: 'include',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
   if (!res.ok) throw new Error('PATCH ' + path + ' failed: ' + String(res.status))

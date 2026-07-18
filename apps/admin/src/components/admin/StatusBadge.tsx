@@ -33,8 +33,10 @@ const userStatusMap: Record<string, StatusVariant> = {
 
 const verificationStatusMap: Record<string, StatusVariant> = {
   pending: 'warning',
+  under_review: 'info',
   approved: 'success',
   rejected: 'error',
+  changes_requested: 'warning',
 }
 
 export type StatusDomain = 'listing' | 'report' | 'user' | 'verification'

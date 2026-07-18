@@ -1,13 +1,26 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
+const API_BASE = '/api/v1'
 
 async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(API_BASE + path, {
+  const url = API_BASE + path
+  console.log('Client API Request:', url, options?.method || 'GET')
+  
+  const res = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
-  if (!res.ok) throw new Error('Request failed: ' + String(res.status))
-  return (await res.json()) as T
+  
+  console.log('Client API Response:', res.status, res.statusText)
+  
+  if (!res.ok) {
+    const errorText = await res.text()
+    console.error('Client API Error:', res.status, errorText)
+    throw new Error('Request failed: ' + String(res.status))
+  }
+  
+  const data = await res.json()
+  console.log('Client API Data:', data)
+  return data as T
 }
 
 export function clientGet<T>(path: string): Promise<T> {
@@ -25,6 +38,12 @@ export function clientPatch<T>(path: string, body?: Record<string, unknown>): Pr
   return clientFetch<T>(path, {
     method: 'PATCH',
     ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+}
+
+export function clientDelete<T>(path: string): Promise<T> {
+  return clientFetch<T>(path, {
+    method: 'DELETE',
   })
 }
 

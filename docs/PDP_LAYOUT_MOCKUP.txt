@@ -1,0 +1,193 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    ENHANCED PRODUCT DETAIL PAGE LAYOUT
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ BREADCRUMB: Home / Electronics / iPhone 13 Pro Max                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────┬───────────────────────────────────────────┐
+│                                 │                                           │
+│                                 │  iPhone 13 Pro Max          [♥] [Share]  │
+│        [  MAIN IMAGE  ]         │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│         800 x 600 px            │  │ ETB 100,000   [Price History] btn   ││
+│                                 │  └──────────────────────────────────────┘│
+│  ┌─────────────────────────┐   │                                           │
+│  │ [Thumb] [Thumb] [Thumb] │   │  [New] [Featured] [Active]                │
+│  └─────────────────────────┘   │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│  IMAGE GALLERY                  │  │  [Buy Now]    [Rent]                 ││
+│  - Lightbox enabled             │  │  [Custom Order]                      ││
+│  - Zoom on hover                │  └──────────────────────────────────────┘│
+│  - Swipe on mobile              │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│                                 │  │ 📞 Request Callback [FULL WIDTH BTN] ││
+│                                 │  └──────────────────────────────────────┘│
+│                                 │                                           │
+│                                 │  📍 Addis Ababa, Bole                     │
+│                                 │  🕒 Posted Jan 15, 2024                   │
+│                                 │  ❤️  24 saved                             │
+│                                 │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│                                 │  │ Contact Seller                       ││
+│                                 │  │ [Show Contact] [WhatsApp] [Telegram] ││
+│                                 │  │ [Start Chat]                         ││
+│                                 │  └──────────────────────────────────────┘│
+│                                 │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│                                 │  │  ╭─────╮                             ││
+│                                 │  │  │  H  │ Hope ✓                      ││
+│                                 │  │  ╰─────╯ 1+ month on Marketplace     ││
+│                                 │  │                                       ││
+│                                 │  │  ⚡ Quick Responder                   ││
+│                                 │  │  Typically replies within minutes    ││
+│                                 │  │                                       ││
+│                                 │  │  [Email ✓] [Phone ✓] [Member 2024]  ││
+│                                 │  │                                       ││
+│                                 │  │  [View Seller Profile] (full width)  ││
+│                                 │  └──────────────────────────────────────┘│
+│                                 │                                           │
+│                                 │  ┌──────────────────────────────────────┐│
+│                                 │  │ ⚠️  Safety Tips          [▼ Expand]  ││
+│                                 │  └──────────────────────────────────────┘│
+│                                 │   [When expanded:]                        │
+│                                 │   • Avoid paying in advance              │
+│                                 │   • Meet at safe public place            │
+│                                 │   • Inspect item before buying           │
+│                                 │   • Verify packed item                   │
+│                                 │   • Only pay if satisfied                │
+│                                 │                                           │
+│                                 │  [Mark Unavailable] [🚩 Report Abuse]    │
+│                                 │                                           │
+└─────────────────────────────────┴───────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Description                                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Brand new iPhone 13 Pro Max, 256GB, Pacific Blue. Comes with original      │
+│ box, charger, and all accessories. Never used, still sealed.                │
+│                                                                             │
+│ Features:                                                                   │
+│ - 6.7" Super Retina XDR display                                            │
+│ - A15 Bionic chip                                                          │
+│ - Triple camera system                                                     │
+│ - 5G capable                                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Reviews                                                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ★★★★★ 4.8 (24 reviews)                                                      │
+│                                                                             │
+│ John D. ★★★★★                                                               │
+│ Great seller! Very responsive and item as described.                       │
+│                                                                             │
+│ [Load More Reviews]                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Similar Listings                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
+│ │ [Image]  │  │ [Image]  │  │ [Image]  │  │ [Image]  │                    │
+│ │ iPhone14 │  │ iPhone13 │  │ iPhone12 │  │ Samsung  │                    │
+│ │ 95,000   │  │ 85,000   │  │ 75,000   │  │ 70,000   │                    │
+│ └──────────┘  └──────────┘  └──────────┘  └──────────┘                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  ╔════════════════════════════════════════╗                 │
+│                  ║  Have something similar to sell?      ║                 │
+│                  ║                                        ║                 │
+│                  ║  Create your listing in minutes and   ║                 │
+│                  ║  reach thousands of buyers            ║                 │
+│                  ║                                        ║                 │
+│                  ║     [➕ Post Ad Like This]            ║                 │
+│                  ╚════════════════════════════════════════╝                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                              KEY IMPROVEMENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+NEW FEATURES HIGHLIGHTED:
+1. [Price History] button next to price ← NEW
+2. [Request Callback] full-width button ← NEW
+3. Enhanced seller card with:
+   - Response time indicator ← NEW
+   - Member duration ← NEW
+   - Trust badges ← NEW
+4. Collapsible Safety Tips section ← NEW
+5. [Mark Unavailable] button (sellers only) ← NEW
+6. [Report Abuse] button ← NEW
+7. "Post Ad Like This" CTA section ← NEW
+
+TRUST SIGNALS (7+):
+✓ Verified badges (email, phone)
+✓ Member since duration
+✓ Response time
+✓ Reviews & ratings
+✓ Price history transparency
+✓ Safety tips education
+✓ Professional seller card design
+
+═══════════════════════════════════════════════════════════════════════════════
+                             MOBILE LAYOUT (< 768px)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────┐
+│ [Breadcrumb: Home > Cat]    │
+├─────────────────────────────┤
+│                             │
+│     [  MAIN IMAGE  ]        │
+│                             │
+├─────────────────────────────┤
+│ Title            [♥] [Share]│
+│                             │
+│ ETB 100,000                 │
+│ [Price History] (btn)       │
+│                             │
+│ [New] [Featured]            │
+├─────────────────────────────┤
+│ [Buy Now] [Rent]            │
+│ [Request Callback]          │
+├─────────────────────────────┤
+│ 📍 Location                 │
+│ 🕒 Date                     │
+│ ❤️  Saves                   │
+├─────────────────────────────┤
+│ Contact Seller              │
+│ [Show Contact]              │
+│ [WhatsApp] [Telegram]       │
+│ [Start Chat]                │
+├─────────────────────────────┤
+│ ╭───╮                       │
+│ │ H │ Hope ✓                │
+│ ╰───╯ 1+ month              │
+│                             │
+│ ⚡ Quick Responder          │
+│                             │
+│ [Email✓] [Phone✓]          │
+│                             │
+│ [View Profile]              │
+├─────────────────────────────┤
+│ ⚠️  Safety Tips   [▼]       │
+├─────────────────────────────┤
+│ [Mark Unavailable]          │
+│ [🚩 Report]                 │
+├─────────────────────────────┤
+│ Description                 │
+│ Text here...                │
+├─────────────────────────────┤
+│ Reviews                     │
+│ ★★★★★                       │
+├─────────────────────────────┤
+│ Similar Listings            │
+│ [Grid 2 columns]            │
+├─────────────────────────────┤
+│ [Post Ad Like This]         │
+│ CTA Section                 │
+└─────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -3,9 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 /**
  * Next.js middleware for route protection.
  * Checks for an access_token cookie on protected paths.
+ * Validates user roles to prevent unauthorized access.
  * Preserves ?redirect= param through the auth flow chain.
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   // Protected paths that require authentication
@@ -24,7 +25,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Auth pages redirect to dashboard if already authenticated
+  // Auth pages redirect to appropriate dashboard if already authenticated
   const authPaths = ['/login', '/register'];
   const isAuthPage = authPaths.some((p) => pathname === p);
 
@@ -35,7 +36,14 @@ export function middleware(request: NextRequest) {
 
     if (token) {
       const redirect = searchParams.get('redirect');
-      const target = redirect ?? '/dashboard';
+      
+      // Validate redirect URL - prevent admin redirects from web app
+      let target = redirect ?? '/dashboard';
+      if (redirect && (redirect.includes('/admin') || redirect.includes('localhost:3003'))) {
+        // If redirect is to admin, use default dashboard instead
+        target = '/dashboard';
+      }
+      
       return NextResponse.redirect(new URL(target, request.url));
     }
   }

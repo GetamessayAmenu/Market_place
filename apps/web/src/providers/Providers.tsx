@@ -1,4 +1,5 @@
 "use client"
+import { ToastProvider } from '@marketplace/ui'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import React, { useEffect } from 'react'
 
@@ -34,5 +35,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     })()
   }, [setUser, clear])
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        {children}
+      </ToastProvider>
+    </QueryClientProvider>
+  )
 }

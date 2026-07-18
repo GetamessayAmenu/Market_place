@@ -30,13 +30,25 @@ export interface AdminListing {
   condition: string
   status: string
   city?: string | null
+  state?: string | null
+  country?: string | null
   isFeatured: boolean
+  availableForPurchase: boolean
+  availableForRent: boolean
+  customOrderAvailable: boolean
+  rentalPricePerDay?: number | null
+  rentalDeposit?: number | null
+  rejectedReason?: string | null
   primaryImageUrl?: string | null
-  images?: { url: string; isPrimary: boolean }[]
+  images?: { url: string; isPrimary: boolean; cloudinaryPublicId?: string; id?: string }[]
   seller?: {
     id: string
     displayName?: string
     email?: string
+    phone?: string | null
+    location?: string | null
+    emailVerifiedAt?: string | null
+    phoneVerifiedAt?: string | null
   } | null
   category?: {
     id: string
@@ -65,6 +77,10 @@ export async function bulkListingAction(listingIds: string[], action: 'approve' 
     action,
     ...(reason ? { reason } : {}),
   })
+}
+
+export async function fetchListingHistory(id: string): Promise<AuditLog[]> {
+  return serverGet<AuditLog[]>('/admin/listings/' + id + '/history')
 }
 
 // ─── Admin Users ─────────────────────────────────────────────────────────────
@@ -102,6 +118,15 @@ export async function fetchUserStats(): Promise<ApiResponse<Record<string, numbe
 
 export async function adminUpdateUser(id: string, data: { status?: string; role?: string; reason?: string }): Promise<ApiResponse<AdminUser>> {
   return serverPatch<ApiResponse<AdminUser>>('/admin/users/' + id, data)
+}
+
+export async function bulkUserAction(userIds: string[], action: 'activate' | 'suspend' | 'ban' | 'verify_email' | 'verify_phone' | 'change_role', reason?: string, newRole?: string): Promise<ApiResponse<unknown>> {
+  return serverPost<ApiResponse<unknown>>('/admin/users/bulk-action', {
+    userIds,
+    action,
+    ...(reason ? { reason } : {}),
+    ...(newRole ? { newRole } : {}),
+  })
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -152,17 +177,57 @@ export async function resolveReport(id: string, resolution: 'resolved' | 'dismis
 
 // ─── Verifications ───────────────────────────────────────────────────────────
 
+export interface BusinessInfo {
+  businessName: string
+  businessType: string
+  taxId?: string | null
+  registrationNumber?: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
+}
+
+export interface StoreInfo {
+  storeName: string
+  storeDescription?: string | null
+  storeUrl?: string | null
+  category?: string | null
+}
+
+export interface IdentityDocument {
+  type: string
+  documentNumber?: string | null
+  expiryDate?: string | null
+  frontUrl?: string | null
+  backUrl?: string | null
+}
+
+export interface VerificationHistory {
+  id: string
+  action: string
+  status: string
+  notes?: string | null
+  actorId: string
+  actorName?: string | null
+  createdAt: string
+}
+
 export interface VerificationRequest {
   id: string
   userId: string
-  type: string
-  status: string
+  type: 'seller_verification' | 'identity_verification' | 'business_verification'
+  status: 'pending' | 'under_review' | 'approved' | 'rejected' | 'changes_requested'
   documentUrl?: string | null
   notes?: string | null
   reviewerNotes?: string | null
   createdAt: string
   updatedAt: string
   user?: { id: string; displayName?: string; email?: string } | null
+  businessInfo?: BusinessInfo | null
+  storeInfo?: StoreInfo | null
+  identityDocument?: IdentityDocument | null
+  documents?: { type: string; url: string }[]
+  history?: VerificationHistory[]
 }
 
 export async function fetchVerifications(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<VerificationRequest>> {
@@ -172,11 +237,26 @@ export async function fetchVerifications(params?: Record<string, string | number
   return serverGet<PaginatedResponse<VerificationRequest>>('/admin/verifications' + qs)
 }
 
-export async function reviewVerification(id: string, decision: 'approved' | 'rejected', notes?: string): Promise<ApiResponse<VerificationRequest>> {
+export async function fetchVerification(id: string): Promise<ApiResponse<VerificationRequest>> {
+  return serverGet<ApiResponse<VerificationRequest>>('/admin/verifications/' + id)
+}
+
+export async function reviewVerification(id: string, decision: 'approved' | 'rejected' | 'changes_requested', notes?: string): Promise<ApiResponse<VerificationRequest>> {
   return serverPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id, {
     decision,
     ...(notes ? { notes } : {}),
   })
+}
+
+export async function updateVerificationStatus(id: string, status: 'under_review' | 'pending' | 'approved' | 'rejected' | 'changes_requested', notes?: string): Promise<ApiResponse<VerificationRequest>> {
+  return serverPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id + '/status', {
+    status,
+    ...(notes ? { notes } : {}),
+  })
+}
+
+export async function fetchVerificationHistory(id: string): Promise<VerificationHistory[]> {
+  return serverGet<VerificationHistory[]>('/admin/verifications/' + id + '/history')
 }
 
 // ─── Analytics ───────────────────────────────────────────────────────────────

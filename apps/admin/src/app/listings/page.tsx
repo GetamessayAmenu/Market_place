@@ -2,10 +2,8 @@ import React from 'react'
 
 import ListingsTable from '../../components/admin/ListingsTable'
 import { fetchAdminListings } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
 
 export default async function ListingsPage() {
-  await requireAdmin()
 
   let initialData
   try {
@@ -24,3 +22,6 @@ export default async function ListingsPage() {
     </div>
   )
 }
+
+
+

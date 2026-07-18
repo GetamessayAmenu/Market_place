@@ -1,9 +1,6 @@
 import React from 'react'
 
-import { requireAdmin } from '../../lib/authServer'
-
 export default async function ChatModerationPage() {
-  await requireAdmin()
   return (
     <div className="space-y-6">
       <div>

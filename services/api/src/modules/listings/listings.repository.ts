@@ -19,6 +19,8 @@ const listingInclude = {
       emailVerifiedAt: true,
       phoneVerifiedAt: true,
       phone: true,
+      location: true,
+      createdAt: true,
     },
   },
   _count: { select: { favorites: true } },

@@ -2,10 +2,8 @@ import React from 'react'
 
 import VerificationTable from '../../components/admin/VerificationTable'
 import { fetchVerifications } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
 
 export default async function VerificationPage() {
-  await requireAdmin()
 
   let initialData
   try {

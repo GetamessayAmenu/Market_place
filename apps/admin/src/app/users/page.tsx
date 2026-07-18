@@ -2,10 +2,8 @@ import React from 'react'
 
 import UsersTable from '../../components/admin/UsersTable'
 import { fetchAdminUsers } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
 
 export default async function UsersPage() {
-  await requireAdmin()
 
   let initialData
   try {

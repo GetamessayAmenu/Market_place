@@ -2,10 +2,7 @@ import React from 'react'
 
 import AuditLogsTable from '../../components/admin/AuditLogsTable'
 import { fetchAuditLogs } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
-
 export default async function AuditPage() {
-  await requireAdmin()
 
   let initialData
   try {

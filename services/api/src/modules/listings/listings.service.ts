@@ -492,6 +492,104 @@ export class ListingsService {
     };
   }
 
+  async moderateListing(
+    id: string,
+    action: 'approve' | 'reject' | 'hide' | 'delete',
+    user: AuthenticatedUser,
+    reason?: string,
+  ) {
+    const existing = await this.listingsRepository.findByIdRaw(id);
+    if (!existing || existing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+    if (!canModerateListings(user)) {
+      throw new ListingForbiddenException('You do not have permission to moderate listings.');
+    }
+
+    if (action === 'delete') {
+      return this.softDelete(user, id);
+    }
+
+    const statusMap: Record<string, ListingStatus> = {
+      approve: 'active',
+      reject: 'rejected',
+      hide: 'archived',
+    };
+    const targetStatus = statusMap[action];
+    if (!targetStatus) {
+      throw new InvalidListingStatusTransitionException(existing.status, action as any);
+    }
+
+    const updateData = this.applyStatusChange(targetStatus, existing);
+    if (targetStatus === 'rejected') {
+      updateData.rejectedReason = reason ?? null;
+    } else {
+      updateData.rejectedReason = null;
+    }
+
+    const listing = await this.listingsRepository.updateListing(id, updateData);
+    await this.listingsCacheService.invalidateAllForListing(listing.categoryId);
+
+    this.eventEmitter.emit(
+      LISTING_EVENTS.UPDATED,
+      new ListingUpdatedEvent(listing.id, listing.sellerId),
+    );
+
+    const logActionMap: Record<string, string> = {
+      active: 'listing.approved',
+      rejected: 'listing.rejected',
+      archived: 'listing.archived',
+    };
+    await this.adminLogsService.createLog({
+      actorId: user.id,
+      action: logActionMap[targetStatus] ?? `listing.moderated:${targetStatus}`,
+      resource: 'listing',
+      resourceId: listing.id,
+      metadata: { newStatus: targetStatus, reason },
+    });
+
+    return serializeListing(listing);
+  }
+
+  async setFeatured(id: string, featured: boolean, user: AuthenticatedUser) {
+    const existing = await this.listingsRepository.findByIdRaw(id);
+    if (!existing || existing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+    if (!canModerateListings(user)) {
+      throw new ListingForbiddenException('You do not have permission to moderate listings.');
+    }
+
+    const listing = await this.listingsRepository.updateListing(id, {
+      isFeatured: featured,
+    });
+    await this.listingsCacheService.invalidateAllForListing(listing.categoryId);
+
+    this.eventEmitter.emit(
+      LISTING_EVENTS.UPDATED,
+      new ListingUpdatedEvent(listing.id, listing.sellerId),
+    );
+
+    await this.adminLogsService.createLog({
+      actorId: user.id,
+      action: featured ? 'listing.featured' : 'listing.unfeatured',
+      resource: 'listing',
+      resourceId: listing.id,
+      metadata: { isFeatured: featured },
+    });
+
+    return serializeListing(listing);
+  }
+
+  async getModerationHistory(id: string) {
+    const logs = await this.adminLogsService.findLogs({
+      resourceId: id,
+      resource: 'listing',
+      limit: 100,
+    });
+    return logs.data;
+  }
+
   private async updateStatus(
     user: AuthenticatedUser,
     id: string,

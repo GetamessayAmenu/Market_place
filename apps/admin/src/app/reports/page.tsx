@@ -2,10 +2,8 @@ import React from 'react'
 
 import ReportsTable from '../../components/admin/ReportsTable'
 import { fetchReports } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
 
 export default async function ReportsPage() {
-  await requireAdmin()
 
   let initialData
   try {

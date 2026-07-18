@@ -8,10 +8,7 @@ import {
   fetchTopCategories,
   type TopCategory,
 } from '../../lib/adminApi'
-import { requireAdmin } from '../../lib/authServer'
-
 export default async function AnalyticsPage() {
-  await requireAdmin()
 
   let stats = { users: { total: 0, newInRange: 0 }, listings: { total: 0, active: 0, pending: 0, newInRange: 0 }, reports: { total: 0, pending: 0 }, messaging: { conversations: 0, messages: 0 } }
   let listingsByStatus: Record<string, number> = {}

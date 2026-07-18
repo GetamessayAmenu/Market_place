@@ -11,6 +11,7 @@ import SellerCover, { type SellerType } from '../../../components/marketplace/Se
 import SellerListings, { type SellerListing } from '../../../components/marketplace/SellerListings'
 import SellerProfileCard from '../../../components/marketplace/SellerProfileCard'
 import SellerStats, { type SellerStatsData } from '../../../components/marketplace/SellerStats'
+import ShopLocationMap from '../../../components/marketplace/ShopLocationMap'
 import TrustBadges from '../../../components/marketplace/TrustBadges'
 import { serverGet } from '../../../lib/serverApi'
 
@@ -221,6 +222,17 @@ export default async function SellerPage({ params, searchParams: _searchParams }
 
         {/* Divider */}
         <hr className="border-border/50" />
+
+        {/* Shop Location */}
+        {seller.location != null && seller.location.length > 0 && (
+          <>
+            <ShopLocationMap 
+              sellerName={seller.displayName}
+              location={seller.location}
+            />
+            <hr className="border-border/50" />
+          </>
+        )}
 
         {/* Two-column: About + Contact */}
         <div className={cn('grid gap-12 lg:grid-cols-2')}>

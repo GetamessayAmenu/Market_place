@@ -14,7 +14,7 @@ import { loginSchema, type LoginInput } from '../../lib/validation';
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') ?? '/dashboard';
+  const redirect = searchParams.get('redirect') ?? '/admin dashboard';
   const showResetSuccess = searchParams.get('reset') === 'success';
 
   const { register, handleSubmit, formState: { errors }, setFocus } = useForm<LoginInput>({
@@ -37,7 +37,21 @@ function LoginForm() {
     try {
       const res = await clientLogin(data.email, data.password);
       setUser(res.user);
-      router.push(redirect);
+      
+      // Role-based redirect
+      let targetRedirect = redirect;
+      if (redirect === '/dashboard') {
+        // If default redirect, determine based on role
+        if (res.user.role === 'seller') {
+          targetRedirect = '/dashboard/seller';
+        } else if (res.user.role === 'buyer') {
+          targetRedirect = '/dashboard/custom-orders';
+        } else {
+          targetRedirect = '/dashboard';
+        }
+      }
+      
+      router.push(targetRedirect);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setError(err.response?.data?.message ?? 'Invalid email or password. Please try again.');

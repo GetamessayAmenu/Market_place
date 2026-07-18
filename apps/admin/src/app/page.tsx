@@ -1,177 +1,67 @@
 import React from 'react'
 
-import { fetchDashboardStats, fetchReportStats } from '../lib/adminApi'
-import { requireAdmin } from '../lib/authServer'
-
-interface StatCard {
-  label: string
-  value: number
-  icon: React.ReactNode
-  color: string
-  subtitle?: string
-}
+import DashboardOverview from '../components/admin/DashboardOverview'
+import {
+  fetchAdminUsers,
+  fetchAuditLogs,
+  fetchDashboardStats,
+  fetchListingsByStatus,
+  fetchTopCategories,
+  fetchUsersByStatus,
+  fetchVerifications,
+} from '../lib/adminApi'
 
 export default async function DashboardPage() {
-  await requireAdmin()
 
-  let userTotal = 0
-  let listingTotal = 0
-  let listingActive = 0
-  let reportPending = 0
+  let stats = {
+    users: { total: 0, newInRange: 0 },
+    listings: { total: 0, active: 0, pending: 0, newInRange: 0 },
+    reports: { total: 0, pending: 0 },
+    messaging: { conversations: 0, messages: 0 },
+  }
+  let listingsByStatus: Record<string, number> = {}
+  let usersByStatus: Record<string, number> = {}
+  let topCategories: Array<{ id: string; name: string; slug: string; listingCount: number }> = []
+  let recentUsers: Array<{ id: string; displayName?: string; email: string; status: string; createdAt: string }> = []
+  let recentActivities: Array<{ id: string; actorId: string; action: string; resource: string; resourceId?: string | null; createdAt: string }> = []
+  let sellersCount = 0
+  let pendingVerifications = 0
 
   try {
-    const [dashStats, repStats] = await Promise.all([
+    const [dashboard, listingsStatus, usersStatus, categories, latestUsers, activityLogs, verifications] = await Promise.all([
       fetchDashboardStats(),
-      fetchReportStats(),
+      fetchListingsByStatus(),
+      fetchUsersByStatus(),
+      fetchTopCategories(),
+      fetchAdminUsers({ page: 1, limit: 5 }),
+      fetchAuditLogs({ page: 1, limit: 5 }),
+      fetchVerifications({ page: 1, limit: 1, status: 'pending' }),
     ])
-    userTotal = dashStats.users.total
-    listingTotal = dashStats.listings.total
-    listingActive = dashStats.listings.active
-    reportPending = repStats.data.pending ?? dashStats.reports.pending
-  } catch {
-    // best effort: stats remain at 0
-  }
 
-  const statCards: StatCard[] = [
-    {
-      label: 'Total Users',
-      value: userTotal,
-      color: 'bg-primary/10 text-primary',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Total Listings',
-      value: listingTotal,
-      color: 'bg-info/10 text-info',
-      subtitle: String(listingActive) + ' active',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Open Reports',
-      value: reportPending,
-      color: 'bg-destructive/10 text-destructive',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-        </svg>
-      ),
-    },
-  ]
+    stats = dashboard
+    listingsByStatus = listingsStatus
+    usersByStatus = usersStatus
+    topCategories = categories
+    recentUsers = latestUsers.data
+    recentActivities = activityLogs.data
+    sellersCount = (await fetchAdminUsers({ page: 1, limit: 1, role: 'seller' })).meta.total
+    pendingVerifications = verifications.meta.total
+  } catch {
+    // best effort only: render available data
+  }
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to the admin panel. Here is an overview of your marketplace.</p>
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="flex items-center gap-4 rounded-lg border bg-card p-6 shadow-sm"
-          >
-            <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${card.color}`}>
-              {card.icon}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{card.label}</p>
-              <p className="text-2xl font-bold">{card.value.toLocaleString()}</p>
-              {card.subtitle && (
-                <p className="text-xs text-muted-foreground">{card.subtitle}</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold">Pending Actions</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-warning" />
-                <span className="text-sm">User Verifications</span>
-              </div>
-              <a href="/verification" className="text-sm font-medium text-primary hover:underline">Review</a>
-            </div>
-            <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-destructive" />
-                <span className="text-sm">Open Reports</span>
-              </div>
-              <a href="/reports" className="text-sm font-medium text-primary hover:underline">Review</a>
-            </div>
-            <div className="flex items-center justify-between rounded-md bg-muted/50 p-3">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-info" />
-                <span className="text-sm">Flagged Listings</span>
-              </div>
-              <a href="/listings" className="text-sm font-medium text-primary hover:underline">Review</a>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold">Quick Links</h3>
-          <div className="space-y-2">
-            <a href="/users" className="block rounded-md p-2 text-sm hover:bg-accent transition-colors">
-              Manage Users
-            </a>
-            <a href="/listings" className="block rounded-md p-2 text-sm hover:bg-accent transition-colors">
-              Moderate Listings
-            </a>
-            <a href="/analytics" className="block rounded-md p-2 text-sm hover:bg-accent transition-colors">
-              View Analytics
-            </a>
-            <a href="/audit" className="block rounded-md p-2 text-sm hover:bg-accent transition-colors">
-              Audit Logs
-            </a>
-            <a href="/notifications" className="block rounded-md p-2 text-sm hover:bg-accent transition-colors">
-              Send Notifications
-            </a>
-          </div>
-        </div>
-
-        <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold">System Status</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">API Server</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Online
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Realtime Service</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Online
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Database</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Connected
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <DashboardOverview
+        stats={stats}
+        listingsByStatus={listingsByStatus}
+        usersByStatus={usersByStatus}
+        topCategories={topCategories}
+        recentUsers={recentUsers}
+        recentActivities={recentActivities}
+        sellersCount={sellersCount}
+        pendingVerifications={pendingVerifications}
+      />
     </div>
   )
 }
