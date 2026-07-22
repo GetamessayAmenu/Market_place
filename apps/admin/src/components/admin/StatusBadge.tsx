@@ -9,6 +9,7 @@ const listingStatusMap: Record<string, StatusVariant> = {
   active: 'success',
   approved: 'success',
   pending: 'warning',
+  pending_review: 'warning',
   under_review: 'info',
   rejected: 'error',
   archived: 'secondary',

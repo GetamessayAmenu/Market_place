@@ -18,6 +18,126 @@ export interface ApiResponse<T> {
   data: T
 }
 
+// ─── Admin Categories ─────────────────────────────────────────────────────────
+
+export interface AdminCategory {
+  id: string
+  name: string
+  slug: string
+  parentId: string | null
+  type: string
+  iconUrl: string | null
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchAdminCategories(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminCategory>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminCategory>>('/admin/categories' + qs)
+}
+
+export async function fetchAdminCategory(id: string): Promise<ApiResponse<AdminCategory>> {
+  return serverGet<ApiResponse<AdminCategory>>('/admin/categories/' + id)
+}
+
+// ─── Admin Attributes ─────────────────────────────────────────────────────────
+
+export interface AdminAttribute {
+  id: string
+  name: string
+  type: string
+  values: string[]
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchAdminAttributes(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminAttribute>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminAttribute>>('/admin/attributes' + qs)
+}
+
+export async function fetchAdminAttribute(id: string): Promise<ApiResponse<AdminAttribute>> {
+  return serverGet<ApiResponse<AdminAttribute>>('/admin/attributes/' + id)
+}
+
+// ─── Admin Orders ─────────────────────────────────────────────────────────
+
+export interface AdminOrder {
+  id: string
+  orderNumber: string
+  type: string
+  status: string
+  paymentStatus: string
+  buyerId: string
+  sellerId: string
+  listingId: string
+  totalAmount: number
+  currency: string
+  rentalStartDate: string | null
+  rentalEndDate: string | null
+  rentalDeposit: number | null
+  customOrderId: string | null
+  measurements: any
+  fabricChoice: string | null
+  colorChoice: string | null
+  designNotes: string | null
+  shippingAddress: any
+  trackingNumber: string | null
+  paymentMethod: string | null
+  paymentId: sheytring | null
+  cancelledAt: string | null
+  cancelledReason: string | null
+  refundedAt: string | null
+  refundAmount: number | null
+  refundReason: string | null
+  confirmedAt: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
+  createdAt: string
+  updatedAt: string
+  buyer: {
+    id: string
+    displayName: string
+    email: string
+    phone: string | null
+    avatarUrl: string | null
+  }
+  seller: {
+    id: string
+    displayName: string
+    email: string
+    phone: string | null
+    avatarUrl: string | null
+  }
+  listing: {
+    id: string
+    title: string
+    slug: string
+    price: number
+    currency: string
+    images: any[]
+  }
+}
+
+export async function fetchAdminOrders(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminOrder>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminOrder>>('/admin/orders' + qs)
+}
+
+export async function fetchAdminOrder(id: string): Promise<ApiResponse<AdminOrder>> {
+  return serverGet<ApiResponse<AdminOrder>>('/admin/orders/' + id)
+}
+
 // ─── Admin Listings ──────────────────────────────────────────────────────────
 
 export interface AdminListing {

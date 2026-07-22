@@ -32,6 +32,20 @@ enum ListingStatus {
   archived
 }
 
+enum CategoryType {
+  product
+  rental
+  custom_service
+}
+
+enum AttributeType {
+  size
+  color
+  material
+  brand
+  custom
+}
+
 enum ListingCondition {
   new
   like_new
@@ -93,6 +107,31 @@ enum CustomOrderStatus {
   shipped
   delivered
   cancelled
+}
+
+enum OrderType {
+  product
+  rental
+  custom_service
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  paid
+  failed
+  refunded
+  partial_refund
 }
 
 enum ReviewTargetType {
@@ -190,6 +229,8 @@ model User {
   verificationReviews  VerificationRequest[] @relation("VerificationReviewer")
   customOrdersAsBuyer  CustomOrder[]         @relation("CustomOrderBuyer")
   customOrdersAsSeller CustomOrder[]         @relation("CustomOrderSeller")
+  ordersAsBuyer       Order[]                @relation("OrderBuyer")
+  ordersAsSeller      Order[]                @relation("OrderSeller")
   reviewsWritten       Review[]              @relation("ReviewsWritten")
   reviewsReceived      Review[]              @relation("ReviewsReceived")
   followers            Follow[]              @relation("Following")
@@ -208,25 +249,65 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Category {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @db.VarChar(100)
-  slug      String    @unique @db.VarChar(120)
-  parentId  String?   @map("parent_id") @db.Uuid
-  iconUrl   String?   @map("icon_url") @db.VarChar(500)
-  sortOrder Int       @default(0) @map("sort_order")
-  isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @db.VarChar(100)
+  slug        String       @unique @db.VarChar(120)
+  parentId    String?      @map("parent_id") @db.Uuid
+  type        CategoryType @default(product)
+  iconUrl     String?      @map("icon_url") @db.VarChar(500)
+  sortOrder   Int          @default(0) @map("sort_order")
+  isActive    Boolean      @default(true) @map("is_active")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
 
-  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children Category[] @relation("CategoryHierarchy")
-  listings Listing[]
+  parent        Category?              @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Category[]             @relation("CategoryHierarchy")
+  listings      Listing[]
+  categoryAttributes CategoryAttribute[]
 
   @@index([parentId])
   @@index([isActive, deletedAt])
   @@index([sortOrder])
+  @@index([type])
   @@map("categories")
+}
+
+model Attribute {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String       @db.VarChar(100)
+  type        AttributeType
+  values      Json         @db.JsonB
+  sortOrder   Int          @default(0) @map("sort_order")
+  isActive    Boolean      @default(true) @map("is_active")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  categoryAttributes CategoryAttribute[]
+
+  @@index([type])
+  @@index([isActive, deletedAt])
+  @@index([sortOrder])
+  @@map("attributes")
+}
+
+model CategoryAttribute {
+  id         String   @id @default(uuid()) @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  attributeId String  @map("attribute_id") @db.Uuid
+  required   Boolean  @default(false)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  category  Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  attribute Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, attributeId])
+  @@index([categoryId])
+  @@index([attributeId])
+  @@map("category_attributes")
 }
 
 model Listing {
@@ -268,6 +349,7 @@ model Listing {
   conversations Conversation[]
   reports       Report[]
   customOrders  CustomOrder[]
+  orders        Order[]
   reviews       Review[]
 
   @@index([sellerId, status])
@@ -461,6 +543,69 @@ model AdminLog {
 }
 
 // ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id                String         @id @default(uuid()) @db.Uuid
+  orderNumber       String         @unique @map("order_number") @db.VarChar(20)
+  type              OrderType
+  status            OrderStatus    @default(pending)
+  paymentStatus     PaymentStatus  @default(pending) @map("payment_status")
+  buyerId           String         @map("buyer_id") @db.Uuid
+  sellerId          String         @map("seller_id") @db.Uuid
+  listingId         String         @map("listing_id") @db.Uuid
+  totalAmount       Decimal        @map("total_amount") @db.Decimal(12, 2)
+  currency          String         @default("USD") @db.VarChar(3)
+  
+  // Rental-specific fields
+  rentalStartDate   DateTime?      @map("rental_start_date")
+  rentalEndDate     DateTime?      @map("rental_end_date")
+  rentalDeposit     Decimal?       @map("rental_deposit") @db.Decimal(12, 2)
+  
+  // Custom service-specific fields
+  customOrderId     String?        @map("custom_order_id") @db.Uuid
+  measurements      Json?          @db.JsonB
+  fabricChoice      String?        @map("fabric_choice") @db.VarChar(100)
+  colorChoice       String?        @map("color_choice") @db.VarChar(100)
+  designNotes       String?        @map("design_notes") @db.Text
+  
+  // Shipping
+  shippingAddress   Json?          @map("shipping_address") @db.JsonB
+  trackingNumber    String?        @map("tracking_number") @db.VarChar(100)
+  
+  // Payment
+  paymentMethod     String?        @map("payment_method") @db.VarChar(50)
+  paymentId         String?        @map("payment_id") @db.VarChar(100)
+  
+  // Cancellation/Refund
+  cancelledAt       DateTime?      @map("cancelled_at")
+  cancelledReason   String?        @map("cancelled_reason") @db.VarChar(500)
+  refundedAt        DateTime?      @map("refunded_at")
+  refundAmount      Decimal?       @map("refund_amount") @db.Decimal(12, 2)
+  refundReason      String?        @map("refund_reason") @db.VarChar(500)
+  
+  // Timestamps
+  confirmedAt       DateTime?      @map("confirmed_at")
+  shippedAt         DateTime?      @map("shipped_at")
+  deliveredAt       DateTime?      @map("delivered_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  buyer       User        @relation("OrderBuyer", fields: [buyerId], references: [id])
+  seller      User        @relation("OrderSeller", fields: [sellerId], references: [id])
+  listing     Listing     @relation(fields: [listingId], references: [id])
+  customOrder CustomOrder? @relation("CustomOrder", fields: [customOrderId], references: [id])
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([type, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+// ---------------------------------------------------------------------------
 // Custom Orders
 // ---------------------------------------------------------------------------
 
@@ -487,6 +632,7 @@ model CustomOrder {
   buyer        User          @relation("CustomOrderBuyer", fields: [buyerId], references: [id])
   seller       User          @relation("CustomOrderSeller", fields: [sellerId], references: [id])
   conversation Conversation? @relation(fields: [conversationId], references: [id])
+  orders       Order[]       @relation("CustomOrder")
 
   @@index([buyerId, status])
   @@index([sellerId, status])

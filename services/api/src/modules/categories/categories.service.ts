@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { slugify } from '@marketplace/utils';
+import { Prisma } from '@prisma/client';
 
 import { CategoryNotFoundException } from '../listings/exceptions/listing.exceptions';
 import { CategoriesRepository, type CategoryWithChildren } from './categories.repository';
@@ -11,8 +12,10 @@ export interface SerializedCategory {
   readonly name: string;
   readonly slug: string;
   readonly parentId: string | null;
+  readonly type: string;
   readonly iconUrl: string | null;
   readonly sortOrder: number;
+  readonly isActive: boolean;
   readonly children?: readonly SerializedCategory[];
 }
 
@@ -52,6 +55,7 @@ export class CategoriesService {
       name: dto.name,
       slug,
       ...(dto.parentId ? { parent: { connect: { id: dto.parentId } } } : {}),
+      ...(dto.type !== undefined ? { type: dto.type } : {}),
       ...(dto.iconUrl !== undefined ? { iconUrl: dto.iconUrl } : {}),
       sortOrder: dto.sortOrder ?? 0,
       isActive: dto.isActive ?? true,
@@ -78,6 +82,7 @@ export class CategoriesService {
           ? { parent: { disconnect: true } }
           : { parent: { connect: { id: dto.parentId } } }
         : {}),
+      ...(dto.type !== undefined ? { type: dto.type } : {}),
       ...(dto.iconUrl !== undefined ? { iconUrl: dto.iconUrl } : {}),
       ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
@@ -93,14 +98,62 @@ export class CategoriesService {
     await this.categoriesRepository.softDelete(id);
   }
 
+  async findAllAdmin(query: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    search?: string;
+    isActive?: boolean;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const where: Prisma.CategoryWhereInput = {
+      deletedAt: null,
+      ...(query.type !== undefined ? { type: query.type as any } : {}),
+      ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
+      ...(query.search !== undefined
+        ? { name: { contains: query.search, mode: 'insensitive' as const } }
+        : {}),
+    };
+
+    const items = await (this.categoriesRepository as any).findMany({
+      where,
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const total = await (this.categoriesRepository as any).count(where);
+
+    return {
+      success: true,
+      data: items.map((c: any) => this.serializeCategory(c)),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findOneAdmin(id: string) {
+    const category = await this.categoriesRepository.findById(id);
+    if (!category || category.deletedAt) {
+      throw new CategoryNotFoundException();
+    }
+    return {
+      success: true,
+      data: this.serializeCategory(category as any),
+    };
+  }
+
   private serializeCategory(category: CategoryWithChildren): SerializedCategory {
     return {
       id: category.id,
       name: category.name,
       slug: category.slug,
       parentId: category.parentId,
+      type: (category as any).type || 'product',
       iconUrl: category.iconUrl,
       sortOrder: category.sortOrder,
+      isActive: (category as any).isActive ?? true,
       ...(category.children?.length
         ? { children: category.children.map((c) => this.serializeCategory(c)) }
         : {}),

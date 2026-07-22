@@ -16,6 +16,7 @@ const listingInclude = {
       id: true,
       displayName: true,
       avatarUrl: true,
+      email: true,
       emailVerifiedAt: true,
       phoneVerifiedAt: true,
       phone: true,

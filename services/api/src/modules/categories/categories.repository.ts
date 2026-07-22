@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 export type CategoryWithChildren = Category & {
-  readonly children?: readonly Category[];
+  readonly children?: readonly CategoryWithChildren[];
 };
 
 @Injectable()
@@ -85,5 +85,27 @@ export class CategoriesRepository extends BaseRepository<Category> {
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
+  }
+
+  async findMany(params: {
+    where?: Prisma.CategoryWhereInput;
+    orderBy?: Prisma.CategoryOrderByWithRelationInput;
+    skip?: number;
+    take?: number;
+  }) {
+    const { where, orderBy, skip, take } = params;
+    return this.prisma.category.findMany({
+      ...(where !== undefined ? { where } : {}),
+      ...(orderBy !== undefined ? { orderBy } : {}),
+      ...(skip !== undefined ? { skip } : {}),
+      ...(take !== undefined ? { take } : {}),
+    });
+  }
+
+  async count(where?: Prisma.CategoryWhereInput): Promise<number> {
+    if (where !== undefined) {
+      return this.prisma.category.count({ where });
+    }
+    return this.prisma.category.count();
   }
 }

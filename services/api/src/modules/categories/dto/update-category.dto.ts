@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -9,6 +10,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+
+import { CategoryType } from './create-category.dto';
 
 export class UpdateCategoryDto {
   @IsOptional()
@@ -26,6 +29,10 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsUUID()
   parentId?: string | null;
+
+  @IsOptional()
+  @IsEnum(CategoryType)
+  type?: CategoryType;
 
   @IsOptional()
   @IsUrl({ require_tld: false })

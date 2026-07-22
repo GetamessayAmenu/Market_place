@@ -8,7 +8,9 @@ import { AdminAuditInterceptor } from './common/interceptors/admin-audit.interce
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { AdminLogsController } from './modules/admin-logs/admin-logs.controller';
 import { AdminLogsService } from './modules/admin-logs/admin-logs.service';
+import { AdminCategoriesController } from './modules/categories/admin-categories.controller';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AttributesModule } from './modules/attributes/attributes.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module';
@@ -16,6 +18,7 @@ import { FavoritesModule } from './modules/favorites/favorites.module';
 import { HealthModule } from './modules/health/health.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OrdersModule } from './modules/orders/orders.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SearchModule } from './modules/search/search.module';
@@ -28,6 +31,8 @@ import { VerificationModule } from './modules/verification/verification.module';
     HealthModule,
     AuthModule,
     CategoriesModule,
+    AttributesModule,
+    OrdersModule,
     UploadsModule,
     ListingsModule,
     FavoritesModule,
@@ -39,7 +44,7 @@ import { VerificationModule } from './modules/verification/verification.module';
     CustomOrdersModule,
     ReviewsModule,
   ],
-  controllers: [AppController, AdminLogsController],
+  controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [
     AppService,
     {
