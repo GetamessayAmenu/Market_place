@@ -6,6 +6,7 @@ export const NOTIFICATION_DOMAIN_EVENTS = {
   LISTING_FAVORITED: 'notification.listing_favorited',
   SELLER_VERIFIED: 'notification.seller_verified',
   SYSTEM_ANNOUNCEMENT: 'notification.system_announcement',
+  REPORT_STATUS_UPDATED: 'notification.report_status_updated',
 } as const;
 
 /** Source events that trigger notifications. */

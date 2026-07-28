@@ -275,6 +275,10 @@ export class ListingsService {
       updateData.slug = await this.generateUniqueSlug(dto.title, id);
     }
 
+    const priceChanged =
+      dto.price !== undefined &&
+      existing.price.toString() !== dto.price.toString();
+
     let listing: ListingWithRelations;
     if (dto.images) {
       if (Object.keys(updateData).length > 0) {
@@ -288,6 +292,10 @@ export class ListingsService {
       listing = (await this.listingsRepository.findByIdWithRelations(id))!;
     } else {
       listing = await this.listingsRepository.updateListing(id, updateData);
+    }
+
+    if (priceChanged && listing) {
+      await this.listingsRepository.createPriceHistory(listing.id, listing.price, listing.currency);
     }
 
     await this.listingsCacheService.invalidateAllForListing(listing.categoryId);
@@ -704,5 +712,43 @@ export class ListingsService {
         new ListingSpamSuspectedEvent(listingId, sellerId),
       );
     }
+  }
+
+  async getPriceHistory(id: string) {
+    const existing = await this.listingsRepository.findByIdRaw(id);
+    if (!existing || existing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+    const history = await this.listingsRepository.getPriceHistory(id);
+    return history.map((entry) => ({
+      price: entry.price.toNumber(),
+      date: entry.createdAt.toISOString(),
+    }));
+  }
+
+  async markUnavailable(user: AuthenticatedUser, id: string) {
+    const existing = await this.listingsRepository.findByIdRaw(id);
+    if (!existing || existing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+    if (existing.sellerId !== user.id && !canModerateListings(user)) {
+      throw new ListingForbiddenException();
+    }
+
+    const updated = await this.listingsRepository.updateListing(id, {
+      status: 'archived',
+      availableForPurchase: false,
+      availableForRent: false,
+      customOrderAvailable: false,
+      expiresAt: null,
+    });
+
+    await this.listingsCacheService.invalidateAllForListing(updated.categoryId);
+    this.eventEmitter.emit(
+      LISTING_EVENTS.UPDATED,
+      new ListingUpdatedEvent(updated.id, updated.sellerId),
+    );
+
+    return { success: true, status: updated.status };
   }
 }

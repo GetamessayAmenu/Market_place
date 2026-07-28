@@ -18,6 +18,7 @@ import SafetyTips from '../../../components/marketplace/SafetyTips'
 import SellerInfoCard from '../../../components/marketplace/SellerInfoCard'
 import ShareButton from '../../../components/marketplace/ShareButton'
 import ShopLocationMap from '../../../components/marketplace/ShopLocationMap'
+import { optionalUser } from '../../../lib/authServer'
 import { serverGet } from '../../../lib/serverApi'
 
 interface ListingImage {
@@ -179,8 +180,8 @@ export default async function ListingPage({ params }: Props) {
 
   const hasActions = (listing.availableForPurchase ?? false) || (listing.availableForRent ?? false) || (listing.customOrderAvailable ?? false)
 
-  // TODO: Replace with actual auth check
-  const isOwner = false // Check if current user is the listing owner
+  const currentUser = await optionalUser()
+  const isOwner = currentUser ? currentUser.id === listing.seller?.id : false
 
   return (
     <Container>
@@ -373,7 +374,14 @@ export default async function ListingPage({ params }: Props) {
             {/* Enhanced Seller info card */}
             {listing.seller ? (
               <SellerInfoCard 
-                seller={listing.seller}
+                seller={{
+                  id: listing.seller.id,
+                  name: listing.seller.displayName,
+                  avatarUrl: listing.seller.avatarUrl,
+                  emailVerifiedAt: listing.seller.emailVerifiedAt,
+                  phoneVerifiedAt: listing.seller.phoneVerifiedAt,
+                  createdAt: listing.seller.createdAt,
+                }}
                 responseTime="Typically replies within minutes"
               />
             ) : null}

@@ -118,6 +118,16 @@ export class ListingsRepository extends BaseRepository<Listing> {
       },
       include: listingInclude,
     });
+
+    // Create initial price history entry
+    await this.prisma.listingPriceHistory.create({
+      data: {
+        listingId: created.id,
+        price: created.price,
+        currency: created.currency,
+      },
+    });
+
     return created as ListingWithRelations;
   }
 
@@ -222,6 +232,27 @@ export class ListingsRepository extends BaseRepository<Listing> {
       },
       select: { id: true },
       take: batchSize,
+    });
+  }
+
+  async createPriceHistory(
+    listingId: string,
+    price: Prisma.Decimal,
+    currency: string,
+  ): Promise<void> {
+    await this.prisma.listingPriceHistory.create({
+      data: {
+        listingId,
+        price,
+        currency,
+      },
+    });
+  }
+
+  async getPriceHistory(listingId: string) {
+    return this.prisma.listingPriceHistory.findMany({
+      where: { listingId },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }

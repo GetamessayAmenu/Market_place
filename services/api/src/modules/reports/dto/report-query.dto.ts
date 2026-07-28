@@ -9,7 +9,7 @@ export class ReportQueryDto extends PaginationQueryDto {
   targetType?: ReportTargetType;
 
   @IsOptional()
-  @IsEnum(['pending', 'under_review', 'resolved', 'dismissed'] as const)
+  @IsEnum(['pending', 'under_review', 'investigating', 'resolved', 'dismissed', 'closed'] as const)
   status?: ReportStatus;
 
   @IsOptional()
@@ -23,4 +23,8 @@ export class ReportQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   listingId?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

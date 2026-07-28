@@ -128,4 +128,20 @@ export class ListingsController {
   ) {
     return this.favoritesService.removeFavorite(user.id, id);
   }
+
+  @Public()
+  @Get(':id/price-history')
+  getPriceHistory(@Param('id') id: string) {
+    return this.listingsService.getPriceHistory(id);
+  }
+
+  @UseGuards(PermissionsGuard, ListingOwnerGuard)
+  @Permissions({ resource: 'listing', action: 'update' })
+  @Patch(':id/mark-unavailable')
+  markUnavailable(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.listingsService.markUnavailable(user, id);
+  }
 }

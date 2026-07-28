@@ -18,7 +18,7 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportQueryDto } from './dto/report-query.dto';
-import { ResolveReportDto } from './dto/resolve-report.dto';
+import { ResolveReportDto, UpdateReportStatusDto } from './dto/resolve-report.dto';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
@@ -92,5 +92,48 @@ export class ReportsController {
     @Body() dto: ResolveReportDto,
   ) {
     return this.reportsService.resolve(user, id, dto);
+  }
+
+  /** Admin/moderator: set report to investigating */
+  @UseGuards(PermissionsGuard)
+  @Permissions({ resource: 'report', action: 'moderate' })
+  @Patch(':id/investigate')
+  setInvestigating(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.setInvestigating(user, id);
+  }
+
+  /** Admin/moderator: close a resolved/dismissed report */
+  @UseGuards(PermissionsGuard)
+  @Permissions({ resource: 'report', action: 'moderate' })
+  @Patch(':id/close')
+  closeReport(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateReportStatusDto,
+  ) {
+    return this.reportsService.closeReport(user, id, dto.note);
+  }
+
+  /** Admin/moderator: get conversation history for a report */
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @Get(':id/conversation')
+  getConversationHistory(
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.getConversationHistory(id);
+  }
+
+  /** Admin/moderator: get audit logs for a report */
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @Get(':id/audit-logs')
+  getAuditLogs(
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.getAuditLogs(id);
   }
 }

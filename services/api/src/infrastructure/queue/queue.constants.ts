@@ -4,6 +4,8 @@ export const QUEUE_NAMES = {
   SEARCH_INDEX: 'search-index',
   EMAIL: 'email',
   MODERATION: 'moderation',
+  CMS_SCHEDULING: 'cms-scheduling',
+  RENTAL_REMINDERS: 'rental-reminders',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

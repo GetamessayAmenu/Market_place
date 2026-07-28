@@ -11,6 +11,7 @@ import {
   ListingFavoritedEvent,
   ListingRejectedEvent,
   MessageReceivedEvent,
+  ReportStatusUpdatedEvent,
   SellerVerifiedEvent,
   SystemAnnouncementEvent,
 } from '../events/notification.domain-events';
@@ -193,6 +194,41 @@ export class NotificationsService {
     this.eventEmitter.emit(
       NOTIFICATION_DOMAIN_EVENTS.SYSTEM_ANNOUNCEMENT,
       new SystemAnnouncementEvent(title, body, targetAudience),
+    );
+  }
+
+  async createReportStatusUpdatedNotification(
+    reporterId: string,
+    reportId: string,
+    status: string,
+    targetType: string,
+  ): Promise<void> {
+    const statusMessages: Record<string, string> = {
+      under_review: 'Your report is under review',
+      investigating: 'Your report is being investigated',
+      resolved: 'Your report has been resolved',
+      dismissed: 'Your report has been dismissed',
+      closed: 'Your report has been closed',
+    };
+
+    const title = 'Report status updated';
+    const body = statusMessages[status] || `Your report status has been updated to: ${status}`;
+
+    await this.notificationsRepository.create({
+      user: { connect: { id: reporterId } },
+      type: 'report_update',
+      title,
+      body,
+      data: {
+        reportId,
+        status,
+        targetType,
+      },
+    });
+
+    this.eventEmitter.emit(
+      NOTIFICATION_DOMAIN_EVENTS.REPORT_STATUS_UPDATED,
+      new ReportStatusUpdatedEvent(reporterId, reportId, status, targetType),
     );
   }
 

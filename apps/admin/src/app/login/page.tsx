@@ -44,7 +44,10 @@ export default function AdminLoginPage() {
         console.log('Login successful, user:', result.data.user)
         console.log('Current cookies:', document.cookie)
         // Login successful, redirect to admin dashboard
-        window.location.href = '/admin'
+        // Wait a moment for cookies to be set, then redirect
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 500)
       } else {
         throw new Error('Invalid response format')
       }

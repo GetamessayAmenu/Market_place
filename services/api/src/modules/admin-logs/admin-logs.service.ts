@@ -59,4 +59,14 @@ export class AdminLogsService {
 
     return toPaginatedResponse({ items, total, page, limit });
   }
+
+  async findByResource(resource: string, resourceId: string) {
+    return this.prisma.adminLog.findMany({
+      where: { resource, resourceId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        actor: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
 }

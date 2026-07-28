@@ -1,5 +1,6 @@
 'use client'
 
+import { apiPost } from '../../lib/api'
 import { Button, Modal, Radio, RadioGroup, Textarea, useToast } from '@marketplace/ui'
 import React, { useState } from 'react'
 
@@ -39,11 +40,12 @@ export default function ReportAbuseButton({ listingId, listingTitle }: ReportAbu
     setLoading(true)
 
     try {
-      // TODO: Implement API call
-      // await fetch('/api/reports', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ listingId, reason, details }),
-      // })
+      await apiPost('/reports', {
+        targetType: 'listing',
+        listingId,
+        reason,
+        description: details || undefined,
+      })
 
       toast({
         title: 'Report submitted',

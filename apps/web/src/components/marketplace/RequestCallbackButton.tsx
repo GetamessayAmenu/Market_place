@@ -1,5 +1,6 @@
 'use client'
 
+import { apiPost } from '../../lib/api'
 import { Button, Modal, Input, Textarea, useToast } from '@marketplace/ui'
 import React, { useState } from 'react'
 
@@ -25,11 +26,11 @@ export default function RequestCallbackButton({ listingId, sellerId, listingTitl
     setLoading(true)
 
     try {
-      // TODO: Implement API call
-      // await fetch('/api/callback-requests', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ ...formData, listingId, sellerId }),
-      // })
+      await apiPost('/callback-requests', {
+        ...formData,
+        listingId,
+        sellerId,
+      })
 
       toast({
         title: 'Request sent!',

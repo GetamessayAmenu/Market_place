@@ -1,5 +1,6 @@
 'use client'
 
+import { apiGet } from '../../lib/api'
 import { Button, Modal } from '@marketplace/ui'
 import React, { useState } from 'react'
 
@@ -24,17 +25,14 @@ export default function PriceHistoryButton({ listingId, currentPrice, currency }
     setLoading(true)
     
     try {
-      // TODO: Fetch price history from API
-      // const response = await fetch(`/api/listings/${listingId}/price-history`)
-      // const data = await response.json()
-      // setHistory(data)
-      
-      // Mock data for now
+      const data = await apiGet<PriceHistoryEntry[]>(`/listings/${listingId}/price-history`)
+      setHistory(data)
+    } catch (error) {
+      console.error('Failed to fetch price history:', error)
+      // Fallback to current price if fetch fails
       setHistory([
         { price: currentPrice, date: new Date().toISOString() },
       ])
-    } catch (error) {
-      console.error('Failed to fetch price history:', error)
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,6 @@
 'use client'
 
+import { apiPatch } from '../../lib/api'
 import { Button, Modal, useToast } from '@marketplace/ui'
 import React, { useState } from 'react'
 
@@ -21,14 +22,8 @@ export default function MarkUnavailableButton({ listingId, listingTitle, isOwner
     setLoading(true)
 
     try {
-      // TODO: Implement API call to mark listing unavailable
-      // await fetch(`/api/listings/${listingId}/mark-unavailable`, {
-      //   method: 'PATCH',
-      // })
+      await apiPatch(`/listings/${listingId}/mark-unavailable`)
 
-      // Simulate success for now
-      console.log('Marking listing as unavailable:', listingId)
-      
       toast({
         title: 'Listing marked as unavailable',
         description: 'Your listing has been hidden from search results.',

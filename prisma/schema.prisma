@@ -64,8 +64,61 @@ enum ReportTargetType {
 enum ReportStatus {
   pending
   under_review
+  investigating
   resolved
   dismissed
+  closed
+}
+
+enum DisputeStatus {
+  open
+  in_progress
+  awaiting_response
+  under_review
+  resolved
+  closed
+  escalated
+}
+
+enum DisputePriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum DisputeType {
+  off_platform_transaction
+  payment_dispute
+  delivery_issue
+  quality_mismatch
+  communication_conflict
+  other
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RentalStatus {
+  REQUESTED
+  APPROVED
+  HANDOVER_PENDING
+  ACTIVE
+  RETURN_INITIATED
+  RETURNED_INSPECTED
+  COMPLETED
+  DISPUTED
+}
+
+enum HolidayTheme {
+  MESKEL
+  TIMKET
+  ENKUTATASH
+  TLEK_SERG
+  FASIKA
 }
 
 enum SellerType {
@@ -139,6 +192,41 @@ enum ReviewTargetType {
   seller
 }
 
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+  under_review
+  deleted
+  restored
+}
+
+enum ModerationItemType {
+  review
+  product_image
+  store_logo
+  store_banner
+  store_gallery
+  custom_service_description
+  custom_service_reference
+}
+
+enum ContentStatus {
+  draft
+  published
+  scheduled
+  archived
+}
+
+enum ContentType {
+  hero_banner
+  featured_product
+  featured_rental
+  featured_custom_service
+  promotional_section
+  homepage_category
+}
+
 // ---------------------------------------------------------------------------
 // RBAC
 // ---------------------------------------------------------------------------
@@ -198,6 +286,9 @@ model User {
   bio             String?     @db.Text
   location        String?     @db.VarChar(200)
   sellerType      SellerType? @map("seller_type")
+  isVerifiedDesigner Boolean  @default(false) @map("is_verified_designer")
+  verifiedDesignerAt DateTime? @map("verified_designer_at")
+  verifiedDesignerById String? @map("verified_designer_by_id") @db.Uuid
   coverImageUrl   String?     @map("cover_image_url") @db.VarChar(500)
   specialties     String[]    @default([])
   socialLinks     Json?       @map("social_links")
@@ -214,6 +305,8 @@ model User {
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   role Role @relation(fields: [roleId], references: [id])
+  verifiedDesignerBy User? @relation("VerifiedDesigner", fields: [verifiedDesignerById], references: [id])
+  verifiedDesigners User[] @relation("VerifiedDesigner")
 
   listings             Listing[]
   favorites            Favorite[]
@@ -233,8 +326,28 @@ model User {
   ordersAsSeller      Order[]                @relation("OrderSeller")
   reviewsWritten       Review[]              @relation("ReviewsWritten")
   reviewsReceived      Review[]              @relation("ReviewsReceived")
+  reviewsModerated     Review[]              @relation("ReviewsModerated")
   followers            Follow[]              @relation("Following")
   following            Follow[]              @relation("Followed")
+  callbackRequests     CallbackRequest[]
+  moderationItemsModerated ModerationItem[] @relation("ModerationItemsModerated")
+  moderationReportsFiled   ModerationReport[] @relation("ModerationReportsFiled")
+  moderationReportsResolved ModerationReport[] @relation("ModerationReportsResolved")
+  homepageContentCreated  HomepageContent[] @relation("HomepageContentCreated")
+  homepageContentUpdated  HomepageContent[] @relation("HomepageContentUpdated")
+  disputesReported     Dispute[]             @relation("DisputeReporter")
+  disputesAgainst      Dispute[]             @relation("DisputeReportedUser")
+  disputesResolved     Dispute[]             @relation("DisputeResolver")
+  disputesEscalated    Dispute[]             @relation("DisputeEscalator")
+  disputeComments      DisputeComment[]
+  vendorKycProfile     VendorKycProfile?
+  kycProfilesReviewed  VendorKycProfile[]    @relation("KycReviewer")
+  rentalOrdersAsRenter RentalOrder[]         @relation("RentalRenter")
+  rentalOrdersAsSeller RentalOrder[]         @relation("RentalSeller")
+  rentalExtensionsRequested RentalExtension[] @relation("ExtensionRequester")
+  rentalExtensionsApproved  RentalExtension[] @relation("ExtensionApprover")
+  heroBannersCreated   HeroBanner[]          @relation("HeroBannerCreated")
+  heroBannersUpdated   HeroBanner[]          @relation("HeroBannerUpdated")
 
   @@index([roleId])
   @@index([status])
@@ -251,9 +364,13 @@ model User {
 model Category {
   id          String       @id @default(uuid()) @db.Uuid
   name        String       @db.VarChar(100)
+  nameAm      String?      @map("name_am") @db.VarChar(100)
   slug        String       @unique @db.VarChar(120)
+  slugAm      String?      @map("slug_am") @db.VarChar(120)
   parentId    String?      @map("parent_id") @db.Uuid
   type        CategoryType @default(product)
+  description String?      @db.Text
+  descriptionAm String?    @map("description_am") @db.Text
   iconUrl     String?      @map("icon_url") @db.VarChar(500)
   sortOrder   Int          @default(0) @map("sort_order")
   isActive    Boolean      @default(true) @map("is_active")
@@ -265,6 +382,7 @@ model Category {
   children      Category[]             @relation("CategoryHierarchy")
   listings      Listing[]
   categoryAttributes CategoryAttribute[]
+  homepageFeaturedContent HomepageContent[] @relation("HomepageFeaturedCategory")
 
   @@index([parentId])
   @@index([isActive, deletedAt])
@@ -351,6 +469,11 @@ model Listing {
   customOrders  CustomOrder[]
   orders        Order[]
   reviews       Review[]
+  callbackRequests     CallbackRequest[]
+  priceHistory         ListingPriceHistory[]
+  homepageFeaturedContent HomepageContent[] @relation("HomepageFeaturedListing")
+  disputes      Dispute[]
+  rentalOrders  RentalOrder[]
 
   @@index([sellerId, status])
   @@index([categoryId, status])
@@ -435,6 +558,7 @@ model Conversation {
   messages     Message[]
   reports      Report[]
   customOrders CustomOrder[]
+  disputes     Dispute[]
 
   @@unique([listingId, buyerId, sellerId])
   @@index([buyerId, lastMessageAt(sort: Desc)])
@@ -478,9 +602,12 @@ model Report {
   conversationId String?          @map("conversation_id") @db.Uuid
   reason         String           @db.VarChar(100)
   description    String?          @db.Text
+  evidence       String[]         @default([])
   status         ReportStatus     @default(pending)
+  resolutionNote String?          @map("resolution_note") @db.Text
   resolvedById   String?          @map("resolved_by_id") @db.Uuid
   resolvedAt     DateTime?        @map("resolved_at")
+  closedAt       DateTime?        @map("closed_at")
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
@@ -646,28 +773,39 @@ model CustomOrder {
 // ---------------------------------------------------------------------------
 
 model Review {
-  id             String           @id @default(uuid()) @db.Uuid
-  listingId      String           @map("listing_id") @db.Uuid
-  reviewerId     String           @map("reviewer_id") @db.Uuid
-  sellerId       String           @map("seller_id") @db.Uuid
-  rating         Int              @db.SmallInt
-  title          String?          @db.VarChar(200)
-  body           String?          @db.Text
-  images         String[]         
-  verifiedPurchase Boolean        @default(false) @map("verified_purchase")
-  helpfulCount   Int              @default(0) @map("helpful_count")
-  deletedAt      DateTime?        @map("deleted_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id                  String           @id @default(uuid()) @db.Uuid
+  listingId           String           @map("listing_id") @db.Uuid
+  reviewerId          String           @map("reviewer_id") @db.Uuid
+  sellerId            String           @map("seller_id") @db.Uuid
+  rating              Int              @db.SmallInt
+  title               String?          @db.VarChar(200)
+  body                String?          @db.Text
+  images              String[]
+  verifiedPurchase    Boolean          @default(false) @map("verified_purchase")
+  helpfulCount        Int              @default(0) @map("helpful_count")
+  moderationStatus    ModerationStatus @default(pending) @map("moderation_status")
+  moderationReason    String?          @map("moderation_reason") @db.Text
+  moderatedById       String?          @map("moderated_by_id") @db.Uuid
+  moderatedAt         DateTime?        @map("moderated_at")
+  isSpam              Boolean          @default(false) @map("is_spam")
+  spamScore           Int?             @map("spam_score")
+  deletedAt           DateTime?        @map("deleted_at")
+  restoredAt          DateTime?        @map("restored_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  listing  Listing @relation(fields: [listingId], references: [id])
-  reviewer User    @relation("ReviewsWritten", fields: [reviewerId], references: [id])
-  seller   User    @relation("ReviewsReceived", fields: [sellerId], references: [id])
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  reviewer      User          @relation("ReviewsWritten", fields: [reviewerId], references: [id])
+  seller        User          @relation("ReviewsReceived", fields: [sellerId], references: [id])
+  moderatedBy   User?         @relation("ReviewsModerated", fields: [moderatedById], references: [id])
+  moderationItems ModerationItem[]
 
   @@unique([reviewerId, listingId])
   @@index([listingId, createdAt(sort: Desc)])
   @@index([sellerId, createdAt(sort: Desc)])
   @@index([rating])
+  @@index([moderationStatus, createdAt(sort: Desc)])
+  @@index([isSpam])
   @@index([deletedAt])
   @@map("reviews")
 }
@@ -694,4 +832,379 @@ model VerificationRequest {
   @@index([reviewedById])
   @@index([deletedAt])
   @@map("verification_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Callback Requests & Price History
+// ---------------------------------------------------------------------------
+
+model CallbackRequest {
+  id            String   @id @default(uuid()) @db.Uuid
+  listingId     String   @map("listing_id") @db.Uuid
+  sellerId      String   @map("seller_id") @db.Uuid
+  buyerName     String   @map("buyer_name") @db.VarChar(255)
+  buyerPhone    String   @map("buyer_phone") @db.VarChar(20)
+  preferredTime String?  @map("preferred_time") @db.VarChar(100)
+  message       String?  @db.Text
+  status        String   @default("pending") @db.VarChar(20)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  seller  User    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([sellerId])
+  @@map("callback_requests")
+}
+
+model ListingPriceHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  price     Decimal  @db.Decimal(12, 2)
+  currency  String   @default("USD") @db.VarChar(3)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("listing_price_history")
+}
+
+// ---------------------------------------------------------------------------
+// Content Moderation
+// ---------------------------------------------------------------------------
+
+model ModerationItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  itemType            ModerationItemType @map("item_type")
+  itemId              String            @map("item_id") @db.Uuid
+  reviewId            String?           @map("review_id") @db.Uuid
+  content             String?           @db.Text
+  imageUrl            String?           @map("image_url") @db.VarChar(500)
+  cloudinaryPublicId  String?           @map("cloudinary_public_id") @db.VarChar(255)
+  status              ModerationStatus  @default(pending)
+  rejectionReason     String?           @map("rejection_reason") @db.Text
+  moderatedById       String?           @map("moderated_by_id") @db.Uuid
+  moderatedAt         DateTime?         @map("moderated_at")
+  isSpam              Boolean           @default(false) @map("is_spam")
+  spamScore           Int?              @map("spam_score")
+  reportCount         Int               @default(0) @map("report_count")
+  deletedAt           DateTime?         @map("deleted_at")
+  restoredAt          DateTime?         @map("restored_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  review       Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  moderatedBy  User?   @relation("ModerationItemsModerated", fields: [moderatedById], references: [id])
+  reports      ModerationReport[]
+
+  @@index([itemType, status, createdAt(sort: Desc)])
+  @@index([itemId])
+  @@index([reviewId])
+  @@index([isSpam])
+  @@index([deletedAt])
+  @@map("moderation_items")
+}
+
+model ModerationReport {
+  id              String            @id @default(uuid()) @db.Uuid
+  moderationItemId String           @map("moderation_item_id") @db.Uuid
+  reporterId      String            @map("reporter_id") @db.Uuid
+  reason          String            @db.VarChar(100)
+  description     String?           @db.Text
+  status          ModerationStatus  @default(pending)
+  resolutionNote  String?           @map("resolution_note") @db.Text
+  resolvedById    String?           @map("resolved_by_id") @db.Uuid
+  resolvedAt      DateTime?         @map("resolved_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  moderationItem ModerationItem @relation(fields: [moderationItemId], references: [id], onDelete: Cascade)
+  reporter       User            @relation("ModerationReportsFiled", fields: [reporterId], references: [id])
+  resolvedBy     User?           @relation("ModerationReportsResolved", fields: [resolvedById], references: [id])
+
+  @@index([moderationItemId, status])
+  @@index([reporterId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("moderation_reports")
+}
+
+// ---------------------------------------------------------------------------
+// Dispute Center
+// ---------------------------------------------------------------------------
+
+model Dispute {
+  id               String          @id @default(uuid()) @db.Uuid
+  ticketNumber     String          @unique @map("ticket_number") @db.VarChar(20)
+  type             DisputeType
+  priority         DisputePriority @default(medium)
+  status           DisputeStatus   @default(open)
+  
+  // Parties involved
+  reporterId       String          @map("reporter_id") @db.Uuid
+  reportedUserId   String?         @map("reported_user_id") @db.Uuid
+  listingId        String?         @map("listing_id") @db.Uuid
+  conversationId   String?         @map("conversation_id") @db.Uuid
+  
+  // Dispute details
+  title            String          @db.VarChar(200)
+  description      String          @db.Text
+  evidenceUrls     String[]        @default([]) @map("evidence_urls")
+  chatEvidenceIds  String[]        @default([]) @map("chat_evidence_ids")
+  
+  // Resolution
+  resolutionNote   String?         @map("resolution_note") @db.Text
+  resolutionAction String?         @map("resolution_action") @db.VarChar(100)
+  resolvedById     String?         @map("resolved_by_id") @db.Uuid
+  resolvedAt       DateTime?       @map("resolved_at")
+  closedAt         DateTime?       @map("closed_at")
+  
+  // Escalation
+  escalatedAt      DateTime?       @map("escalated_at")
+  escalatedById    String?         @map("escalated_by_id") @db.Uuid
+  
+  // Timestamps
+  lastActivityAt   DateTime?       @map("last_activity_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  reporter       User          @relation("DisputeReporter", fields: [reporterId], references: [id])
+  reportedUser   User?         @relation("DisputeReportedUser", fields: [reportedUserId], references: [id])
+  listing        Listing?      @relation(fields: [listingId], references: [id])
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  resolvedBy     User?         @relation("DisputeResolver", fields: [resolvedById], references: [id])
+  escalatedBy    User?         @relation("DisputeEscalator", fields: [escalatedById], references: [id])
+  comments       DisputeComment[]
+
+  @@index([status, priority, createdAt(sort: Desc)])
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([type, status])
+  @@index([ticketNumber])
+  @@map("disputes")
+}
+
+model DisputeComment {
+  id         String   @id @default(uuid()) @db.Uuid
+  disputeId  String   @map("dispute_id") @db.Uuid
+  authorId   String   @map("author_id") @db.Uuid
+  content    String   @db.Text
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@index([disputeId, createdAt(sort: Desc)])
+  @@index([authorId])
+  @@map("dispute_comments")
+}
+
+// ---------------------------------------------------------------------------
+// Homepage Content Management
+// ---------------------------------------------------------------------------
+
+model HomepageContent {
+  id                String        @id @default(uuid()) @db.Uuid
+  type              ContentType
+  title             String        @db.VarChar(200)
+  subtitle          String?       @db.VarChar(300)
+  description       String?       @db.Text
+  imageUrl          String?       @map("image_url") @db.VarChar(500)
+  cloudinaryPublicId String?       @map("cloudinary_public_id") @db.VarChar(255)
+  linkUrl           String?       @map("link_url") @db.VarChar(500)
+  linkLabel         String?       @map("link_label") @db.VarChar(100)
+  buttonText        String?       @map("button_text") @db.VarChar(100)
+  backgroundColor   String?       @map("background_color") @db.VarChar(7)
+  textColor         String?       @map("text_color") @db.VarChar(7)
+  status            ContentStatus @default(draft)
+  sortOrder         Int           @default(0) @map("sort_order")
+  publishAt         DateTime?     @map("publish_at")
+  unpublishAt       DateTime?     @map("unpublish_at")
+  featuredListingId String?       @map("featured_listing_id") @db.Uuid
+  featuredCategoryId String?      @map("featured_category_id") @db.Uuid
+  createdById       String       @map("created_by_id") @db.Uuid
+  updatedById       String?      @map("updated_by_id") @db.Uuid
+  deletedAt         DateTime?    @map("deleted_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  featuredListing  Listing?      @relation("HomepageFeaturedListing", fields: [featuredListingId], references: [id])
+  featuredCategory Category?     @relation("HomepageFeaturedCategory", fields: [featuredCategoryId], references: [id])
+  createdBy        User          @relation("HomepageContentCreated", fields: [createdById], references: [id])
+  updatedBy        User?         @relation("HomepageContentUpdated", fields: [updatedById], references: [id])
+
+  @@index([type, status, sortOrder])
+  @@index([status, publishAt])
+  @@index([deletedAt])
+  @@map("homepage_content")
+}
+
+// ---------------------------------------------------------------------------
+// Vendor KYC Profile
+// ---------------------------------------------------------------------------
+
+model VendorKycProfile {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String    @unique @map("user_id") @db.Uuid
+  businessName        String    @map("business_name") @db.VarChar(200)
+  businessNameAm      String?   @map("business_name_am") @db.VarChar(200)
+  tinNumber           String    @unique @map("tin_number") @db.VarChar(15)
+  licenseUrl          String    @map("license_url") @db.VarChar(500)
+  licenseCloudinaryId String?   @map("license_cloudinary_id") @db.VarChar(255)
+  status              KycStatus @default(PENDING)
+  rejectionReason     String?   @map("rejection_reason") @db.Text
+  reviewedById        String?   @map("reviewed_by_id") @db.Uuid
+  reviewedAt          DateTime? @map("reviewed_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user        User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy  User? @relation("KycReviewer", fields: [reviewedById], references: [id])
+
+  @@index([status])
+  @@index([tinNumber])
+  @@map("vendor_kyc_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Rental Orders
+// ---------------------------------------------------------------------------
+
+model RentalOrder {
+  id                    String        @id @default(uuid()) @db.Uuid
+  orderNumber           String        @unique @map("order_number") @db.VarChar(20)
+  listingId            String        @map("listing_id") @db.Uuid
+  renterId             String        @map("renter_id") @db.Uuid
+  sellerId             String        @map("seller_id") @db.Uuid
+  
+  // Rental Schedule
+  startDate             DateTime      @map("start_date")
+  endDate               DateTime      @map("end_date")
+  actualReturnDate      DateTime?     @map("actual_return_date")
+  
+  // Financials
+  dailyRate             Float         @map("daily_rate")
+  totalAmount           Float         @map("total_amount")
+  securityDeposit       Float         @map("security_deposit")
+  depositRefunded       Boolean       @default(false) @map("deposit_refunded")
+  depositRefundAmount   Float?        @map("deposit_refund_amount")
+  depositRefundReason   String?       @map("deposit_refund_reason") @db.Text
+  
+  // Status
+  status                RentalStatus  @default(REQUESTED)
+  
+  // Condition Logs
+  preHandoverCondition  String?       @map("pre_handover_condition") @db.Text
+  preHandoverPhotos     String[]      @default([]) @map("pre_handover_photos")
+  postReturnCondition   String?       @map("post_return_condition") @db.Text
+  postReturnPhotos      String[]      @default([]) @map("post_return_photos")
+  damageNotes           String?       @map("damage_notes") @db.Text
+  damageCost            Float?        @map("damage_cost")
+  
+  // Handover
+  handoverLocation      String?       @map("handover_location") @db.VarChar(200)
+  handoverAt            DateTime?     @map("handover_at")
+  returnedAt            DateTime?     @map("returned_at")
+  
+  // Timestamps
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  
+  listing               Listing       @relation(fields: [listingId], references: [id])
+  renter                User          @relation("RentalRenter", fields: [renterId], references: [id])
+  seller                User          @relation("RentalSeller", fields: [sellerId], references: [id])
+  extensions            RentalExtension[]
+  
+  @@index([status, startDate])
+  @@index([renterId])
+  @@index([sellerId])
+  @@index([listingId])
+  @@index([orderNumber])
+  @@map("rental_orders")
+}
+
+model RentalExtension {
+  id              String    @id @default(uuid()) @db.Uuid
+  rentalOrderId   String    @map("rental_order_id") @db.Uuid
+  requestedBy     String    @map("requested_by") @db.Uuid
+  additionalDays  Int       @map("additional_days")
+  newEndDate      DateTime  @map("new_end_date")
+  additionalCost  Float     @map("additional_cost")
+  status          RentalStatus @default(REQUESTED)
+  approvedById    String?   @map("approved_by_id") @db.Uuid
+  approvedAt      DateTime? @map("approved_at")
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  rentalOrder     RentalOrder @relation(fields: [rentalOrderId], references: [id], onDelete: Cascade)
+  requestedByUser User       @relation("ExtensionRequester", fields: [requestedBy], references: [id])
+  approvedByUser  User?      @relation("ExtensionApprover", fields: [approvedById], references: [id])
+  
+  @@index([rentalOrderId, status])
+  @@map("rental_extensions")
+}
+
+// ---------------------------------------------------------------------------
+// Regional Hubs
+// ---------------------------------------------------------------------------
+
+model RegionHub {
+  id              String    @id @default(uuid()) @db.Uuid
+  name            String    @db.VarChar(100)
+  nameAm          String?   @map("name_am") @db.VarChar(100)
+  description     String?   @db.Text
+  descriptionAm   String?   @map("description_am") @db.Text
+  type            String    @db.VarChar(50) // sub_city, regional_city, pickup_point
+  city            String    @db.VarChar(100)
+  cityAm          String?   @map("city_am") @db.VarChar(100)
+  coordinates     String?   @db.VarChar(100) // lat,lng
+  sortOrder       Int       @default(0) @map("sort_order")
+  isActive        Boolean   @default(true) @map("is_active")
+  isPopular       Boolean   @default(false) @map("is_popular")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  @@index([type, isActive])
+  @@index([city])
+  @@map("region_hubs")
+}
+
+// ---------------------------------------------------------------------------
+// Hero Banners with Holiday Themes
+// ---------------------------------------------------------------------------
+
+model HeroBanner {
+  id                String        @id @default(uuid()) @db.Uuid
+  title             String        @db.VarChar(200)
+  titleAm           String?       @map("title_am") @db.VarChar(200)
+  subtitle          String?       @db.VarChar(300)
+  subtitleAm        String?       @map("subtitle_am") @db.VarChar(300)
+  imageUrl          String        @map("image_url") @db.VarChar(500)
+  cloudinaryPublicId String?       @map("cloudinary_public_id") @db.VarChar(255)
+  linkUrl           String?       @map("link_url") @db.VarChar(500)
+  holidayTheme      HolidayTheme? @map("holiday_theme")
+  themeStartDate    DateTime?     @map("theme_start_date")
+  themeEndDate      DateTime?     @map("theme_end_date")
+  searchWeight      Float         @default(1.0) @map("search_weight")
+  status            ContentStatus @default(draft)
+  sortOrder         Int           @default(0) @map("sort_order")
+  publishAt         DateTime?     @map("publish_at")
+  unpublishAt       DateTime?     @map("unpublish_at")
+  createdById       String        @map("created_by_id") @db.Uuid
+  updatedById       String?       @map("updated_by_id") @db.Uuid
+  deletedAt         DateTime?     @map("deleted_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  createdBy         User          @relation("HeroBannerCreated", fields: [createdById], references: [id])
+  updatedBy         User?         @relation("HeroBannerUpdated", fields: [updatedById], references: [id])
+  
+  @@index([holidayTheme, status])
+  @@index([status, publishAt])
+  @@index([deletedAt])
+  @@map("hero_banners")
 }

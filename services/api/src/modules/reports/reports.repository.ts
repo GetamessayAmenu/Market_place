@@ -43,7 +43,7 @@ export class ReportsRepository {
       where: {
         reporterId,
         targetType,
-        status: { in: ['pending', 'under_review'] },
+        status: { in: ['pending', 'under_review', 'investigating'] },
         ...(listingId ? { listingId } : {}),
         ...(reportedUserId ? { reportedUserId } : {}),
         ...(messageId ? { messageId } : {}),
@@ -93,19 +93,45 @@ export class ReportsRepository {
         status,
         ...(resolvedById ? { resolvedById } : {}),
         ...(status === 'resolved' || status === 'dismissed' ? { resolvedAt: new Date() } : {}),
-        ...(resolutionNote ? { description: resolutionNote } : {}),
+        ...(resolutionNote ? { resolutionNote } : {}),
       },
       include: this.include,
     });
   }
 
-  async countByStatus(): Promise<Record<ReportStatus, number>> {
-    const [pending, underReview, resolved, dismissed] = await Promise.all([
+  async closeReport(id: string, note?: string): Promise<ReportWithRelations> {
+    return this.prisma.report.update({
+      where: { id },
+      data: {
+        status: 'closed' as any,
+        closedAt: new Date() as any,
+        ...(note ? { resolutionNote: note } : {}),
+      },
+      include: this.include,
+    }) as any;
+  }
+
+  async countByStatus(): Promise<Record<string, number>> {
+    const [pending, underReview, investigating, resolved, dismissed, closed] = await Promise.all([
       this.prisma.report.count({ where: { status: 'pending' } }),
       this.prisma.report.count({ where: { status: 'under_review' } }),
+      this.prisma.report.count({ where: { status: 'investigating' as any } }),
       this.prisma.report.count({ where: { status: 'resolved' } }),
       this.prisma.report.count({ where: { status: 'dismissed' } }),
+      this.prisma.report.count({ where: { status: 'closed' as any } }),
     ]);
-    return { pending, under_review: underReview, resolved, dismissed };
+    return { pending, under_review: underReview, investigating, resolved, dismissed, closed };
+  }
+
+  async getConversationMessages(conversationId: string) {
+    return this.prisma.message.findMany({
+      where: { conversationId },
+      include: {
+        sender: {
+          select: { id: true, displayName: true, email: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }

@@ -24,6 +24,13 @@ import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SearchModule } from './modules/search/search.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { VerificationModule } from './modules/verification/verification.module';
+import { CallbackRequestsModule } from './modules/callback-requests/callback-requests.module';
+import { ModerationModule } from './modules/moderation/moderation.module';
+import { HomepageContentModule } from './modules/homepage-content/homepage-content.module';
+import { DisputesModule } from './modules/disputes/disputes.module';
+import { AdminTaxonomiesModule } from './modules/admin-taxonomies/admin-taxonomies.module';
+import { RentalsModule } from './modules/rentals/rentals.module';
+import { HeroBannersModule } from './modules/hero-banners/hero-banners.module';
 
 @Module({
   imports: [
@@ -43,6 +50,13 @@ import { VerificationModule } from './modules/verification/verification.module';
     VerificationModule,
     CustomOrdersModule,
     ReviewsModule,
+    CallbackRequestsModule,
+    ModerationModule,
+    HomepageContentModule,
+    DisputesModule,
+    AdminTaxonomiesModule,
+    RentalsModule,
+    HeroBannersModule,
   ],
   controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [

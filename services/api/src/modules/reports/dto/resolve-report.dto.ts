@@ -9,3 +9,13 @@ export class ResolveReportDto {
   @MaxLength(1000)
   resolutionNote?: string;
 }
+
+export class UpdateReportStatusDto {
+  @IsEnum(['pending', 'under_review', 'investigating', 'resolved', 'dismissed', 'closed'] as const)
+  status!: 'pending' | 'under_review' | 'investigating' | 'resolved' | 'dismissed' | 'closed';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
+}

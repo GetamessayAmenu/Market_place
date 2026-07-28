@@ -28,6 +28,8 @@ import { QUEUE_NAMES } from './queue.constants';
       { name: QUEUE_NAMES.SEARCH_INDEX },
       { name: QUEUE_NAMES.EMAIL },
       { name: QUEUE_NAMES.MODERATION },
+      { name: QUEUE_NAMES.CMS_SCHEDULING },
+      { name: QUEUE_NAMES.RENTAL_REMINDERS },
     ),
   ],
   exports: [BullModule],

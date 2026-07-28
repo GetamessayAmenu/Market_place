@@ -73,3 +73,16 @@ export class SystemAnnouncementEvent extends DomainEvent {
     super();
   }
 }
+
+export class ReportStatusUpdatedEvent extends DomainEvent {
+  readonly eventName = 'notification.report_status_updated';
+
+  constructor(
+    readonly reporterId: string,
+    readonly reportId: string,
+    readonly status: string,
+    readonly targetType: string,
+  ) {
+    super();
+  }
+}

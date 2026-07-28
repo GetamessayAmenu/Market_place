@@ -1,4 +1,4 @@
-import { serverGet, serverPatch, serverPost } from './serverApi'
+import { serverGet, serverPatch, serverPost, serverPut, serverDelete } from './serverApi'
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ export interface AdminOrder {
   shippingAddress: any
   trackingNumber: string | null
   paymentMethod: string | null
-  paymentId: sheytring | null
+  paymentId: string | null
   cancelledAt: string | null
   cancelledReason: string | null
   refundedAt: string | null
@@ -136,6 +136,244 @@ export async function fetchAdminOrders(params?: Record<string, string | number |
 
 export async function fetchAdminOrder(id: string): Promise<ApiResponse<AdminOrder>> {
   return serverGet<ApiResponse<AdminOrder>>('/admin/orders/' + id)
+}
+
+// ─── Admin Disputes ─────────────────────────────────────────────────────────
+
+export interface AdminDispute {
+  id: string
+  ticketNumber: string
+  type: string
+  status: string
+  priority: string
+  title: string
+  description: string
+  reporterId: string
+  reportedUserId: string
+  listingId: string | null
+  conversationId: string | null
+  resolvedById: string | null
+  escalatedById: string | null
+  closedById: string | null
+  resolution: string | null
+  escalationReason: string | null
+  createdAt: string
+  updatedAt: string
+  resolvedAt: string | null
+  escalatedAt: string | null
+  closedAt: string | null
+  reporter: {
+    id: string
+    displayName: string
+    email: string
+  }
+  reportedUser: {
+    id: string
+    displayName: string
+    email: string
+  }
+  listing: {
+    id: string
+    title: string
+  } | null
+  comments: AdminDisputeComment[]
+}
+
+export interface AdminDisputeComment {
+  id: string
+  disputeId: string
+  authorId: string
+  content: string
+  isInternal: boolean
+  createdAt: string
+  author: {
+    id: string
+    displayName: string
+  }
+}
+
+export async function fetchAdminDisputes(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminDispute>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminDispute>>('/admin/disputes' + qs)
+}
+
+export async function fetchAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
+  return serverGet<ApiResponse<AdminDispute>>('/admin/disputes/' + id)
+}
+
+export async function fetchAdminDisputeStats(): Promise<ApiResponse<Record<string, number>>> {
+  return serverGet<ApiResponse<Record<string, number>>>('/admin/disputes/stats')
+}
+
+export async function createAdminDispute(data: any): Promise<ApiResponse<AdminDispute>> {
+  return serverPost<ApiResponse<AdminDispute>>('/admin/disputes', data)
+}
+
+export async function updateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
+  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id, data)
+}
+
+export async function updateAdminDisputeStatus(id: string, status: string): Promise<ApiResponse<AdminDispute>> {
+  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/status', { status })
+}
+
+export async function resolveAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
+  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/resolve', data)
+}
+
+export async function escalateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
+  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/escalate', data)
+}
+
+export async function closeAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
+  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/close', {})
+}
+
+export async function addAdminDisputeComment(id: string, data: any): Promise<ApiResponse<AdminDisputeComment>> {
+  return serverPost<ApiResponse<AdminDisputeComment>>('/admin/disputes/' + id + '/comments', data)
+}
+
+export async function fetchAdminDisputeComments(id: string, includeInternal?: boolean): Promise<ApiResponse<AdminDisputeComment[]>> {
+  const qs = includeInternal ? '?includeInternal=true' : ''
+  return serverGet<ApiResponse<AdminDisputeComment[]>>('/admin/disputes/' + id + '/comments' + qs)
+}
+
+// ─── Admin Taxonomies ───────────────────────────────────────────────────────
+
+export interface AdminTaxonomyCategory {
+  id: string
+  name: string
+  nameAm: string | null
+  slug: string
+  slugAm: string | null
+  parentId: string | null
+  type: string
+  description: string | null
+  descriptionAm: string | null
+  iconUrl: string | null
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  parent: {
+    id: string
+    name: string
+    nameAm: string | null
+  } | null
+  children: {
+    id: string
+    name: string
+    nameAm: string | null
+  }[]
+  _count: {
+    listings: number
+  }
+}
+
+export interface AdminTaxonomyAttribute {
+  id: string
+  name: string
+  nameAm: string | null
+  type: string
+  values: { value: string; valueAm?: string }[]
+  description: string | null
+  descriptionAm: string | null
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminRegionalHub {
+  id: string
+  name: string
+  nameAm: string | null
+  description: string | null
+  descriptionAm: string | null
+  type: string
+  city: string | null
+  cityAm: string | null
+  coordinates: string | null
+  sortOrder: number
+  isActive: boolean
+  isPopular: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchAdminTaxonomyCategories(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminTaxonomyCategory>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories' + qs)
+}
+
+export async function fetchAdminTaxonomyCategory(id: string): Promise<ApiResponse<AdminTaxonomyCategory>> {
+  return serverGet<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
+}
+
+export async function createAdminTaxonomyCategory(data: any): Promise<ApiResponse<AdminTaxonomyCategory>> {
+  return serverPost<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories', data)
+}
+
+export async function updateAdminTaxonomyCategory(id: string, data: any): Promise<ApiResponse<AdminTaxonomyCategory>> {
+  return serverPatch<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id, data)
+}
+
+export async function deleteAdminTaxonomyCategory(id: string): Promise<ApiResponse<AdminTaxonomyCategory>> {
+  return serverDelete<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
+}
+
+export async function fetchAdminTaxonomyAttributes(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminTaxonomyAttribute>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes' + qs)
+}
+
+export async function fetchAdminTaxonomyAttribute(id: string): Promise<ApiResponse<AdminTaxonomyAttribute>> {
+  return serverGet<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
+}
+
+export async function createAdminTaxonomyAttribute(data: any): Promise<ApiResponse<AdminTaxonomyAttribute>> {
+  return serverPost<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes', data)
+}
+
+export async function updateAdminTaxonomyAttribute(id: string, data: any): Promise<ApiResponse<AdminTaxonomyAttribute>> {
+  return serverPatch<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id, data)
+}
+
+export async function deleteAdminTaxonomyAttribute(id: string): Promise<ApiResponse<AdminTaxonomyAttribute>> {
+  return serverDelete<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
+}
+
+export async function fetchAdminRegionalHubs(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminRegionalHub>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs' + qs)
+}
+
+export async function createAdminRegionalHub(data: any): Promise<ApiResponse<AdminRegionalHub>> {
+  return serverPost<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs', data)
+}
+
+export async function updateAdminRegionalHub(id: string, data: any): Promise<ApiResponse<AdminRegionalHub>> {
+  return serverPatch<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id, data)
+}
+
+export async function deleteAdminRegionalHub(id: string): Promise<ApiResponse<AdminRegionalHub>> {
+  return serverDelete<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id)
+}
+
+export async function getRegionalHubsByProximity(lat: number, lng: number, radiusKm?: number): Promise<ApiResponse<any[]>> {
+  const params = new URLSearchParams()
+  params.append('lat', lat.toString())
+  params.append('lng', lng.toString())
+  if (radiusKm) params.append('radius', radiusKm.toString())
+  return serverGet<ApiResponse<any[]>>('/admin/taxonomies/regional-hubs/proximity?' + params.toString())
 }
 
 // ─── Admin Listings ──────────────────────────────────────────────────────────
@@ -263,10 +501,13 @@ export interface AdminReport {
   listingId?: string | null
   resolution?: string | null
   resolutionNote?: string | null
+  evidence?: string[]
   createdAt: string
   updatedAt: string
   reporter?: { id: string; displayName?: string; email?: string } | null
   listing?: { id: string; title: string } | null
+  reportedUser?: { id: string; displayName?: string; email?: string; status?: string } | null
+  resolvedBy?: { id: string; displayName?: string } | null
 }
 
 export async function fetchReports(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminReport>> {
@@ -293,6 +534,22 @@ export async function resolveReport(id: string, resolution: 'resolved' | 'dismis
     resolution,
     ...(resolutionNote ? { resolutionNote } : {}),
   })
+}
+
+export async function setReportInvestigating(id: string): Promise<ApiResponse<AdminReport>> {
+  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/investigate')
+}
+
+export async function closeReport(id: string, note?: string): Promise<ApiResponse<AdminReport>> {
+  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/close', { note })
+}
+
+export async function fetchReportConversationHistory(id: string): Promise<any[]> {
+  return serverGet<any[]>('/reports/' + id + '/conversation')
+}
+
+export async function fetchReportAuditLogs(id: string): Promise<AuditLog[]> {
+  return serverGet<AuditLog[]>('/reports/' + id + '/audit-logs')
 }
 
 // ─── Verifications ───────────────────────────────────────────────────────────
@@ -434,4 +691,493 @@ export async function fetchAuditLogs(params?: Record<string, string | number | b
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
   return serverGet<PaginatedResponse<AuditLog>>('/admin/audit-logs' + qs)
+}
+
+// ─── Content Moderation ─────────────────────────────────────────────────────
+
+export interface ModerationItem {
+  id: string
+  itemType: string
+  itemId: string
+  reviewId?: string | null
+  content?: string | null
+  imageUrl?: string | null
+  cloudinaryPublicId?: string | null
+  status: string
+  rejectionReason?: string | null
+  moderatedById?: string | null
+  moderatedAt?: string | null
+  isSpam: boolean
+  spamScore?: number | null
+  reportCount: number
+  deletedAt?: string | null
+  restoredAt?: string | null
+  createdAt: string
+  updatedAt: string
+  review?: {
+    id: string
+    rating: number
+    title?: string | null
+    body?: string | null
+    images: string[]
+    verifiedPurchase: boolean
+    helpfulCount: number
+    moderationStatus: string
+    moderationReason?: string | null
+    createdAt: string
+    listing?: {
+      id: string
+      title: string
+      slug: string
+    }
+    reviewer?: {
+      id: string
+      displayName?: string
+      email?: string
+    }
+    seller?: {
+      id: string
+      displayName?: string
+      email?: string
+    }
+  }
+  moderatedBy?: {
+    id: string
+    displayName?: string
+    email?: string
+  }
+  reports?: Array<{
+    id: string
+    reason: string
+    description?: string | null
+    status: string
+    createdAt: string
+    reporter?: {
+      id: string
+      displayName?: string
+      email?: string
+    }
+  }>
+}
+
+export async function fetchModerationItems(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<ModerationItem>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<ModerationItem>>('/admin/moderation' + qs)
+}
+
+export async function fetchModerationItem(id: string): Promise<ApiResponse<ModerationItem>> {
+  return serverGet<ApiResponse<ModerationItem>>('/admin/moderation/' + id)
+}
+
+export async function fetchModerationStats(): Promise<ApiResponse<Record<string, number>>> {
+  return serverGet<ApiResponse<Record<string, number>>>('/admin/moderation/stats')
+}
+
+export async function fetchModerationHistory(id: string): Promise<AuditLog[]> {
+  return serverGet<AuditLog[]>('/admin/moderation/' + id + '/history')
+}
+
+export async function moderateItem(id: string, action: 'approve' | 'reject' | 'delete' | 'restore', reason?: string): Promise<ApiResponse<ModerationItem>> {
+  const endpoint = `/admin/moderation/${id}/${action}`
+  if (action === 'reject') {
+    return serverPost<ApiResponse<ModerationItem>>(endpoint, { reason })
+  }
+  return serverPost<ApiResponse<ModerationItem>>(endpoint)
+}
+
+export async function moderateReview(reviewId: string, status: string, reason?: string, isSpam?: boolean): Promise<ApiResponse<unknown>> {
+  return serverPost<ApiResponse<unknown>>(`/admin/moderation/review/${reviewId}`, {
+    status,
+    reason,
+    isSpam,
+  })
+}
+
+export async function toggleSpamFlag(id: string, isSpam: boolean, reason?: string): Promise<ApiResponse<ModerationItem>> {
+  return serverPatch<ApiResponse<ModerationItem>>(`/admin/moderation/${id}/spam`, {
+    isSpam,
+    reason,
+  })
+}
+
+export async function bulkModerationAction(itemIds: string[], action: string, reason?: string): Promise<ApiResponse<unknown>> {
+  return serverPost<ApiResponse<unknown>>('/admin/moderation/bulk-action', {
+    itemIds,
+    action,
+    reason,
+  })
+}
+
+// ─── Homepage Content ─────────────────────────────────────────────────────────
+
+export interface HomepageContent {
+  id: string
+  type: string
+  title: string
+  subtitle?: string | null
+  description?: string | null
+  imageUrl?: string | null
+  cloudinaryPublicId?: string | null
+  linkUrl?: string | null
+  linkLabel?: string | null
+  buttonText?: string | null
+  backgroundColor?: string | null
+  textColor?: string | null
+  status: string
+  sortOrder: number
+  publishAt?: string | null
+  unpublishAt?: string | null
+  featuredListingId?: string | null
+  featuredCategoryId?: string | null
+  deletedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  featuredListing?: {
+    id: string
+    title: string
+    slug: string
+    price: number
+    currency: string
+    seller?: {
+      id: string
+      displayName?: string
+    }
+    images?: Array<{ url: string; isPrimary: boolean }>
+  } | null
+  featuredCategory?: {
+    id: string
+    name: string
+    slug: string
+  } | null
+  createdBy?: {
+    id: string
+    displayName?: string
+    email?: string
+  } | null
+  updatedBy?: {
+    id: string
+    displayName?: string
+    email?: string
+  } | null
+}
+
+export async function fetchHomepageContents(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<HomepageContent>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return serverGet<PaginatedResponse<HomepageContent>>('/admin/homepage-content' + qs)
+}
+
+export async function fetchHomepageContent(id: string): Promise<ApiResponse<HomepageContent>> {
+  return serverGet<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id)
+}
+
+export async function fetchPublishedHomepageContent(): Promise<ApiResponse<HomepageContent[]>> {
+  return serverGet<ApiResponse<HomepageContent[]>>('/admin/homepage-content/published')
+}
+
+export async function createHomepageContent(data: {
+  type: string
+  title: string
+  subtitle?: string
+  description?: string
+  imageUrl?: string
+  cloudinaryPublicId?: string
+  linkUrl?: string
+  linkLabel?: string
+  buttonText?: string
+  backgroundColor?: string
+  textColor?: string
+  status: string
+  sortOrder?: number
+  publishAt?: string
+  unpublishAt?: string
+  featuredListingId?: string
+  featuredCategoryId?: string
+}): Promise<ApiResponse<HomepageContent>> {
+  return serverPost<ApiResponse<HomepageContent>>('/admin/homepage-content', data)
+}
+
+export async function updateHomepageContent(id: string, data: Partial<{
+  type: string
+  title: string
+  subtitle?: string
+  description?: string
+  imageUrl?: string
+  cloudinaryPublicId?: string
+  linkUrl?: string
+  linkLabel?: string
+  buttonText?: string
+  backgroundColor?: string
+  textColor?: string
+  status: string
+  sortOrder?: number
+  publishAt?: string
+  unpublishAt?: string
+  featuredListingId?: string
+  featuredCategoryId?: string
+}>): Promise<ApiResponse<HomepageContent>> {
+  return serverPut<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id, data)
+}
+
+export async function deleteHomepageContent(id: string): Promise<ApiResponse<unknown>> {
+  return serverDelete<ApiResponse<unknown>>('/admin/homepage-content/' + id)
+}
+
+export async function restoreHomepageContent(id: string): Promise<ApiResponse<unknown>> {
+  return serverPost<ApiResponse<unknown>>('/admin/homepage-content/' + id + '/restore')
+}
+
+export async function reorderHomepageContent(itemIds: string[]): Promise<ApiResponse<unknown>> {
+  return serverPost<ApiResponse<unknown>>('/admin/homepage-content/reorder', { itemIds })
+}
+
+// ─── Image Upload ───────────────────────────────────────────────────────────
+
+export interface SignedUploadResponse {
+  uploadUrl: string
+  publicId: string
+  resourceType: string
+}
+
+export async function signUpload(count: number = 1): Promise<SignedUploadResponse[]> {
+  return serverPost<SignedUploadResponse[]>('/uploads/sign', { count })
+}
+
+export async function validateUpload(mimeType: string, bytes: number): Promise<{ valid: boolean }> {
+  return serverPost<{ valid: boolean }>('/uploads/validate', { mimeType, bytes })
+}
+
+// ─── Rentals ────────────────────────────────────────────────────────────────
+
+export interface RentalOrder {
+  id: string
+  userId: string
+  listingId: string
+  status: string
+  startDate: string
+  endDate: string
+  totalAmount: number
+  depositAmount: number
+  createdAt: string
+  updatedAt: string
+  user?: {
+    id: string
+    displayName: string
+    email: string
+  }
+  listing?: {
+    id: string
+    title: string
+    images: string[]
+  }
+}
+
+export interface RentalExtension {
+  id: string
+  rentalOrderId: string
+  additionalDays: number
+  additionalAmount: number
+  status: string
+  createdAt: string
+}
+
+export async function getRentalOrders(query?: {
+  page?: number
+  limit?: number
+  status?: string
+  userId?: string
+}): Promise<ApiResponse<{ items: RentalOrder[]; total: number }>> {
+  const params = new URLSearchParams()
+  if (query?.page) params.append('page', query.page.toString())
+  if (query?.limit) params.append('limit', query.limit.toString())
+  if (query?.status) params.append('status', query.status)
+  if (query?.userId) params.append('userId', query.userId)
+  return serverGet<ApiResponse<{ items: RentalOrder[]; total: number }>>('/admin/rentals?' + params.toString())
+}
+
+export async function getRentalOrder(id: string): Promise<ApiResponse<RentalOrder>> {
+  return serverGet<ApiResponse<RentalOrder>>('/admin/rentals/' + id)
+}
+
+export async function updateRentalOrder(id: string, data: {
+  status?: string
+  returnDate?: string
+}): Promise<ApiResponse<RentalOrder>> {
+  return serverPatch<ApiResponse<RentalOrder>>('/admin/rentals/' + id, data)
+}
+
+export async function createRentalExtension(data: {
+  rentalOrderId: string
+  additionalDays: number
+}): Promise<ApiResponse<RentalExtension>> {
+  return serverPost<ApiResponse<RentalExtension>>('/admin/rentals/extensions', data)
+}
+
+export async function getRentalExtensions(rentalOrderId: string): Promise<ApiResponse<RentalExtension[]>> {
+  return serverGet<ApiResponse<RentalExtension[]>>('/admin/rentals/' + rentalOrderId + '/extensions')
+}
+
+// ─── Hero Banners ────────────────────────────────────────────────────────────
+
+export interface HeroBanner {
+  id: string
+  title: string
+  titleAm?: string
+  subtitle?: string
+  subtitleAm?: string
+  imageUrl: string
+  cloudinaryPublicId?: string
+  linkUrl?: string
+  holidayTheme?: string
+  themeStartDate?: string
+  themeEndDate?: string
+  searchWeight?: number
+  sortOrder?: number
+  status: string
+  publishAt?: string
+  unpublishAt?: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: {
+    id: string
+    displayName: string
+  }
+}
+
+export async function getHeroBanners(query?: {
+  page?: number
+  limit?: number
+  status?: string
+}): Promise<ApiResponse<{ items: HeroBanner[]; total: number }>> {
+  const params = new URLSearchParams()
+  if (query?.page) params.append('page', query.page.toString())
+  if (query?.limit) params.append('limit', query.limit.toString())
+  if (query?.status) params.append('status', query.status)
+  return serverGet<ApiResponse<{ items: HeroBanner[]; total: number }>>('/admin/hero-banners?' + params.toString())
+}
+
+export async function getActiveHeroBanners(): Promise<ApiResponse<HeroBanner[]>> {
+  return serverGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/active')
+}
+
+export async function getHeroBannersByTheme(theme: string): Promise<ApiResponse<HeroBanner[]>> {
+  return serverGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/holiday/' + theme)
+}
+
+export async function getHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
+  return serverGet<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id)
+}
+
+export async function createHeroBanner(data: {
+  title: string
+  titleAm?: string
+  subtitle?: string
+  subtitleAm?: string
+  imageUrl: string
+  cloudinaryPublicId?: string
+  linkUrl?: string
+  holidayTheme?: string
+  themeStartDate?: string
+  themeEndDate?: string
+  searchWeight?: number
+  sortOrder?: number
+}): Promise<ApiResponse<HeroBanner>> {
+  return serverPost<ApiResponse<HeroBanner>>('/admin/hero-banners', data)
+}
+
+export async function updateHeroBanner(id: string, data: Partial<{
+  title: string
+  titleAm?: string
+  subtitle?: string
+  subtitleAm?: string
+  imageUrl: string
+  cloudinaryPublicId?: string
+  linkUrl?: string
+  holidayTheme?: string
+  themeStartDate?: string
+  themeEndDate?: string
+  searchWeight?: number
+  sortOrder?: number
+}>): Promise<ApiResponse<HeroBanner>> {
+  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id, data)
+}
+
+export async function publishHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
+  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/publish', {})
+}
+
+export async function unpublishHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
+  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/unpublish', {})
+}
+
+export async function deleteHeroBanner(id: string): Promise<ApiResponse<unknown>> {
+  return serverDelete<ApiResponse<unknown>>('/admin/hero-banners/' + id)
+}
+
+// ─── Vendor KYC ───────────────────────────────────────────────────────────────
+
+export interface VendorKycProfile {
+  id: string
+  userId: string
+  businessName: string
+  businessNameAm?: string
+  tinNumber: string
+  licenseUrl: string
+  licenseCloudinaryId?: string
+  status: string
+  rejectionReason?: string
+  reviewedById?: string
+  reviewedAt?: string
+  createdAt: string
+  updatedAt: string
+  user?: {
+    id: string
+    displayName: string
+    email: string
+    phone?: string
+  }
+  reviewedBy?: {
+    id: string
+    displayName: string
+  }
+}
+
+export async function getVendorKycProfiles(query?: {
+  page?: number
+  limit?: number
+  status?: string
+  userId?: string
+  tinNumber?: string
+}): Promise<ApiResponse<{ items: VendorKycProfile[]; total: number }>> {
+  const params = new URLSearchParams()
+  if (query?.page) params.append('page', query.page.toString())
+  if (query?.limit) params.append('limit', query.limit.toString())
+  if (query?.status) params.append('status', query.status)
+  if (query?.userId) params.append('userId', query.userId)
+  if (query?.tinNumber) params.append('tinNumber', query.tinNumber)
+  return serverGet<ApiResponse<{ items: VendorKycProfile[]; total: number }>>('/admin/vendor-kyc?' + params.toString())
+}
+
+export async function getVendorKycProfile(id: string): Promise<ApiResponse<VendorKycProfile>> {
+  return serverGet<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id)
+}
+
+export async function reviewVendorKyc(id: string, data: {
+  decision: 'APPROVED' | 'REJECTED'
+  reason?: string
+}): Promise<ApiResponse<VendorKycProfile>> {
+  return serverPatch<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id + '/review', data)
+}
+
+export async function createVendorKycProfile(data: {
+  businessName: string
+  businessNameAm?: string
+  tinNumber: string
+  licenseUrl: string
+  licenseCloudinaryId?: string
+}): Promise<ApiResponse<VendorKycProfile>> {
+  return serverPost<ApiResponse<VendorKycProfile>>('/vendor-kyc', data)
 }

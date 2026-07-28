@@ -55,12 +55,12 @@ export async function serverPatch<T = unknown>(path: string, body?: Record<strin
   const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
   const cookieHeader = cookieStore.toString()
-  
+
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (cookieHeader) {
     headers.Cookie = cookieHeader
   }
-  
+
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',
     credentials: 'include',
@@ -72,4 +72,45 @@ export async function serverPatch<T = unknown>(path: string, body?: Record<strin
   return (await res.json()) as T
 }
 
-export default { serverGet, serverPost, serverPatch }
+export async function serverPut<T = unknown>(path: string, body?: Record<string, unknown>) {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
+    credentials: 'include',
+    cache: 'no-store',
+    headers,
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+  if (!res.ok) throw new Error('PUT ' + path + ' failed: ' + String(res.status))
+  return (await res.json()) as T
+}
+
+export async function serverDelete<T = unknown>(path: string) {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    cache: 'no-store',
+    headers,
+  })
+  if (!res.ok) throw new Error('DELETE ' + path + ' failed: ' + String(res.status))
+  return (await res.json()) as T
+}
+
+export default { serverGet, serverPost, serverPatch, serverPut, serverDelete }
