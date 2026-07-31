@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   }
 
   if (user.role === 'seller') {
-    redirect('/dashboard/seller');
+    redirect('/seller/dashboard');
   }
 
   if (user.role === 'buyer') {
@@ -24,5 +24,5 @@ export default async function DashboardPage() {
   }
 
   // Default fallback
-  redirect('/dashboard/seller');
+  redirect('/seller/dashboard');
 }

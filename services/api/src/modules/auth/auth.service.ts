@@ -70,7 +70,8 @@ export class AuthService {
       throw new PhoneAlreadyRegisteredException();
     }
 
-    const roleId = await this.rolesService.getRoleIdBySlug(DEFAULT_REGISTER_ROLE);
+    const roleSlug = dto.userType || DEFAULT_REGISTER_ROLE;
+    const roleId = await this.rolesService.getRoleIdBySlug(roleSlug);
     const passwordHash = await hashPassword(dto.password);
 
     const user = await this.authRepository.createUser({

@@ -31,6 +31,7 @@ import { DisputesModule } from './modules/disputes/disputes.module';
 import { AdminTaxonomiesModule } from './modules/admin-taxonomies/admin-taxonomies.module';
 import { RentalsModule } from './modules/rentals/rentals.module';
 import { HeroBannersModule } from './modules/hero-banners/hero-banners.module';
+import { SellerModule } from './modules/seller/seller.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { HeroBannersModule } from './modules/hero-banners/hero-banners.module';
     AdminTaxonomiesModule,
     RentalsModule,
     HeroBannersModule,
+    SellerModule,
   ],
   controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [

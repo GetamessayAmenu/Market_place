@@ -85,15 +85,13 @@ const IconPlus = () => (
 /* ── Default Items ────────────────────────────────────────────────────────── */
 
 const defaultItems: SidebarItem[] = [
-  { label: 'Overview', href: '/dashboard/seller', icon: <IconGrid />, section: 'Seller Hub' },
-  { label: 'Listings', href: '/dashboard/seller/listings', icon: <IconTag />, section: 'Seller Hub' },
-  { label: 'Custom Orders', href: '/dashboard/seller/orders', icon: <IconScissors />, section: 'Seller Hub' },
-  { label: 'Rentals', href: '/dashboard/seller/rentals', icon: <IconChart />, section: 'Seller Hub' },
-  { label: 'Rental Queue', href: '/dashboard/seller/rental-queue', icon: <IconChart />, section: 'Seller Hub' },
-  { label: 'Messages', href: '/dashboard/seller/messages', icon: <IconChat />, section: 'Seller Hub' },
-  { label: 'Analytics', href: '/dashboard/seller/analytics', icon: <IconChart />, section: 'Seller Hub' },
-  { label: 'Reviews', href: '/dashboard/seller/reviews', icon: <IconStar />, section: 'Seller Hub' },
-  { label: 'Create Listing', href: '/dashboard/seller/listings/create', icon: <IconPlus />, section: 'Seller Hub' },
+  // New Seller Hub - 6 Hub Structure
+  { label: 'Overview', href: '/seller/dashboard', icon: <IconGrid />, section: 'Seller Hub' },
+  { label: 'Catalog & Stock', href: '/seller/catalog', icon: <IconTag />, section: 'Seller Hub' },
+  { label: 'Orders & Requests', href: '/seller/orders', icon: <IconScissors />, section: 'Seller Hub' },
+  { label: 'Messages', href: '/seller/messages', icon: <IconChat />, section: 'Seller Hub' },
+  { label: 'Store & Profile', href: '/seller/store', icon: <IconShield />, section: 'Seller Hub' },
+  { label: 'Insights & Feedback', href: '/seller/insights', icon: <IconChart />, section: 'Seller Hub' },
 
   { label: 'My Rentals', href: '/dashboard/rentals', icon: <IconChart />, section: 'Account' },
   { label: 'Saved Items', href: '/dashboard/saved', icon: <IconHeart />, section: 'Account' },

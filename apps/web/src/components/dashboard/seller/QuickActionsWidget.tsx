@@ -18,6 +18,7 @@ const ALL_ACTIONS = [
   { id: 'seller_settings', label: 'qa_seller_settings', icon: '⚙️', url: '/dashboard/seller/settings' },
   { id: 'promote_listings', label: 'qa_promote_listings', icon: '🚀', url: '/dashboard/seller/promote' },
   { id: 'view_reviews', label: 'qa_view_reviews', icon: '⭐', url: '/dashboard/seller/reviews' },
+  { id: 'view_customers', label: 'qa_view_customers', icon: '👥', url: '/dashboard/seller/customers' },
   { id: 'download_reports', label: 'qa_download_reports', icon: '📥', url: '/dashboard/seller/reports' },
 ] as const;
 

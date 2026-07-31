@@ -14,7 +14,7 @@ import { loginSchema, type LoginInput } from '../../lib/validation';
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') ?? '/admin dashboard';
+  const redirect = searchParams.get('redirect') ?? '/dashboard';
   const showResetSuccess = searchParams.get('reset') === 'success';
 
   const { register, handleSubmit, formState: { errors }, setFocus } = useForm<LoginInput>({
@@ -32,10 +32,12 @@ function LoginForm() {
   }, [setFocus]);
 
   async function onSubmit(data: LoginInput) {
+    console.log('=== LOGIN SUBMIT ===', data)
     setError(null);
     setIsSubmitting(true);
     try {
       const res = await clientLogin(data.email, data.password);
+      console.log('=== LOGIN SUCCESS ===', res)
       setUser(res.user);
       
       // Role-based redirect
@@ -43,7 +45,7 @@ function LoginForm() {
       if (redirect === '/dashboard') {
         // If default redirect, determine based on role
         if (res.user.role === 'seller') {
-          targetRedirect = '/dashboard/seller';
+          targetRedirect = '/seller/dashboard';
         } else if (res.user.role === 'buyer') {
           targetRedirect = '/dashboard/custom-orders';
         } else {

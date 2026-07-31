@@ -15,6 +15,7 @@ import {
   type SellerListing,
   type SellerListingsResponse,
 } from '../lib/sellerApi';
+import { apiGet } from '../lib/api';
 
 // ─── Query hooks ─────────────────────────────────────────────────────────────
 
@@ -192,6 +193,41 @@ export function useImageUpload() {
   }, []);
 
   return { uploadImage, isUploading, uploadError, clearError: () => { setUploadError(null); } };
+}
+
+// ─── Customers hook ─────────────────────────────────────────────────────────────
+
+interface UseSellerCustomersParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+}
+
+interface CustomersResponse {
+  data: any[];
+  meta: {
+    totalPages: number;
+    currentPage: number;
+    total: number;
+  };
+}
+
+export function useSellerCustomers(userId: string, params?: UseSellerCustomersParams) {
+  return useQuery<CustomersResponse>({
+    queryKey: ['seller-customers', userId, params],
+    queryFn: async () => {
+      const queryParams: Record<string, string | number | undefined> = {
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 20,
+      };
+      if (params?.search) queryParams.search = params.search;
+      if (params?.sortBy) queryParams.sortBy = params.sortBy;
+      return apiGet(`/api/seller/customers`, queryParams);
+    },
+    keepPreviousData: true,
+    enabled: !!userId,
+  });
 }
 
 export type { UseMyListingsParams };

@@ -13,10 +13,10 @@ export default function PostSimilarAdButton({ categorySlug, className }: PostSim
   const router = useRouter()
 
   const handleClick = () => {
-    // Navigate to create listing page, optionally pre-fill category
+    // Navigate to catalog page, optionally pre-fill category
     const url = categorySlug 
-      ? `/dashboard/seller/create?category=${categorySlug}`
-      : '/dashboard/seller/create'
+      ? `/seller/catalog?category=${categorySlug}`
+      : '/seller/catalog'
     router.push(url)
   }
 
