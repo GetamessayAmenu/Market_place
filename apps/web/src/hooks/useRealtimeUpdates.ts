@@ -105,6 +105,17 @@ export function useRealtimeUpdates({ sellerId, enabled = true }: UseRealtimeUpda
           void qc.invalidateQueries({ queryKey: ['dashboard-kpis', sellerId] });
           void qc.invalidateQueries({ queryKey: ['inventory-alerts', sellerId] });
           void qc.invalidateQueries({ queryKey: ['notifications', sellerId] });
+          void qc.invalidateQueries({ queryKey: ['seller-listings', sellerId] });
+        });
+
+        socket.on('listing:moderated', (data: { listingId: string; status: string; reason?: string }) => {
+          void qc.invalidateQueries({ queryKey: ['dashboard-kpis', sellerId] });
+          void qc.invalidateQueries({ queryKey: ['notifications', sellerId] });
+          void qc.invalidateQueries({ queryKey: ['seller-listings', sellerId] });
+          // Trigger toast notification for the seller
+          if (typeof window !== 'undefined' && (window as any).__listingModerationCallback) {
+            (window as any).__listingModerationCallback(data);
+          }
         });
 
         socket.on('notification', () => {

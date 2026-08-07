@@ -16,11 +16,30 @@ import {
   MaxLength,
   Min,
   MinLength,
+  Validate,
   ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
 } from 'class-validator';
 
 import { ContactOptionsDto } from './contact-options.dto';
 import { ListingImageInputDto } from './listing-image-input.dto';
+
+@ValidatorConstraint({ name: 'customDesignValidation', async: false })
+export class CustomDesignValidation implements ValidatorConstraintInterface {
+  validate(_value: any, args: ValidationArguments) {
+    const object = args.object as any;
+    if (object.supportsCustomDesign === true) {
+      return object.estimatedProductionDays !== undefined && object.estimatedProductionDays > 0;
+    }
+    return true;
+  }
+
+  defaultMessage(_args: ValidationArguments) {
+    return 'estimatedProductionDays is required when supportsCustomDesign is true';
+  }
+}
 
 export class CreateListingDto {
   @IsString()
@@ -93,6 +112,32 @@ export class CreateListingDto {
   customOrderAvailable?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  supportsReadyMade?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  supportsCustomDesign?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(99_999_999.99)
+  startingCustomPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  estimatedProductionDays?: number;
+
+  @IsOptional()
+  @IsObject()
+  customizationOptions?: Record<string, unknown>;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
@@ -116,4 +161,7 @@ export class CreateListingDto {
   @ValidateNested({ each: true })
   @Type(() => ListingImageInputDto)
   images!: ListingImageInputDto[];
+
+  @Validate(CustomDesignValidation)
+  classValidatorCustomDesign?: any;
 }

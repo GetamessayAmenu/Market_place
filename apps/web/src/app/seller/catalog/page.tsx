@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Card, CardContent, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Badge } from '@marketplace/ui';
 import Link from 'next/link';
 import useAuth from '../../../hooks/useAuth';
@@ -15,10 +15,12 @@ interface Listing {
   title: string;
   price: number;
   status: 'in_stock' | 'rented_out' | 'out_of_stock';
+  moderationStatus: 'draft' | 'pending_review' | 'active' | 'rejected' | 'archived';
   businessModels: ('sale' | 'rental' | 'custom')[];
   primaryImageUrl?: string;
   city?: string;
   condition: string;
+  rejectedReason?: string | null;
 }
 
 interface BlackoutDate {
@@ -57,6 +59,53 @@ function StockStatusBadge({ status }: { status: Listing['status'] }) {
   };
   const { variant, label } = variants[status];
   return <Badge variant={variant}>{label}</Badge>;
+}
+
+function ModerationStatusBadge({ status }: { status: Listing['moderationStatus'] }) {
+  const config = {
+    draft: {
+      color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      label: 'Draft',
+      tooltip: 'Listing is saved as draft and not submitted for review',
+    },
+    pending_review: {
+      color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      label: 'Pending Approval',
+      tooltip: 'Under review by platform moderators before going live',
+    },
+    active: {
+      color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      label: 'Live / Approved',
+      tooltip: 'Listing is approved and publicly visible',
+    },
+    rejected: {
+      color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      label: 'Rejected / Changes Requested',
+      tooltip: 'Listing was rejected or requires changes. Click to view feedback.',
+    },
+    archived: {
+      color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      label: 'Archived',
+      tooltip: 'Listing has been archived and is not visible',
+    },
+  };
+
+  const { color, label, tooltip } = config[status];
+
+  return (
+    <div className="group relative inline-block">
+      <span className={`px-2 py-1 rounded text-xs font-medium ${color}`}>
+        {status === 'pending_review' && '🟡 '}
+        {status === 'active' && '🟢 '}
+        {status === 'rejected' && '🔴 '}
+        {label}
+      </span>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+        {tooltip}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </div>
+    </div>
+  );
 }
 
 function BusinessModelBadges({ models }: { models: Listing['businessModels'] }) {
@@ -175,6 +224,39 @@ export default function CatalogPage() {
   const user = useAuth((s) => s.user);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'rented_out' | 'out_of_stock'>('all');
+  const [feedbackModal, setFeedbackModal] = useState<{ listing: Listing | null }>({ listing: null });
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Real-time moderation updates via Socket.IO
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Set up callback for moderation events
+    (window as any).__listingModerationCallback = (data: { listingId: string; status: string; reason?: string }) => {
+      const messages = {
+        active: `Your listing has been approved and is now live!`,
+        rejected: `Your listing was rejected. ${data.reason || 'Please check the feedback for details.'}`,
+        pending_review: `Changes requested for your listing. ${data.reason || 'Please review the feedback.'}`,
+      };
+      const types = {
+        active: 'success' as const,
+        rejected: 'error' as const,
+        pending_review: 'info' as const,
+      };
+
+      setToast({
+        message: messages[data.status as keyof typeof messages] || 'Listing status updated',
+        type: types[data.status as keyof typeof types] || 'info',
+      });
+
+      // Auto-hide toast after 5 seconds
+      setTimeout(() => setToast(null), 5000);
+    };
+
+    return () => {
+      delete (window as any).__listingModerationCallback;
+    };
+  }, [user?.id]);
 
   // Mock data - TODO: Replace with actual API calls using useMyListings hook
   const listings: Listing[] = [
@@ -183,6 +265,7 @@ export default function CatalogPage() {
       title: 'Traditional Habesha Kemis with Tilf Embroidery',
       price: 3500,
       status: 'in_stock',
+      moderationStatus: 'active',
       businessModels: ['sale', 'custom'],
       city: 'Addis Ababa',
       condition: 'new',
@@ -192,6 +275,7 @@ export default function CatalogPage() {
       title: 'Ethiopian Gabi - White Cotton',
       price: 800,
       status: 'rented_out',
+      moderationStatus: 'pending_review',
       businessModels: ['sale', 'rental'],
       city: 'Addis Ababa',
       condition: 'excellent',
@@ -201,15 +285,18 @@ export default function CatalogPage() {
       title: 'Modern Dress with Ethiopian Patterns',
       price: 1200,
       status: 'in_stock',
+      moderationStatus: 'rejected',
       businessModels: ['sale'],
       city: 'Bole',
       condition: 'new',
+      rejectedReason: 'Photos are unclear. Please provide better quality images showing the fabric details.',
     },
     {
       id: '4',
       title: 'Custom Netela - Handwoven',
       price: 450,
       status: 'out_of_stock',
+      moderationStatus: 'pending_review',
       businessModels: ['sale', 'custom'],
       city: 'Shiro Meda',
       condition: 'good',
@@ -280,7 +367,8 @@ export default function CatalogPage() {
                 <TableHead>Listing</TableHead>
                 <TableHead>Business Models</TableHead>
                 <TableHead>Price (ETB)</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Moderation Status</TableHead>
+                <TableHead>Stock Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -297,6 +385,14 @@ export default function CatalogPage() {
                     <BusinessModelBadges models={listing.businessModels} />
                   </TableCell>
                   <TableCell className="font-medium">{listing.price.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => listing.moderationStatus === 'rejected' && setFeedbackModal({ listing })}
+                      className="cursor-pointer"
+                    >
+                      <ModerationStatusBadge status={listing.moderationStatus} />
+                    </button>
+                  </TableCell>
                   <TableCell>
                     <StockStatusBadge status={listing.status} />
                   </TableCell>
@@ -342,6 +438,79 @@ export default function CatalogPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Feedback Modal for Rejected Listings */}
+      {feedbackModal.listing && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Moderation Feedback</h3>
+              <button
+                onClick={() => setFeedbackModal({ listing: null })}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Listing</p>
+                <p className="text-sm text-muted-foreground">{feedbackModal.listing.title}</p>
+              </div>
+              <div className="border border-destructive/20 bg-destructive/5 rounded-lg p-4">
+                <p className="text-sm font-semibold text-destructive mb-2">Admin Feedback</p>
+                <p className="text-sm text-foreground">{feedbackModal.listing.rejectedReason || 'No feedback provided.'}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Please make the requested changes and resubmit your listing for review.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setFeedbackModal({ listing: null })}
+              >
+                Close
+              </Button>
+              <Link href={`/seller/catalog/${feedbackModal.listing.id}/edit`}>
+                <Button onClick={() => setFeedbackModal({ listing: null })}>
+                  Edit & Resubmit
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification for Real-time Updates */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right">
+          <div
+            className={`px-4 py-3 rounded-lg shadow-lg border ${
+              toast.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
+                : toast.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
+                : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span>
+                {toast.type === 'success' && '✓'}
+                {toast.type === 'error' && '✕'}
+                {toast.type === 'info' && 'ℹ'}
+              </span>
+              <p className="text-sm font-medium">{toast.message}</p>
+              <button
+                onClick={() => setToast(null)}
+                className="ml-2 text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -15,11 +15,12 @@ export class HeroBannersController {
 
   @Get()
   findAll(@Query() query: any) {
+    const take = query.limit ? Number(query.limit) : 20;
     return this.heroBannersService.findAll({
-      where: query.status ? { status: query.status } : undefined,
+      ...(query.status ? { where: { status: query.status } } : {}),
       orderBy: { sortOrder: 'asc' },
       skip: query.page ? (Number(query.page) - 1) * (query.limit || 20) : 0,
-      take: query.limit ? Number(query.limit) : 20,
+      take,
     });
   }
 

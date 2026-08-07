@@ -6,6 +6,7 @@ export const QUEUE_NAMES = {
   MODERATION: 'moderation',
   CMS_SCHEDULING: 'cms-scheduling',
   RENTAL_REMINDERS: 'rental-reminders',
+  RENTAL_EXPIRATION: 'rental-expiration',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

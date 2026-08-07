@@ -1,375 +1,268 @@
 "use client"
-import { Button, Checkbox, cn } from '@marketplace/ui'
-import React, { useCallback, useMemo, useState } from 'react'
+import { Button, FormInput, FormSelect, FormTextarea, Alert, Spinner } from '@marketplace/ui'
+import React, { useState } from 'react'
 
-import DeliveryEstimate from './DeliveryEstimate'
-import PriceEstimator from './PriceEstimator'
+import { useAuth } from '../../hooks/useAuth'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface MeasurementsData {
-  chest: string
-  waist: string
-  hips: string
-  shoulder: string
-  sleeve: string
-  length: string
-  unit: 'cm' | 'in'
-}
-
-export interface CustomOrderFormData {
-  measurements: MeasurementsData
-  fabricChoice: string
-  colorChoice: string
-  designNotes: string
-  referenceImages: string[]
-  embroidery: boolean
-  customPattern: boolean
-  fitAdjustment: boolean
-}
-
-export interface CustomOrderFormProps {
+interface CustomOrderFormProps {
   listingId: string
-  basePrice: number
-  estimatedDays: number
-  currency?: string
-  onSubmit: (data: CustomOrderFormData) => void
-  isSubmitting?: boolean
-  className?: string
+  sellerId: string
+  startingPrice?: number | null
+  estimatedDays?: number | null
+  customizationOptions?: {
+    requiresMeasurements: boolean
+    fabricTypes: string[]
+    colors: string[]
+    embroideryTypes: string[]
+    customNotesAllowed: boolean
+  }
+  onClose: () => void
+  onSuccess: () => void
 }
-
-const FABRIC_OPTIONS = ['Cotton', 'Silk', 'Linen', 'Chiffon', 'Satin', 'Velvet', 'Habesha Kemis Fabric', 'Tibeb']
-const COLOR_OPTIONS = [
-  { value: 'White', hex: '#FFFFFF' },
-  { value: 'Black', hex: '#000000' },
-  { value: 'Red', hex: '#DC2626' },
-  { value: 'Blue', hex: '#2563EB' },
-  { value: 'Green', hex: '#16A34A' },
-  { value: 'Gold', hex: '#D4AF37' },
-  { value: 'Burgundy', hex: '#800020' },
-  { value: 'Ivory', hex: '#FFFFF0' },
-  { value: 'Navy', hex: '#1E3A5F' },
-  { value: 'Custom', hex: '#8B5CF6' },
-]
-
-const STEPS = ['Measurements', 'Fabric & Color', 'Design', 'Review']
-
-const emptyMeasurements: MeasurementsData = {
-  chest: '', waist: '', hips: '', shoulder: '', sleeve: '', length: '', unit: 'cm',
-}
-
-// ─── Step components ──────────────────────────────────────────────────────────
-
-function MeasurementsStep({
-  measurements,
-  onChange,
-}: {
-  measurements: MeasurementsData
-  onChange: (m: MeasurementsData) => void
-}) {
-  const fields = ['chest', 'waist', 'hips', 'shoulder', 'sleeve', 'length'] as const
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-lg font-semibold text-foreground">Your Measurements</h3>
-        <button
-          type="button"
-          onClick={() => { onChange({ ...measurements, unit: measurements.unit === 'cm' ? 'in' : 'cm' }) }}
-          className="text-xs font-medium text-brand-gold hover:underline"
-        >
-          Switch to {measurements.unit === 'cm' ? 'inches' : 'cm'}
-        </button>
-      </div>
-      <p className="text-sm text-muted-foreground">Enter your body measurements in {measurements.unit}.</p>
-      <div className="grid grid-cols-2 gap-3">
-        {fields.map((field) => (
-          <div key={field}>
-            <label htmlFor={`m-${field}`} className="mb-1 block text-xs font-medium capitalize text-muted-foreground">
-              {field} ({measurements.unit})
-            </label>
-            <input
-              id={`m-${field}`}
-              type="number"
-              min="0"
-              max="200"
-              step="0.5"
-              value={measurements[field]}
-              onChange={(e) => { onChange({ ...measurements, [field]: e.target.value }) }}
-              placeholder="0"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function FabricColorStep({
-  fabricChoice,
-  colorChoice,
-  onFabricChange,
-  onColorChange,
-}: {
-  fabricChoice: string
-  colorChoice: string
-  onFabricChange: (v: string) => void
-  onColorChange: (v: string) => void
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="font-display text-lg font-semibold text-foreground mb-3">Fabric</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {FABRIC_OPTIONS.map((fabric) => (
-            <button
-              key={fabric}
-              type="button"
-              onClick={() => { onFabricChange(fabric) }}
-              className={cn(
-                'rounded-lg border px-3 py-2 text-sm transition-colors',
-                fabricChoice === fabric
-                  ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-medium'
-                  : 'border-input bg-background text-muted-foreground hover:border-foreground/30'
-              )}
-            >
-              {fabric}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="font-display text-lg font-semibold text-foreground mb-3">Color</h3>
-        <div className="flex flex-wrap gap-2">
-          {COLOR_OPTIONS.map((color) => (
-            <button
-              key={color.value}
-              type="button"
-              onClick={() => { onColorChange(color.value) }}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors',
-                colorChoice === color.value
-                  ? 'border-brand-gold bg-brand-gold/5 font-medium'
-                  : 'border-transparent bg-muted/50 hover:bg-muted'
-              )}
-            >
-              <span
-                className="h-4 w-4 rounded-full ring-1 ring-inset ring-border"
-                style={{ backgroundColor: color.hex }}
-                aria-hidden="true"
-              />
-              {color.value}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DesignStep({
-  designNotes,
-  embroidery,
-  customPattern,
-  fitAdjustment,
-  onNotesChange,
-  onEmbroideryChange,
-  onCustomPatternChange,
-  onFitAdjustmentChange,
-}: {
-  designNotes: string
-  embroidery: boolean
-  customPattern: boolean
-  fitAdjustment: boolean
-  onNotesChange: (v: string) => void
-  onEmbroideryChange: (v: boolean) => void
-  onCustomPatternChange: (v: boolean) => void
-  onFitAdjustmentChange: (v: boolean) => void
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="font-display text-lg font-semibold text-foreground mb-3">Customization Options</h3>
-        <div className="space-y-3">
-          <Checkbox label="Embroidery (Tibeb)" checked={embroidery} onChange={(e) => { onEmbroideryChange(e.target.checked) }} />
-          <Checkbox label="Custom pattern/design" checked={customPattern} onChange={(e) => { onCustomPatternChange(e.target.checked) }} />
-          <Checkbox label="Fit adjustments (e.g., longer hem, wider sleeves)" checked={fitAdjustment} onChange={(e) => { onFitAdjustmentChange(e.target.checked) }} />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="design-notes" className="mb-1 block text-sm font-medium text-foreground">Design Notes</label>
-        <textarea
-          id="design-notes"
-          rows={4}
-          value={designNotes}
-          onChange={(e) => { onNotesChange(e.target.value) }}
-          placeholder="Describe your vision... special details, occasion, inspiration images"
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50 resize-none"
-        />
-      </div>
-    </div>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CustomOrderForm({
-  basePrice,
+  listingId,
+  sellerId,
+  startingPrice,
   estimatedDays,
-  currency = 'ETB',
-  onSubmit,
-  isSubmitting,
-  className,
+  customizationOptions,
+  onClose,
+  onSuccess,
 }: CustomOrderFormProps) {
-  const [step, setStep] = useState(0)
-  const [measurements, setMeasurements] = useState<MeasurementsData>(emptyMeasurements)
-  const [fabricChoice, setFabricChoice] = useState('')
-  const [colorChoice, setColorChoice] = useState('')
-  const [designNotes, setDesignNotes] = useState('')
-  const [embroidery, setEmbroidery] = useState(false)
-  const [customPattern, setCustomPattern] = useState(false)
-  const [fitAdjustment, setFitAdjustment] = useState(false)
+  const { user } = useAuth()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const [formData, setFormData] = useState({
+    selectedSize: '',
+    measurements: {
+      bust: '',
+      waist: '',
+      hips: '',
+      height: '',
+      shoulderToHem: '',
+    },
+    selectedFabric: '',
+    selectedColor: '',
+    embroideryNotes: '',
+    buyerNotes: '',
+    inspirationImages: [] as string[],
+  })
 
-  const priceAdjustments = useMemo(() => {
-    const adj: { label: string; amount: number }[] = []
-    if (embroidery) adj.push({ label: 'Embroidery (Tibeb)', amount: Math.round(basePrice * 0.2) })
-    if (customPattern) adj.push({ label: 'Custom pattern', amount: Math.round(basePrice * 0.15) })
-    if (fitAdjustment) adj.push({ label: 'Fit adjustment', amount: Math.round(basePrice * 0.05) })
-    return adj
-  }, [basePrice, embroidery, customPattern, fitAdjustment])
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
 
-  const canProceed = useCallback(() => {
-    if (step === 0) {
-      return Object.entries(measurements).some(([k, v]) => k !== 'unit' && v !== '')
+  const handleMeasurementChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      measurements: { ...prev.measurements, [field]: value }
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      // Validate required fields based on customization options
+      if (customizationOptions?.requiresMeasurements) {
+        const measurements = formData.measurements
+        if (!measurements.bust || !measurements.waist || !measurements.hips) {
+          throw new Error('Please provide required measurements')
+        }
+      }
+
+      // Prepare submission data
+      const submissionData = {
+        listingId,
+        ...(formData.selectedSize ? { selectedSize: formData.selectedSize } : {}),
+        ...(customizationOptions?.requiresMeasurements ? { measurements: formData.measurements } : {}),
+        ...(formData.selectedFabric ? { selectedFabric: formData.selectedFabric } : {}),
+        ...(formData.selectedColor ? { selectedColor: formData.selectedColor } : {}),
+        ...(formData.embroideryNotes ? { embroideryNotes: formData.embroideryNotes } : {}),
+        ...(formData.buyerNotes ? { buyerNotes: formData.buyerNotes } : {}),
+        ...(formData.inspirationImages.length > 0 ? { inspirationImages: formData.inspirationImages } : {}),
+      }
+
+      // API call to create custom order
+      const response = await fetch('/api/custom-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to submit custom order' }))
+        throw new Error(errorData.message || 'Failed to submit custom order')
+      }
+
+      onSuccess()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit custom order')
+    } finally {
+      setIsSubmitting(false)
     }
-    return true
-  }, [step, measurements])
-
-  const handleSubmit = () => {
-    onSubmit({
-      measurements,
-      fabricChoice,
-      colorChoice,
-      designNotes,
-      referenceImages: [],
-      embroidery,
-      customPattern,
-      fitAdjustment,
-    })
   }
 
   return (
-    <div className={cn('rounded-xl border bg-card p-6', className)}>
-      {/* Step indicator */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors',
-                  i < step && 'bg-brand-gold text-brand-gold-foreground',
-                  i === step && 'bg-brand-gold text-brand-gold-foreground ring-2 ring-brand-gold/30',
-                  i > step && 'bg-muted text-muted-foreground'
-                )}
-              >
-                {i < step ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  String(i + 1)
-                )}
-              </div>
-              <span className={cn('text-xs hidden sm:inline', i <= step ? 'text-foreground font-medium' : 'text-muted-foreground')}>
-                {label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className={cn('hidden sm:block w-8 h-px', i < step ? 'bg-brand-gold' : 'bg-border')} />
-              )}
-            </div>
-          ))}
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Custom Order Request</h3>
+        <button
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
-      {/* Step content */}
-      <div className="min-h-[300px]">
-        {step === 0 && (
-          <MeasurementsStep measurements={measurements} onChange={setMeasurements} />
-        )}
-        {step === 1 && (
-          <FabricColorStep
-            fabricChoice={fabricChoice}
-            colorChoice={colorChoice}
-            onFabricChange={setFabricChoice}
-            onColorChange={setColorChoice}
-          />
-        )}
-        {step === 2 && (
-          <DesignStep
-            designNotes={designNotes}
-            embroidery={embroidery}
-            customPattern={customPattern}
-            fitAdjustment={fitAdjustment}
-            onNotesChange={setDesignNotes}
-            onEmbroideryChange={setEmbroidery}
-            onCustomPatternChange={setCustomPattern}
-            onFitAdjustmentChange={setFitAdjustment}
-          />
-        )}
-        {step === 3 && (
-          <div className="space-y-4">
-            <h3 className="font-display text-lg font-semibold text-foreground">Review Your Order</h3>
+      {error && <Alert variant="error" onDismiss={() => setError(null)}>{error}</Alert>}
 
-            <div className="rounded-lg border bg-background p-4 space-y-3 text-sm">
-              {fabricChoice && <div className="flex justify-between"><span className="text-muted-foreground">Fabric</span><span>{fabricChoice}</span></div>}
-              {colorChoice && <div className="flex justify-between"><span className="text-muted-foreground">Color</span><span>{colorChoice}</span></div>}
-              {embroidery && <div className="flex justify-between"><span className="text-muted-foreground">Embroidery</span><span>Yes</span></div>}
-              {customPattern && <div className="flex justify-between"><span className="text-muted-foreground">Custom pattern</span><span>Yes</span></div>}
-              {fitAdjustment && <div className="flex justify-between"><span className="text-muted-foreground">Fit adjustment</span><span>Yes</span></div>}
-              {designNotes && (
-                <div>
-                  <span className="text-muted-foreground">Notes:</span>
-                  <p className="mt-1 whitespace-pre-wrap text-foreground/90">{designNotes}</p>
-                </div>
-              )}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Size Selection */}
+        <FormInput
+          label="Size (if applicable)"
+          placeholder="e.g., M, L, XL"
+          value={formData.selectedSize}
+          onChange={(e) => handleInputChange('selectedSize', e.target.value)}
+        />
+
+        {/* Measurements - shown if required */}
+        {customizationOptions?.requiresMeasurements && (
+          <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+            <h4 className="text-sm font-medium">Body Measurements (cm)</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormInput
+                label="Bust"
+                type="number"
+                placeholder="90"
+                value={formData.measurements.bust}
+                onChange={(e) => handleMeasurementChange('bust', e.target.value)}
+                required
+              />
+              <FormInput
+                label="Waist"
+                type="number"
+                placeholder="70"
+                value={formData.measurements.waist}
+                onChange={(e) => handleMeasurementChange('waist', e.target.value)}
+                required
+              />
+              <FormInput
+                label="Hips"
+                type="number"
+                placeholder="95"
+                value={formData.measurements.hips}
+                onChange={(e) => handleMeasurementChange('hips', e.target.value)}
+                required
+              />
+              <FormInput
+                label="Height"
+                type="number"
+                placeholder="170"
+                value={formData.measurements.height}
+                onChange={(e) => handleMeasurementChange('height', e.target.value)}
+              />
+              <FormInput
+                label="Shoulder to Hem"
+                type="number"
+                placeholder="120"
+                value={formData.measurements.shoulderToHem}
+                onChange={(e) => handleMeasurementChange('shoulderToHem', e.target.value)}
+              />
             </div>
-
-            <PriceEstimator basePrice={basePrice} adjustments={priceAdjustments} currency={currency} />
-            <DeliveryEstimate productionDays={estimatedDays} />
           </div>
         )}
-      </div>
 
-      {/* Navigation buttons */}
-      <div className="mt-6 flex items-center justify-between border-t border-border/50 pt-4">
-        <Button
-          variant="outline"
-          onClick={() => { setStep(Math.max(0, step - 1)) }}
-          {...(step === 0 ? { disabled: true } : {})}
-        >
-          Back
-        </Button>
-
-        {step < STEPS.length - 1 ? (
-          <Button
-            onClick={() => { setStep(step + 1) }}
-            {...(!canProceed() ? { disabled: true } : {})}
+        {/* Fabric Selection */}
+        {customizationOptions?.fabricTypes && customizationOptions.fabricTypes.length > 0 && (
+          <FormSelect
+            label="Fabric Preference"
+            value={formData.selectedFabric}
+            onChange={(e) => handleInputChange('selectedFabric', e.target.value)}
           >
-            Next
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            {...(isSubmitting ? { disabled: true } : {})}
-            className="bg-brand-wine hover:bg-brand-wine/90"
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Custom Order'}
-          </Button>
+            <option value="">Select fabric type</option>
+            {customizationOptions.fabricTypes.map(fabric => (
+              <option key={fabric} value={fabric}>{fabric}</option>
+            ))}
+          </FormSelect>
         )}
-      </div>
+
+        {/* Color Selection */}
+        {customizationOptions?.colors && customizationOptions.colors.length > 0 && (
+          <FormSelect
+            label="Color Preference"
+            value={formData.selectedColor}
+            onChange={(e) => handleInputChange('selectedColor', e.target.value)}
+          >
+            <option value="">Select color</option>
+            {customizationOptions.colors.map(color => (
+              <option key={color} value={color}>{color}</option>
+            ))}
+          </FormSelect>
+        )}
+
+        {/* Embroidery Notes */}
+        {customizationOptions?.embroideryTypes && customizationOptions.embroideryTypes.length > 0 && (
+          <FormTextarea
+            label="Embroidery/Tilf Style Notes"
+            placeholder="Describe your preferred embroidery style..."
+            rows={3}
+            value={formData.embroideryNotes}
+            onChange={(e) => handleInputChange('embroideryNotes', e.target.value)}
+          />
+        )}
+
+        {/* Custom Notes */}
+        {customizationOptions?.customNotesAllowed && (
+          <FormTextarea
+            label="Additional Notes"
+            placeholder="Any other customization requests..."
+            rows={3}
+            value={formData.buyerNotes}
+            onChange={(e) => handleInputChange('buyerNotes', e.target.value)}
+          />
+        )}
+
+        {/* Price Info */}
+        {startingPrice && (
+          <div className="p-3 bg-brand-wine/5 border border-brand-wine/20 rounded-lg">
+            <p className="text-sm">
+              <span className="font-medium">Starting Price:</span> {startingPrice.toLocaleString()} ETB
+            </p>
+            {estimatedDays && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Estimated production time: {estimatedDays} days
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 bg-brand-wine text-white hover:bg-brand-wine/90"
+          >
+            {isSubmitting ? <><Spinner size="sm" /> Submitting...</> : 'Send Custom Order Request'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }

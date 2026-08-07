@@ -31,7 +31,9 @@ export class HeroBannersRepository {
           },
         },
       }),
-      this.prisma.heroBanner.count({ where: args.where }),
+      args.where
+        ? this.prisma.heroBanner.count({ where: args.where })
+        : this.prisma.heroBanner.count(),
     ]);
 
     return { items, total };
@@ -75,7 +77,9 @@ export class HeroBannersRepository {
   }
 
   async count(where?: Prisma.HeroBannerWhereInput) {
-    return this.prisma.heroBanner.count({ where });
+    return where
+      ? this.prisma.heroBanner.count({ where })
+      : this.prisma.heroBanner.count();
   }
 
   // Get active banners for current date (considering holiday themes)

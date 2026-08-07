@@ -22,6 +22,10 @@ export interface ListingCardProps {
   originalPrice?: number;
   discount?: number;
   className?: string;
+  // Unified custom design fields
+  supportsReadyMade?: boolean;
+  supportsCustomDesign?: boolean;
+  startingCustomPrice?: number | null;
 }
 
 const typeLabels: Record<ListingType, string> = {
@@ -46,8 +50,12 @@ export default function ListingCard({
   originalPrice,
   discount,
   className,
+  supportsReadyMade = true,
+  supportsCustomDesign = false,
+  startingCustomPrice,
 }: ListingCardProps) {
   const isSold = status === 'sold-out';
+  const showBadges = supportsReadyMade || supportsCustomDesign;
 
   return (
     <Link href={'/listings/' + id} className="group block" aria-label={title}>
@@ -117,6 +125,22 @@ export default function ListingCard({
               <Badge variant={status}>
                 {status === 'new-arrival' ? 'New' : 'Featured'}
               </Badge>
+            </div>
+          )}
+
+          {/* Unified capability badges - show below status badge or at top-left if no status */}
+          {showBadges && !isSold && !status && (
+            <div className="absolute left-2 top-2 flex flex-col gap-1">
+              {supportsReadyMade && (
+                <Badge variant="secondary" className="text-xs">
+                  Ready-made
+                </Badge>
+              )}
+              {supportsCustomDesign && (
+                <Badge variant="outline" className="text-xs bg-brand-gold/10 border-brand-gold/30 text-brand-gold">
+                  Custom Design
+                </Badge>
+              )}
             </div>
           )}
 

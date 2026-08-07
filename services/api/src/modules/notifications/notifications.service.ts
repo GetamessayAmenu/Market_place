@@ -142,6 +142,32 @@ export class NotificationsService {
     );
   }
 
+  async createListingChangesRequestedNotification(
+    sellerId: string,
+    listingId: string,
+    listingTitle: string,
+    reason?: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'listing_rejected',
+      title: 'Changes requested',
+      body: reason
+        ? `Your listing "${listingTitle}" requires changes: ${reason}`
+        : `Your listing "${listingTitle}" requires changes before approval`,
+      data: {
+        listingId,
+        listingTitle,
+        reason,
+      },
+    });
+
+    this.eventEmitter.emit(
+      NOTIFICATION_DOMAIN_EVENTS.LISTING_REJECTED,
+      new ListingRejectedEvent(sellerId, listingId, listingTitle, reason),
+    );
+  }
+
   async createListingFavoritedNotification(
     sellerId: string,
     listingId: string,
@@ -184,6 +210,47 @@ export class NotificationsService {
       NOTIFICATION_DOMAIN_EVENTS.SELLER_VERIFIED,
       new SellerVerifiedEvent(userId, verificationType),
     );
+  }
+
+  async createCustomNotification(
+    userId: string,
+    type: string,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: userId } },
+      type: type as any,
+      title,
+      body,
+      ...(data !== undefined ? { data } : {}),
+    });
+  }
+
+  async createNewOrderNotification(
+    sellerId: string,
+    orderId: string,
+    orderNumber: string,
+    listingTitle: string,
+    buyerName: string,
+    totalAmount: number,
+    currency: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'new_order' as any,
+      title: 'New order received',
+      body: `You have a new order for "${listingTitle}" - ${currency} ${totalAmount.toLocaleString()}`,
+      data: {
+        orderId,
+        orderNumber,
+        listingTitle,
+        buyerName,
+        totalAmount,
+        currency,
+      },
+    });
   }
 
   createSystemAnnouncement(
@@ -229,6 +296,123 @@ export class NotificationsService {
     this.eventEmitter.emit(
       NOTIFICATION_DOMAIN_EVENTS.REPORT_STATUS_UPDATED,
       new ReportStatusUpdatedEvent(reporterId, reportId, status, targetType),
+    );
+  }
+
+  async createOrderStatusUpdatedNotification(
+    userId: string,
+    orderId: string,
+    orderNumber: string,
+    status: string,
+    listingTitle: string,
+  ): Promise<void> {
+    const statusMessages: Record<string, string> = {
+      pending: 'Order placed successfully',
+      confirmed: 'Order confirmed by seller',
+      processing: 'Order is being processed',
+      shipped: 'Order has been shipped',
+      delivered: 'Order has been delivered',
+      cancelled: 'Order has been cancelled',
+      refunded: 'Order has been refunded',
+    };
+
+    const title = 'Order status updated';
+    const body = `Order ${orderNumber} for "${listingTitle}": ${statusMessages[status] || status}`;
+
+    await this.createCustomNotification(
+      userId,
+      'new_order',
+      title,
+      body,
+      {
+        orderId,
+        orderNumber,
+        status,
+        listingTitle,
+      },
+    );
+  }
+
+  async createCustomOrderStatusUpdatedNotification(
+    userId: string,
+    customOrderId: string,
+    status: string,
+    listingTitle: string,
+  ): Promise<void> {
+    const statusMessages: Record<string, string> = {
+      submitted: 'Custom order request submitted',
+      under_review: 'Custom order is under review',
+      confirmed: 'Custom order confirmed',
+      in_production: 'Custom order is in production',
+      shipped: 'Custom order has been shipped',
+      delivered: 'Custom order has been delivered',
+      cancelled: 'Custom order has been cancelled',
+    };
+
+    const title = 'Custom order status updated';
+    const body = `"${listingTitle}": ${statusMessages[status] || status}`;
+
+    await this.createCustomNotification(
+      userId,
+      'new_offer',
+      title,
+      body,
+      {
+        customOrderId,
+        status,
+        listingTitle,
+      },
+    );
+  }
+
+  async createRentalStatusUpdatedNotification(
+    userId: string,
+    rentalOrderId: string,
+    status: string,
+    listingTitle: string,
+  ): Promise<void> {
+    const statusMessages: Record<string, string> = {
+      requested: 'Rental request submitted',
+      confirmed: 'Rental confirmed',
+      active: 'Rental period started',
+      returned: 'Item returned',
+      completed: 'Rental completed',
+      cancelled: 'Rental cancelled',
+    };
+
+    const title = 'Rental status updated';
+    const body = `"${listingTitle}": ${statusMessages[status] || status}`;
+
+    await this.createCustomNotification(
+      userId,
+      'new_message',
+      title,
+      body,
+      {
+        rentalOrderId,
+        status,
+        listingTitle,
+      },
+    );
+  }
+
+  async createSellerStatusChangedNotification(
+    userId: string,
+    oldStatus: string,
+    newStatus: string,
+  ): Promise<void> {
+    const title = 'Account status changed';
+    const body = `Your account status has been changed from ${oldStatus} to ${newStatus}`;
+
+    await this.createCustomNotification(
+      userId,
+      'verification_update',
+      title,
+      body,
+      {
+        oldStatus,
+        newStatus,
+      },
     );
   }
 

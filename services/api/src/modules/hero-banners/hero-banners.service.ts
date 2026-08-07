@@ -21,9 +21,10 @@ export class HeroBannersService {
     take?: number;
   }) {
     const { items, total } = await this.repository.findMany(args);
+    const limit = args.take ?? 20;
     const skip = args.skip ?? 0;
-    const take = args.take ?? 20;
-    return toPaginatedResponse({ items, total, skip, take });
+    const page = Math.floor(skip / limit) + 1;
+    return toPaginatedResponse({ items, total, page, limit });
   }
 
   async findOne(id: string) {

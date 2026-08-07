@@ -53,6 +53,9 @@ export function toListingSearchDocument(
     status: listing.status,
     createdAt: listing.createdAt.getTime(),
     primaryImageUrl: primaryImage?.url ?? null,
+    supportsReadyMade: (listing as any).supportsReadyMade ?? true,
+    supportsCustomDesign: (listing as any).supportsCustomDesign ?? false,
+    startingCustomPrice: (listing as any).startingCustomPrice ? Number((listing as any).startingCustomPrice) : null,
   };
 }
 
@@ -78,5 +81,8 @@ export function documentToSearchHit(
     featured: doc.featured,
     createdAt: doc.createdAt,
     primaryImageUrl: doc.primaryImageUrl,
+    supportsReadyMade: doc.supportsReadyMade,
+    supportsCustomDesign: doc.supportsCustomDesign,
+    startingCustomPrice: doc.startingCustomPrice,
   };
 }

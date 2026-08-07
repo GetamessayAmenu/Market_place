@@ -30,7 +30,7 @@ export class UpdateCustomOrderStatusDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(99_999_999.99)
-  finalPrice?: number;
+  agreedPrice?: number;
 
   @IsOptional()
   @IsString()

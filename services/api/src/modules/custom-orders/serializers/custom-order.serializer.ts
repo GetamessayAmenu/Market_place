@@ -6,14 +6,14 @@ export interface SerializedCustomOrder {
   readonly buyerId: string;
   readonly sellerId: string;
   readonly status: string;
+  readonly selectedSize: string | null;
   readonly measurements: Record<string, unknown> | null;
-  readonly fabricChoice: string | null;
-  readonly colorChoice: string | null;
-  readonly designNotes: string | null;
-  readonly referenceImages: readonly string[];
-  readonly estimatedPrice: number | null;
-  readonly finalPrice: number | null;
-  readonly estimatedDays: number | null;
+  readonly selectedFabric: string | null;
+  readonly selectedColor: string | null;
+  readonly embroideryNotes: string | null;
+  readonly inspirationImages: readonly string[];
+  readonly buyerNotes: string | null;
+  readonly agreedPrice: number | null;
   readonly conversationId: string | null;
   readonly cancelledReason: string | null;
   readonly createdAt: string;
@@ -60,14 +60,14 @@ export function serializeCustomOrder(
     buyerId: order.buyerId,
     sellerId: order.sellerId,
     status: order.status,
+    selectedSize: order.selectedSize,
     measurements: parseJson(order.measurements),
-    fabricChoice: order.fabricChoice,
-    colorChoice: order.colorChoice,
-    designNotes: order.designNotes,
-    referenceImages: order.referenceImages,
-    estimatedPrice: decimalToNumber(order.estimatedPrice),
-    finalPrice: decimalToNumber(order.finalPrice),
-    estimatedDays: order.estimatedDays,
+    selectedFabric: order.selectedFabric,
+    selectedColor: order.selectedColor,
+    embroideryNotes: order.embroideryNotes,
+    inspirationImages: order.inspirationImages,
+    buyerNotes: order.buyerNotes,
+    agreedPrice: decimalToNumber(order.agreedPrice),
     conversationId: order.conversationId,
     cancelledReason: order.cancelledReason,
     createdAt: order.createdAt.toISOString(),

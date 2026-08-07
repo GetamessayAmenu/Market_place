@@ -20,6 +20,8 @@ export interface FilterValues {
   condition?: string;
   city?: string;
   sortBy?: string;
+  // Unified custom design filters
+  capabilityFilter?: 'ready-made' | 'custom-design' | 'both';
 }
 
 export interface FilterPanelProps {
@@ -196,6 +198,45 @@ export default function FilterPanel({
                 </Tag>
               );
             })}
+          </div>
+        </FilterSection>
+
+        {/* Capability Filter (Unified Custom Design) */}
+        <FilterSection title="Availability">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="capability"
+                value="both"
+                checked={values.capabilityFilter === 'both' || !values.capabilityFilter}
+                onChange={() => { updateValue('capabilityFilter', 'both'); }}
+                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
+              />
+              <span className="text-sm text-foreground">All Listings</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="capability"
+                value="ready-made"
+                checked={values.capabilityFilter === 'ready-made'}
+                onChange={() => { updateValue('capabilityFilter', 'ready-made'); }}
+                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
+              />
+              <span className="text-sm text-foreground">Ready-made Only</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="capability"
+                value="custom-design"
+                checked={values.capabilityFilter === 'custom-design'}
+                onChange={() => { updateValue('capabilityFilter', 'custom-design'); }}
+                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
+              />
+              <span className="text-sm text-foreground">Custom Design Available</span>
+            </label>
           </div>
         </FilterSection>
 

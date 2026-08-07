@@ -6,6 +6,10 @@ interface ServerGetOptions {
   cookieHeader?: string
 }
 
+interface ServerPostOptions {
+  cookieHeader?: string
+}
+
 export async function serverGet<T = unknown>(path: string, options?: ServerGetOptions) {
   let url = `${API_BASE}${path}`
 
@@ -40,4 +44,31 @@ export async function serverGet<T = unknown>(path: string, options?: ServerGetOp
   return body.data
 }
 
-export default { serverGet }
+export async function serverPost<T = unknown>(path: string, body: unknown, options?: ServerPostOptions) {
+  const url = `${API_BASE}${path}`
+  
+  const fetchOpts: RequestInit = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  }
+  
+  if (options?.cookieHeader) {
+    fetchOpts.headers = {
+      ...fetchOpts.headers,
+      Cookie: options.cookieHeader,
+    }
+  }
+  
+  const res = await fetch(url, fetchOpts)
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ message: 'Request failed' }))
+    throw new Error(errorBody.message || `Failed to POST ${path}: ${String(res.status)}`)
+  }
+  const responseBody = (await res.json()) as { data: T }
+  return responseBody.data
+}
+
+export default { serverGet, serverPost }

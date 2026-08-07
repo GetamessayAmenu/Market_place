@@ -21,6 +21,8 @@
     "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
+    "db:add-data": "tsx prisma/add-test-data.ts",
+    "db:test-integration": "tsx prisma/test-integration.ts",
     "db:studio": "prisma studio --schema=prisma/schema.prisma",
     "db:validate": "prisma validate --schema=prisma/schema.prisma",
     "db:format": "prisma format --schema=prisma/schema.prisma",

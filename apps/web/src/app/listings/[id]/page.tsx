@@ -68,6 +68,18 @@ interface ListingData {
   customOrderAvailable?: boolean
   rentalPricePerDay?: number | null
   rentalDeposit?: number | null
+  // Unified custom design fields
+  supportsReadyMade?: boolean
+  supportsCustomDesign?: boolean
+  startingCustomPrice?: number | null
+  estimatedProductionDays?: number | null
+  customizationOptions?: {
+    requiresMeasurements: boolean
+    fabricTypes: string[]
+    colors: string[]
+    embroideryTypes: string[]
+    customNotesAllowed: boolean
+  }
   createdAt: string
 }
 
@@ -258,6 +270,11 @@ export default async function ListingPage({ params }: Props) {
                 {...(listing.rentalPricePerDay !== undefined ? { rentalPricePerDay: listing.rentalPricePerDay ?? null } : { rentalPricePerDay: null })}
                 {...(listing.rentalDeposit !== undefined ? { rentalDeposit: listing.rentalDeposit ?? null } : { rentalDeposit: null })}
                 sellerId={listing.seller.id}
+                supportsReadyMade={listing.supportsReadyMade ?? true}
+                supportsCustomDesign={listing.supportsCustomDesign ?? false}
+                {...(listing.startingCustomPrice !== undefined ? { startingCustomPrice: listing.startingCustomPrice } : {})}
+                {...(listing.estimatedProductionDays !== undefined ? { estimatedProductionDays: listing.estimatedProductionDays } : {})}
+                {...(listing.customizationOptions !== undefined ? { customizationOptions: listing.customizationOptions } : {})}
               />
             )}
 
@@ -377,10 +394,10 @@ export default async function ListingPage({ params }: Props) {
                 seller={{
                   id: listing.seller.id,
                   name: listing.seller.displayName,
-                  avatarUrl: listing.seller.avatarUrl,
-                  emailVerifiedAt: listing.seller.emailVerifiedAt,
-                  phoneVerifiedAt: listing.seller.phoneVerifiedAt,
-                  createdAt: listing.seller.createdAt,
+                  avatarUrl: listing.seller.avatarUrl ?? null,
+                  emailVerifiedAt: listing.seller.emailVerifiedAt ?? null,
+                  phoneVerifiedAt: listing.seller.phoneVerifiedAt ?? null,
+                  ...(listing.seller.createdAt ? { createdAt: listing.seller.createdAt } : {}),
                 }}
                 responseTime="Typically replies within minutes"
               />

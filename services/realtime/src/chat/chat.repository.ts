@@ -185,4 +185,30 @@ export class ChatRepository {
   ): string {
     return conversation.buyerId === userId ? conversation.sellerId : conversation.buyerId;
   }
+
+  async findOrderByUser(orderId: string, userId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        OR: [{ buyerId: userId }, { sellerId: userId }],
+      },
+    }) as any;
+    
+    if (!order) return null;
+
+    // Get conversation separately if it exists
+    let conversation = null;
+    if (order.conversation_id) {
+      conversation = await this.prisma.conversation.findUnique({
+        where: { id: order.conversation_id },
+      });
+    }
+
+    return {
+      ...order,
+      conversation,
+      buyer: { id: order.buyerId, displayName: 'Buyer' },
+      seller: { id: order.sellerId, displayName: 'Seller' },
+    };
+  }
 }

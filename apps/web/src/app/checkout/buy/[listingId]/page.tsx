@@ -7,6 +7,7 @@ import Container from '../../../../components/Container'
 import BreadcrumbNav from '../../../../components/marketplace/BreadcrumbNav'
 import { useAuth } from '../../../../hooks/useAuth'
 import { serverGet } from '../../../../lib/serverApi'
+import { apiPost } from '../../../../lib/api'
 
 interface ListingData {
   id: string
@@ -57,18 +58,39 @@ export default function BuyCheckoutPage({ params }: Props) {
     void fetchListing()
   }, [listingId, user, router])
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!fullName || !phone || !address || !city) {
       setError('Please fill in all required fields')
       return
     }
     setIsSubmitting(true)
     setError(null)
-    // In a real implementation, this would call a checkout API
-    // For now, redirect to a success state
-    setTimeout(() => {
-      router.push(`/dashboard/orders?success=${listingId}`)
-    }, 1500)
+    
+    try {
+      const orderData = {
+        type: 'SALE' as const,
+        productId: listingId,
+        agreedPrice: listing.price,
+        shippingAddress: {
+          fullName,
+          phone,
+          address,
+          city,
+          notes: notes || undefined,
+        },
+      }
+
+      const result = await apiPost<{ id: string; orderNumber: string }>('/orders', orderData)
+      
+      // Redirect to orders page with success
+      router.push(`/dashboard/orders?success=${result.orderNumber}`)
+    } catch (err: any) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to place order. Please try again.'
+      setError(errorMessage)
+      console.error('Order creation error:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (loading) {

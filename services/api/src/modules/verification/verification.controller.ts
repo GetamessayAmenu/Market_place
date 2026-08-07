@@ -49,6 +49,26 @@ export class VerificationController {
     return this.verificationAdminService.review({ id: admin.id }, id, dto);
   }
 
+  /** Admin: get verification details with history */
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @Get('admin/verifications/:id/detail')
+  getVerificationDetail(@Param('id') id: string) {
+    return this.verificationAdminService.getVerificationDetail(id);
+  }
+
+  /** Admin: update verification status */
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'super_admin', 'moderator')
+  @Patch('admin/verifications/:id/status')
+  updateVerificationStatus(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: { status: string; action?: string; notes?: string },
+  ) {
+    return this.verificationAdminService.updateVerificationStatus({ id: admin.id }, id, dto);
+  }
+
   /** Admin: grant verified designer badge */
   @UseGuards(RolesGuard)
   @Roles('super_admin', 'moderator')

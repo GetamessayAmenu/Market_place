@@ -8,7 +8,7 @@ import {
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 
-import { NOTIFICATIONS_SERVER_EVENTS } from '../events.constants';
+import { NOTIFICATIONS_SERVER_EVENTS, userRoom } from '../events.constants';
 import { SocketAuthService } from '../websocket/socket-auth.service';
 import { SocketAuthMiddleware } from '../websocket/socket-auth.middleware';
 
@@ -110,6 +110,24 @@ export class NotificationsGateway
     } catch (error) {
       this.logger.error(
         `Failed to send read receipt to user ${userId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Broadcast listing moderation event to a specific seller
+   */
+  sendListingModeratedEvent(
+    sellerId: string,
+    data: { listingId: string; status: string; reason?: string },
+  ): void {
+    try {
+      const room = userRoom(sellerId);
+      this.server.to(room).emit(NOTIFICATIONS_SERVER_EVENTS.LISTING_MODERATED, data);
+      this.logger.log(`Sent listing moderated event to seller ${sellerId} for listing ${data.listingId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send listing moderated event to seller ${sellerId}: ${(error as Error).message}`,
       );
     }
   }

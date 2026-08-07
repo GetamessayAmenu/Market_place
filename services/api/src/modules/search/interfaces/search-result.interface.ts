@@ -17,6 +17,9 @@ export interface SearchListingHit {
   readonly featured: boolean;
   readonly createdAt: number;
   readonly primaryImageUrl: string | null;
+  readonly supportsReadyMade: boolean;
+  readonly supportsCustomDesign: boolean;
+  readonly startingCustomPrice: number | null;
 }
 
 export interface SearchSuggestionHit {

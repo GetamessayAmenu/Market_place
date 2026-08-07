@@ -19,8 +19,8 @@ export function useCategories() {
   return useQuery<{ success: boolean; data: Category[] }>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const res = await apiGet<{ success: boolean; data: Category[] }>('/categories')
-      return res
+      const res = await apiGet<Category[]>('/categories')
+      return { success: true, data: res }
     },
     staleTime: 5 * 60 * 1000,
   })

@@ -2,8 +2,8 @@ import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MaxLength } from 
 
 export class UpdateRentalOrderDto {
   @IsOptional()
-  @IsEnum(['REQUESTED', 'APPROVED', 'HANDOVER_PENDING', 'ACTIVE', 'RETURN_INITIATED', 'RETURNED_INSPECTED', 'COMPLETED', 'DISPUTED'])
-  status?: 'REQUESTED' | 'APPROVED' | 'HANDOVER_PENDING' | 'ACTIVE' | 'RETURN_INITIATED' | 'RETURNED_INSPECTED' | 'COMPLETED' | 'DISPUTED';
+  @IsEnum(['REQUESTED', 'APPROVED', 'HANDOVER_PENDING', 'ACTIVE', 'RETURN_INITIATED', 'RETURNED_PENDING_INSPECTION', 'COMPLETED', 'DECLINED', 'EXPIRED', 'CANCELLED', 'DISPUTED'])
+  status?: 'REQUESTED' | 'APPROVED' | 'HANDOVER_PENDING' | 'ACTIVE' | 'RETURN_INITIATED' | 'RETURNED_PENDING_INSPECTION' | 'COMPLETED' | 'DECLINED' | 'EXPIRED' | 'CANCELLED' | 'DISPUTED';
 
   @IsOptional()
   @IsDateString()
@@ -53,4 +53,19 @@ export class UpdateRentalOrderDto {
   @IsString()
   @MaxLength(500)
   depositRefundReason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  pickupHub?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  cancellationReason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  offlineDepositStatus?: string;
 }

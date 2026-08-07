@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 import { QueueModule } from '../../infrastructure/queue/queue.module';
 import { EventsInfrastructureModule } from '../../infrastructure/events/events.module';
@@ -11,7 +11,7 @@ import { NotificationsRepository } from './notifications.repository';
 import { NotificationsService } from './notifications.service';
 
 @Module({
-  imports: [EventsInfrastructureModule, EventsModule, QueueModule, ListingsModule],
+  imports: [EventsInfrastructureModule, EventsModule, QueueModule, forwardRef(() => ListingsModule)],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationsRepository, NotificationEventListener, NotificationQueueProcessor],
   exports: [NotificationsService],

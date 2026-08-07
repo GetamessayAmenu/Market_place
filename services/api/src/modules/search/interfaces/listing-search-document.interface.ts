@@ -19,6 +19,9 @@ export interface ListingSearchDocument extends Record<string, unknown> {
   readonly status: string;
   readonly createdAt: number;
   readonly primaryImageUrl: string | null;
+  readonly supportsReadyMade: boolean;
+  readonly supportsCustomDesign: boolean;
+  readonly startingCustomPrice: number | null;
 }
 
 export interface SearchIndexJobPayload {

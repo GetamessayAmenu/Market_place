@@ -124,7 +124,7 @@ export class DisputesService {
     const escalated = await this.repository.escalate(id, {
       status: 'escalated',
       escalatedById: user.id,
-      reason: dto.reason || undefined,
+      ...(dto.reason ? { reason: dto.reason } : {}),
     });
 
     await this.adminLogsService.createLog({

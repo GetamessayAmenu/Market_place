@@ -197,12 +197,12 @@ export class DisputesRepository {
         escalatedById: data.escalatedById,
         escalatedAt: new Date(),
         lastActivityAt: new Date(),
-        resolutionNote: data.reason,
+        ...(data.reason !== undefined ? { resolutionNote: data.reason } : {}),
       },
     });
   }
 
-  async close(id: string, closedById: string) {
+  async close(id: string, _closedById: string) {
     return this.prisma.dispute.update({
       where: { id },
       data: {

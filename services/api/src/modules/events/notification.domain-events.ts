@@ -86,3 +86,34 @@ export class ReportStatusUpdatedEvent extends DomainEvent {
     super();
   }
 }
+
+export class CustomOrderCreatedEvent extends DomainEvent {
+  readonly eventName = 'notification.custom_order_created';
+
+  constructor(
+    readonly sellerId: string,
+    readonly buyerId: string,
+    readonly customOrderId: string,
+    readonly listingId: string,
+    readonly listingTitle: string,
+    readonly conversationId: string,
+  ) {
+    super();
+  }
+}
+
+export class CustomOrderStatusUpdatedEvent extends DomainEvent {
+  readonly eventName = 'notification.custom_order_status_updated';
+
+  constructor(
+    readonly sellerId: string,
+    readonly buyerId: string,
+    readonly customOrderId: string,
+    readonly listingId: string,
+    readonly listingTitle: string,
+    readonly status: string,
+    readonly conversationId: string,
+  ) {
+    super();
+  }
+}

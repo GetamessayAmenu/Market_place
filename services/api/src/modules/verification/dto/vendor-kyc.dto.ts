@@ -1,4 +1,5 @@
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateVendorKycDto {
   @IsString()
@@ -25,7 +26,8 @@ export class CreateVendorKycDto {
 }
 
 export class ReviewVendorKycDto {
-  @IsEnum(['APPROVED', 'REJECTED'])
+  @IsEnum(['APPROVED', 'REJECTED'], { message: 'decision must be either APPROVED or REJECTED' })
+  @Type(() => String)
   decision!: 'APPROVED' | 'REJECTED';
 
   @IsOptional()

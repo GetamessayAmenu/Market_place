@@ -11,6 +11,7 @@ import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import { AdminLogsService } from '../admin-logs/admin-logs.service';
 import { CategoriesService } from '../categories/categories.service';
 import { FavoritesService } from '../favorites/favorites.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UploadsService } from '../uploads/uploads.service';
 
 import { ListingsCacheService } from './cache/listings-cache.service';
@@ -34,6 +35,7 @@ import {
 } from './exceptions/listing.exceptions';
 import type { ListingWithRelations } from './interfaces/listing-with-relations.interface';
 import { ListingsRepository } from './listings.repository';
+import { AdminListingAction, AdminListingActionDto, BulkAdminListingActionDto } from './dto/admin-listing-action.dto';
 import {
   canModerateListings,
   canSetListingStatus,
@@ -52,6 +54,7 @@ export class ListingsService {
     private readonly listingsCacheService: ListingsCacheService,
     private readonly eventEmitter: EventEmitter2,
     private readonly adminLogsService: AdminLogsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateListingDto) {
@@ -93,6 +96,21 @@ export class ListingsService {
         : {}),
       ...(dto.customOrderAvailable !== undefined
         ? { customOrderAvailable: dto.customOrderAvailable }
+        : {}),
+      ...(dto.supportsReadyMade !== undefined
+        ? { supportsReadyMade: dto.supportsReadyMade }
+        : {}),
+      ...(dto.supportsCustomDesign !== undefined
+        ? { supportsCustomDesign: dto.supportsCustomDesign }
+        : {}),
+      ...(dto.startingCustomPrice !== undefined
+        ? { startingCustomPrice: new Prisma.Decimal(dto.startingCustomPrice) }
+        : {}),
+      ...(dto.estimatedProductionDays !== undefined
+        ? { estimatedProductionDays: dto.estimatedProductionDays }
+        : {}),
+      ...(dto.customizationOptions !== undefined
+        ? { customizationOptions: dto.customizationOptions as Prisma.InputJsonValue }
         : {}),
       ...(dto.rentalPricePerDay !== undefined
         ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
@@ -256,6 +274,21 @@ export class ListingsService {
       ...(dto.customOrderAvailable !== undefined
         ? { customOrderAvailable: dto.customOrderAvailable }
         : {}),
+      ...(dto.supportsReadyMade !== undefined
+        ? { supportsReadyMade: dto.supportsReadyMade }
+        : {}),
+      ...(dto.supportsCustomDesign !== undefined
+        ? { supportsCustomDesign: dto.supportsCustomDesign }
+        : {}),
+      ...(dto.startingCustomPrice !== undefined
+        ? { startingCustomPrice: new Prisma.Decimal(dto.startingCustomPrice) }
+        : {}),
+      ...(dto.estimatedProductionDays !== undefined
+        ? { estimatedProductionDays: dto.estimatedProductionDays }
+        : {}),
+      ...(dto.customizationOptions !== undefined
+        ? { customizationOptions: dto.customizationOptions as Prisma.InputJsonValue }
+        : {}),
       ...(dto.rentalPricePerDay !== undefined
         ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
         : {}),
@@ -265,10 +298,15 @@ export class ListingsService {
       ...(dto.attributes !== undefined
         ? { attributes: dto.attributes as Prisma.InputJsonValue }
         : {}),
+      ...(dto.rejectedReason !== undefined ? { rejectedReason: dto.rejectedReason } : {}),
     };
 
     if (dto.status) {
       Object.assign(updateData, this.applyStatusChange(dto.status, existing));
+      // Handle rejection reason for rejected status
+      if (dto.status === 'rejected' && dto.rejectedReason) {
+        updateData.rejectedReason = dto.rejectedReason;
+      }
     }
 
     if (dto.title && dto.title !== existing.title) {
@@ -317,8 +355,24 @@ export class ListingsService {
         action,
         resource: 'listing',
         resourceId: listing.id,
-        metadata: { newStatus: dto.status },
+        metadata: { newStatus: dto.status, rejectedReason: dto.rejectedReason },
       });
+
+      // Send notifications for approval/rejection
+      if (dto.status === 'active') {
+        await this.notificationsService.createListingApprovedNotification(
+          listing.sellerId,
+          listing.id,
+          listing.title,
+        );
+      } else if (dto.status === 'rejected') {
+        await this.notificationsService.createListingRejectedNotification(
+          listing.sellerId,
+          listing.id,
+          listing.title,
+          dto.rejectedReason,
+        );
+      }
     }
 
     return serializeListing(listing);
@@ -503,7 +557,7 @@ export class ListingsService {
 
   async moderateListing(
     id: string,
-    action: 'approve' | 'reject' | 'hide' | 'delete',
+    action: 'approve' | 'reject' | 'request_changes' | 'hide' | 'delete',
     user: AuthenticatedUser,
     reason?: string,
   ) {
@@ -522,6 +576,7 @@ export class ListingsService {
     const statusMap: Record<string, ListingStatus> = {
       approve: 'active',
       reject: 'rejected',
+      request_changes: 'pending_review',
       hide: 'archived',
     };
     const targetStatus = statusMap[action];
@@ -530,7 +585,7 @@ export class ListingsService {
     }
 
     const updateData = this.applyStatusChange(targetStatus, existing);
-    if (targetStatus === 'rejected') {
+    if (targetStatus === 'rejected' || action === 'request_changes') {
       updateData.rejectedReason = reason ?? null;
     } else {
       updateData.rejectedReason = null;
@@ -547,6 +602,7 @@ export class ListingsService {
     const logActionMap: Record<string, string> = {
       active: 'listing.approved',
       rejected: 'listing.rejected',
+      pending_review: 'listing.changes_requested',
       archived: 'listing.archived',
     };
     await this.adminLogsService.createLog({
@@ -556,6 +612,29 @@ export class ListingsService {
       resourceId: listing.id,
       metadata: { newStatus: targetStatus, reason },
     });
+
+    // Send notification to seller
+    if (targetStatus === 'active') {
+      await this.notificationsService.createListingApprovedNotification(
+        listing.sellerId,
+        listing.id,
+        listing.title,
+      );
+    } else if (targetStatus === 'rejected') {
+      await this.notificationsService.createListingRejectedNotification(
+        listing.sellerId,
+        listing.id,
+        listing.title,
+        reason,
+      );
+    } else if (action === 'request_changes') {
+      await this.notificationsService.createListingChangesRequestedNotification(
+        listing.sellerId,
+        listing.id,
+        listing.title,
+        reason,
+      );
+    }
 
     return serializeListing(listing);
   }
@@ -750,5 +829,121 @@ export class ListingsService {
     );
 
     return { success: true, status: updated.status };
+  }
+
+  async adminListingAction(user: AuthenticatedUser, dto: AdminListingActionDto) {
+    const listing = await this.listingsRepository.findByIdRaw(dto.listingId);
+    if (!listing || listing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+
+    const statusMap: Record<AdminListingAction, ListingStatus> = {
+      [AdminListingAction.APPROVE]: 'active',
+      [AdminListingAction.REJECT]: 'rejected',
+      [AdminListingAction.ARCHIVE]: 'archived',
+      [AdminListingAction.FEATURE]: listing.status,
+      [AdminListingAction.UNFEATURE]: listing.status,
+    };
+
+    const updateData: Prisma.ListingUpdateInput = {};
+    let newStatus: ListingStatus | null = null;
+
+    switch (dto.action) {
+      case AdminListingAction.APPROVE:
+      case AdminListingAction.REJECT:
+      case AdminListingAction.ARCHIVE:
+        newStatus = statusMap[dto.action];
+        updateData.status = newStatus;
+        if (newStatus === 'active') {
+          const now = new Date();
+          updateData.publishedAt = listing.publishedAt ?? now;
+          updateData.expiresAt = this.addDays(now, LISTING_DEFAULT_TTL_DAYS);
+        }
+        if (newStatus === 'rejected' && dto.reason) {
+          updateData.rejectedReason = dto.reason;
+        }
+        if (newStatus === 'archived') {
+          updateData.expiresAt = null;
+        }
+        break;
+      case AdminListingAction.FEATURE:
+        updateData.isFeatured = true;
+        break;
+      case AdminListingAction.UNFEATURE:
+        updateData.isFeatured = false;
+        break;
+    }
+
+    const updated = await this.listingsRepository.updateListing(dto.listingId, updateData);
+    await this.listingsCacheService.invalidateAllForListing(updated.categoryId);
+
+    // Log admin action
+    const actionMap: Record<AdminListingAction, string> = {
+      [AdminListingAction.APPROVE]: 'listing.approved',
+      [AdminListingAction.REJECT]: 'listing.rejected',
+      [AdminListingAction.ARCHIVE]: 'listing.archived',
+      [AdminListingAction.FEATURE]: 'listing.featured',
+      [AdminListingAction.UNFEATURE]: 'listing.unfeatured',
+    };
+    await this.adminLogsService.createLog({
+      actorId: user.id,
+      action: actionMap[dto.action],
+      resource: 'listing',
+      resourceId: updated.id,
+      metadata: { reason: dto.reason, newStatus },
+    });
+
+    // Send notifications
+    if (newStatus === 'active') {
+      await this.notificationsService.createListingApprovedNotification(
+        updated.sellerId,
+        updated.id,
+        updated.title,
+      );
+    } else if (newStatus === 'rejected') {
+      await this.notificationsService.createListingRejectedNotification(
+        updated.sellerId,
+        updated.id,
+        updated.title,
+        dto.reason,
+      );
+    }
+
+    this.eventEmitter.emit(
+      LISTING_EVENTS.UPDATED,
+      new ListingUpdatedEvent(updated.id, updated.sellerId),
+    );
+
+    return serializeListing(updated);
+  }
+
+  async bulkAdminListingAction(user: AuthenticatedUser, dto: BulkAdminListingActionDto) {
+    const listings = await this.listingsRepository.findByIds(dto.listingIds);
+    const results = [];
+
+    for (const listing of listings) {
+      try {
+        const actionDto: AdminListingActionDto = {
+          listingId: listing.id,
+          action: dto.action,
+        };
+        if (dto.reason !== undefined) {
+          actionDto.reason = dto.reason;
+        }
+        
+        const result = await this.adminListingAction(user, actionDto);
+        results.push({ success: true, listingId: listing.id, result });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ success: false, listingId: listing.id, error: errorMessage });
+      }
+    }
+
+    return {
+      total: dto.listingIds.length,
+      succeeded: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    };
   }
 }

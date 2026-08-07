@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 
 import { useAuth } from '../../../hooks/useAuth';
 import { formatRelativeTime } from '../../../lib/formatters';
@@ -187,7 +186,6 @@ export default function OrderManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Mock orders data
   const orders: Order[] = [
@@ -1778,7 +1776,6 @@ function RentalWorkflow({ order }: { order: Order }) {
   const [currentStage, setCurrentStage] = useState<RentalStage>(
     order.rentalData?.stage || 'booking_request'
   );
-  const [notes, setNotes] = useState('');
 
   const stages: { key: RentalStage; title: string; icon: string }[] = [
     { key: 'booking_request', title: 'Booking Request', icon: '📝' },
@@ -1798,10 +1795,6 @@ function RentalWorkflow({ order }: { order: Order }) {
   ];
 
   const getStageIndex = (stage: RentalStage) => stages.findIndex((s) => s.key === stage);
-
-  const moveToStage = (stage: RentalStage) => {
-    setCurrentStage(stage);
-  };
 
   const moveToNextStage = () => {
     const currentIndex = getStageIndex(currentStage);
@@ -1858,7 +1851,7 @@ function RentalWorkflow({ order }: { order: Order }) {
       <div className="rounded-xl bg-white p-6 shadow-sm border border-slate-200">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-foreground">
-            {stages[getStageIndex(currentStage)].title}
+            {stages[getStageIndex(currentStage)]?.title || 'Unknown Stage'}
           </h3>
           <span className="text-sm text-muted-foreground">
             Stage {getStageIndex(currentStage) + 1} of {stages.length}
@@ -1930,7 +1923,7 @@ function BookingRequestStage({ order, onNext }: { order: Order; onNext: () => vo
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Requested Item</label>
-          <p className="text-sm text-muted-foreground">{order.products[0].name}</p>
+          <p className="text-sm text-muted-foreground">{order.products?.[0]?.name || 'Unknown Item'}</p>
         </div>
 
         <div>
@@ -1969,7 +1962,7 @@ function BookingRequestStage({ order, onNext }: { order: Order; onNext: () => vo
 }
 
 // Stage 2: Availability Check
-function AvailabilityCheckStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function AvailabilityCheckStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -2051,7 +2044,7 @@ function BookingConfirmationStage({ order, onNext }: { order: Order; onNext: () 
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Item:</span>
-            <span className="font-medium">{order.products[0].name}</span>
+            <span className="font-medium">{order.products?.[0]?.name || 'Unknown Item'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Start Date:</span>
@@ -2133,7 +2126,7 @@ function RentalDetailsStage({ order, onNext }: { order: Order; onNext: () => voi
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Included Items</label>
           <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-            <li>{order.products[0].name}</li>
+            <li>{order.products?.[0]?.name || 'Unknown Item'}</li>
             <li>Garment bag</li>
             <li>Hanger</li>
           </ul>
@@ -2180,7 +2173,7 @@ function RentalDetailsStage({ order, onNext }: { order: Order; onNext: () => voi
 }
 
 // Stage 5: Rental Agreement
-function RentalAgreementStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function RentalAgreementStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [agreed, setAgreed] = useState(false);
 
   return (
@@ -2230,7 +2223,7 @@ function RentalAgreementStage({ order, onNext }: { order: Order; onNext: () => v
 }
 
 // Stage 6: Item Preparation
-function ItemPreparationStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function ItemPreparationStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [checklist, setChecklist] = useState({
     cleaning: false,
     ironing: false,
@@ -2323,9 +2316,8 @@ function ItemPreparationStage({ order, onNext }: { order: Order; onNext: () => v
 }
 
 // Stage 7: Pickup
-function PickupStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function PickupStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [notes, setNotes] = useState('');
-  const [photosUploaded, setPhotosUploaded] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -2472,8 +2464,8 @@ function RentalActiveStage({ order, onNext }: { order: Order; onNext: () => void
 }
 
 // Stage 9: Extension Request
-function ExtensionRequestStage({ order, onNext }: { order: Order; onNext: () => void }) {
-  const [hasRequest, setHasRequest] = useState(false);
+function ExtensionRequestStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
+  const [hasRequest, _setHasRequest] = useState(false);
   const [decision, setDecision] = useState<'approved' | 'rejected' | null>(null);
 
   return (
@@ -2547,7 +2539,7 @@ function ExtensionRequestStage({ order, onNext }: { order: Order; onNext: () => 
 }
 
 // Stage 10: Return
-function ReturnStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function ReturnStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [notes, setNotes] = useState('');
 
   return (
@@ -2618,7 +2610,7 @@ function ReturnStage({ order, onNext }: { order: Order; onNext: () => void }) {
 }
 
 // Stage 11: Inspection
-function InspectionStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function InspectionStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [condition, setCondition] = useState<'excellent' | 'good' | 'fair' | 'poor'>('good');
   const [notes, setNotes] = useState('');
 
@@ -2688,7 +2680,7 @@ function InspectionStage({ order, onNext }: { order: Order; onNext: () => void }
 }
 
 // Stage 12: Damage Report
-function DamageReportStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function DamageReportStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   const [hasDamage, setHasDamage] = useState(false);
   const [description, setDescription] = useState('');
 
@@ -2753,7 +2745,7 @@ function DamageReportStage({ order, onNext }: { order: Order; onNext: () => void
 }
 
 // Stage 13: Rental History
-function RentalHistoryStage({ order, onNext }: { order: Order; onNext: () => void }) {
+function RentalHistoryStage({ order: _order, onNext }: { order: Order; onNext: () => void }) {
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -2845,7 +2837,7 @@ function RentalCompletionStage({ order, onNext }: { order: Order; onNext: () => 
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Item:</span>
-            <span className="font-medium">{order.products[0].name}</span>
+            <span className="font-medium">{order.products?.[0]?.name || 'Unknown Item'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Rental Period:</span>

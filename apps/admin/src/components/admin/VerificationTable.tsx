@@ -13,7 +13,7 @@ import {
   Alert,
   Spinner,
 } from '@marketplace/ui'
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
 import { clientGet, clientPatch, buildQuery } from '../../lib/clientApi'
 import type { VerificationRequest, VerificationHistory } from '../../lib/adminApi'
@@ -27,18 +27,25 @@ interface PaginatedResponse<T> {
 }
 
 interface VerificationTableProps {
-  initialData: PaginatedResponse<VerificationRequest>
+  initialData?: PaginatedResponse<VerificationRequest>
 }
 
 export default function VerificationTable({ initialData }: VerificationTableProps) {
-  const [verifications, setVerifications] = useState(initialData.data)
-  const [page, setPage] = useState(initialData.meta.page)
-  const [totalPages, setTotalPages] = useState(initialData.meta.totalPages)
-  const [total, setTotal] = useState(initialData.meta.total)
-  const [loading, setLoading] = useState(false)
+  const [verifications, setVerifications] = useState(initialData?.data || [])
+  const [page, setPage] = useState(initialData?.meta.page || 1)
+  const [totalPages, setTotalPages] = useState(initialData?.meta.totalPages || 0)
+  const [total, setTotal] = useState(initialData?.meta.total || 0)
+  const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
+
+  // Fetch data on mount if no initial data provided
+  useEffect(() => {
+    if (!initialData) {
+      void fetchData(1, '', '')
+    }
+  }, [initialData])
 
   // Detail modal
   const [detailItem, setDetailItem] = useState<VerificationRequest | null>(null)
@@ -76,8 +83,9 @@ export default function VerificationTable({ initialData }: VerificationTableProp
       setVerifications(res.data)
       setTotalPages(res.meta.totalPages)
       setTotal(res.meta.total)
-    } catch {
-      setError('Failed to load verifications.')
+    } catch (err) {
+      console.error('Failed to load verifications:', err)
+      setError('Authentication required. Please log in to view verification requests.')
     } finally {
       setLoading(false)
     }
@@ -94,13 +102,16 @@ export default function VerificationTable({ initialData }: VerificationTableProp
   }
 
   const handleViewDetail = async (item: VerificationRequest) => {
+    console.log('View detail clicked for item:', item)
     setDetailLoading(true)
     setDetailItem(item)
     try {
       // Fetch full details including history
       const res = await clientGet<{ item: VerificationRequest; history: VerificationHistory[] }>('/admin/verifications/' + item.id + '/detail')
+      console.log('Detail response:', res)
       setDetailItem({ ...item, history: res.history })
-    } catch {
+    } catch (err) {
+      console.error('Failed to load verification details:', err)
       setError('Failed to load verification details.')
     } finally {
       setDetailLoading(false)

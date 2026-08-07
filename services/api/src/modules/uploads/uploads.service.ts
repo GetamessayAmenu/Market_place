@@ -65,11 +65,13 @@ export class UploadsService {
     const capped = Math.min(count, MAX_LISTING_IMAGES);
     const timestamp = Math.round(Date.now() / 1000);
     const folder = LISTING_UPLOAD_FOLDER;
+    const transformation = 'c_limit,w_1200,h_1200/q_auto/f_auto';
 
     return Array.from({ length: capped }, () => {
       const paramsToSign = {
         timestamp,
         folder,
+        transformation,
       };
       const signature = cloudinary.utils.api_sign_request(
         paramsToSign,
@@ -82,7 +84,7 @@ export class UploadsService {
         apiKey: this.config.cloudinaryApiKey!,
         cloudName: this.config.cloudinaryCloudName!,
         folder,
-        transformation: 'c_limit,w_1200,h_1200/q_auto/f_auto',
+        transformation,
       };
     });
   }

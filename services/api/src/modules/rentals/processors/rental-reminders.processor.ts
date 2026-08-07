@@ -67,10 +67,22 @@ export class RentalRemindersProcessor extends WorkerHost {
     }
 
     // Notify renter about upcoming return
-    await this.notificationsService.createSellerVerifiedNotification(data.renterId, 'rental_pre_return');
+    await this.notificationsService.createCustomNotification(
+      data.renterId,
+      'rental_pre_return',
+      'Rental Return Reminder',
+      'Your rental period is ending soon. Please arrange for return.',
+      { rentalOrderId: data.rentalOrderId },
+    );
 
     // Notify seller about upcoming return
-    await this.notificationsService.createSellerVerifiedNotification(data.sellerId, 'rental_pre_return_seller');
+    await this.notificationsService.createCustomNotification(
+      data.sellerId,
+      'rental_pre_return_seller',
+      'Rental Return Reminder',
+      'A rental period is ending soon. Prepare for item return.',
+      { rentalOrderId: data.rentalOrderId },
+    );
 
     this.logger.log(`Pre-return reminder sent for rental ${data.rentalOrderId}`);
   }
@@ -98,17 +110,35 @@ export class RentalRemindersProcessor extends WorkerHost {
     });
 
     // Notify renter about overdue item
-    await this.notificationsService.createSellerVerifiedNotification(data.renterId, 'rental_overdue');
+    await this.notificationsService.createCustomNotification(
+      data.renterId,
+      'rental_overdue',
+      'Rental Overdue',
+      'Your rental is overdue. Please return the item immediately.',
+      { rentalOrderId: data.rentalOrderId },
+    );
 
     // Notify seller about overdue item
-    await this.notificationsService.createSellerVerifiedNotification(data.sellerId, 'rental_overdue_seller');
+    await this.notificationsService.createCustomNotification(
+      data.sellerId,
+      'rental_overdue_seller',
+      'Rental Overdue',
+      'A rental is overdue. Contact the renter for return.',
+      { rentalOrderId: data.rentalOrderId },
+    );
 
     this.logger.log(`Overdue reminder sent and status updated for rental ${data.rentalOrderId}`);
   }
 
   private async handleReturnInitiated(data: RentalReminderJobData): Promise<void> {
     // Notify seller that renter has initiated return
-    await this.notificationsService.createSellerVerifiedNotification(data.sellerId, 'rental_return_initiated');
+    await this.notificationsService.createCustomNotification(
+      data.sellerId,
+      'rental_return_initiated',
+      'Return Initiated',
+      'The renter has initiated the return process',
+      { rentalOrderId: data.rentalOrderId },
+    );
 
     this.logger.log(`Return initiated notification sent for rental ${data.rentalOrderId}`);
   }

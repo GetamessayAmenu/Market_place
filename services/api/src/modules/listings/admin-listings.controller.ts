@@ -54,6 +54,15 @@ export class AdminListingsController {
     return this.listingsService.moderateListing(id, 'reject', user, dto.reason);
   }
 
+  @Post(':id/request-changes')
+  requestChanges(
+    @Param('id') id: string,
+    @Body() dto: ModerationActionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.listingsService.moderateListing(id, 'request_changes', user, dto.reason);
+  }
+
   @Post(':id/hide')
   hide(
     @Param('id') id: string,

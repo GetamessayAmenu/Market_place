@@ -207,4 +207,18 @@ export class ChatService {
       );
     }
   }
+
+  async verifyOrderAccess(orderId: string, userId: string) {
+    return this.chatRepository.findOrderByUser(orderId, userId);
+  }
+
+  async sendMessageSimple(data: {
+    conversationId: string;
+    senderId: string;
+    body: string;
+  }) {
+    const message = await this.chatRepository.createMessage(data);
+    this.detectSpam(data.body, data.conversationId, data.senderId);
+    return message;
+  }
 }

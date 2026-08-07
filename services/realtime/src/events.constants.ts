@@ -16,11 +16,38 @@ export const CHAT_SERVER_EVENTS = {
   JOINED: 'chat:joined',
 } as const;
 
+export const ORDER_CLIENT_EVENTS = {
+  JOIN_ORDER_CHAT: 'order:join_chat',
+  LEAVE_ORDER_CHAT: 'order:leave_chat',
+  SEND_ORDER_MESSAGE: 'order:send_message',
+  REQUEST_QUOTE: 'order:request_quote',
+  ACCEPT_QUOTE: 'order:accept_quote',
+  UPDATE_STATUS: 'order:update_status',
+} as const;
+
+export const ORDER_SERVER_EVENTS = {
+  ORDER_MESSAGE: 'order:message',
+  QUOTE_RECEIVED: 'order:quote_received',
+  QUOTE_PROPOSED: 'order:quote_proposed',
+  QUOTE_ACCEPTED: 'order:quote_accepted',
+  ORDER_DECLINED: 'order:declined',
+  ALTERNATIVE_DATES_PROPOSED: 'order:alternative_dates_proposed',
+  TAILORING_MILESTONE_UPDATED: 'order:tailoring_milestone_updated',
+  EXTENSION_REQUESTED: 'order:extension_requested',
+  EXTENSION_RESPONDED: 'order:extension_responded',
+  STATUS_UPDATED: 'order:status_updated',
+  ORDER_JOINED: 'order:joined',
+  ORDER_ERROR: 'order:error',
+  PRE_HANDOVER_PHOTOS_UPLOADED: 'order:pre_handover_photos_uploaded',
+  POST_RETURN_PHOTOS_UPLOADED: 'order:post_return_photos_uploaded',
+} as const;
+
 export const NOTIFICATIONS_SERVER_EVENTS = {
   NEW_NOTIFICATION: 'notifications:new',
   NOTIFICATION_READ: 'notifications:read',
   NOTIFICATION_READ_ALL: 'notifications:read_all',
   UNREAD_COUNT: 'notifications:unread_count',
+  LISTING_MODERATED: 'listing:moderated',
 } as const;
 
 /** In-process domain events (moderation / notifications). */

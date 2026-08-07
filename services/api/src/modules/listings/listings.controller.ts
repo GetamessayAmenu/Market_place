@@ -17,6 +17,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { FavoritesService } from '../favorites/favorites.service';
+import { AdminListingActionDto, BulkAdminListingActionDto } from './dto/admin-listing-action.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { ListingQueryDto } from './dto/listing-query.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
@@ -143,5 +144,26 @@ export class ListingsController {
     @Param('id') id: string,
   ) {
     return this.listingsService.markUnavailable(user, id);
+  }
+
+  // Admin-only listing management endpoints
+  @UseGuards(PermissionsGuard)
+  @Permissions({ resource: 'listing', action: 'moderate' })
+  @Post('admin/action')
+  adminListingAction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AdminListingActionDto,
+  ) {
+    return this.listingsService.adminListingAction(user, dto);
+  }
+
+  @UseGuards(PermissionsGuard)
+  @Permissions({ resource: 'listing', action: 'moderate' })
+  @Post('admin/bulk-action')
+  bulkAdminListingAction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: BulkAdminListingActionDto,
+  ) {
+    return this.listingsService.bulkAdminListingAction(user, dto);
   }
 }

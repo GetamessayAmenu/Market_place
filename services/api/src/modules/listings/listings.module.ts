@@ -5,6 +5,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { AdminLogsModule } from '../admin-logs/admin-logs.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { FavoritesModule } from '../favorites/favorites.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { UploadsModule } from '../uploads/uploads.module';
 
 import { AdminListingsController } from './admin-listings.controller';
@@ -17,7 +18,7 @@ import { ListingsService } from './listings.service';
 import { UserListingsController } from './user-listings.controller';
 
 @Module({
-  imports: [CategoriesModule, UploadsModule, forwardRef(() => FavoritesModule), AdminLogsModule],
+  imports: [CategoriesModule, UploadsModule, forwardRef(() => FavoritesModule), AdminLogsModule, forwardRef(() => NotificationsModule)],
   controllers: [ListingsController, UserListingsController, AdminListingsController],
   providers: [
     ListingsRepository,

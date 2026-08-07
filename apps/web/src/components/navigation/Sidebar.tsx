@@ -88,7 +88,8 @@ const defaultItems: SidebarItem[] = [
   // New Seller Hub - 6 Hub Structure
   { label: 'Overview', href: '/seller/dashboard', icon: <IconGrid />, section: 'Seller Hub' },
   { label: 'Catalog & Stock', href: '/seller/catalog', icon: <IconTag />, section: 'Seller Hub' },
-  { label: 'Orders & Requests', href: '/seller/orders', icon: <IconScissors />, section: 'Seller Hub' },
+  { label: 'Orders & Requests Pipeline', href: '/seller/orders', icon: <IconScissors />, section: 'Seller Hub' },
+  { label: 'Rental Queue', href: '/seller/orders/rental-queue', icon: <IconScissors />, section: 'Seller Hub' },
   { label: 'Messages', href: '/seller/messages', icon: <IconChat />, section: 'Seller Hub' },
   { label: 'Store & Profile', href: '/seller/store', icon: <IconShield />, section: 'Seller Hub' },
   { label: 'Insights & Feedback', href: '/seller/insights', icon: <IconChart />, section: 'Seller Hub' },

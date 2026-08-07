@@ -9,6 +9,63 @@ import { messageSchema, type MessageInput } from '../../../lib/validations/selle
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+type OrderType = 'SALE' | 'RENTAL' | 'CUSTOM_TAILORING';
+
+type OrderStatus = 'INQUIRY_PENDING' | 'QUOTE_PROPOSED' | 'APPROVED_RESERVED' | 'READY_FOR_HANDOVER' | 
+  'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'MEASUREMENTS_SUBMITTED' | 'FABRIC_CUTTING' | 
+  'TAILORING_IN_PROGRESS' | 'FITTING_READY' | 'HANDOVER_PENDING_DEPOSIT' | 'RENTAL_ACTIVE' | 
+  'RETURN_INITIATED' | 'RETURNED_INSPECTED';
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  type: OrderType;
+  status: OrderStatus;
+  buyerId: string;
+  sellerId: string;
+  productId: string;
+  conversationId: string | null;
+  agreedPrice: number;
+  agreedDeposit: number | null;
+  offlineDepositRefunded: boolean;
+  customMeasurements: any;
+  fittingDate: string | null;
+  rentalStartDate: string | null;
+  rentalEndDate: string | null;
+  extensionDaysRequested: number;
+  extensionApproved: boolean | null;
+  preHandoverPhotos: string[];
+  postReturnPhotos: string[];
+  disputeNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  buyer: {
+    id: string;
+    displayName: string;
+    email: string;
+    phone: string | null;
+    avatarUrl: string | null;
+    location: string | null;
+  };
+  seller: {
+    id: string;
+    displayName: string;
+    email: string;
+    phone: string | null;
+    avatarUrl: string | null;
+    location: string | null;
+  };
+  product: {
+    id: string;
+    title: string;
+    slug: string;
+    price: number;
+    currency: string;
+    images: any[];
+  };
+  customQuotes?: any[];
+}
+
 interface Message {
   id: string;
   customerName: string;
@@ -16,11 +73,7 @@ interface Message {
   lastMessage: string;
   timestamp: string;
   unread: boolean;
-  relatedOrder?: {
-    id: string;
-    title: string;
-    model: 'sale' | 'rental' | 'custom';
-  };
+  relatedOrder?: Order;
 }
 
 interface QuickResponse {
@@ -72,7 +125,7 @@ function MessageThreadCard({ message, onSelect }: { message: Message; onSelect: 
             {message.relatedOrder && (
               <div className="mt-2">
                 <Badge variant="outline" className="text-xs">
-                  {message.relatedOrder.model}: {message.relatedOrder.title}
+                  {message.relatedOrder.type}: {message.relatedOrder.product.title}
                 </Badge>
               </div>
             )}
@@ -101,6 +154,7 @@ function QuickResponseTemplate({ template, onSelect }: { template: QuickResponse
 
 function ChatInterface({ message, onClose }: { message: Message; onClose: () => void }) {
   const [showQuickResponses, setShowQuickResponses] = useState(false);
+  const [showOrderActions, setShowOrderActions] = useState(false);
 
   const {
     register,
@@ -151,7 +205,7 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
 
   const handleWhatsApp = () => {
     // Open WhatsApp with pre-filled message
-    const url = `https://wa.me/?text=${encodeURIComponent(`Re: ${message.relatedOrder?.title || 'Inquiry'} - ${message.lastMessage}`)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(`Re: ${message.relatedOrder?.product.title || 'Inquiry'} - ${message.lastMessage}`)}`;
     window.open(url, '_blank');
   };
 
@@ -172,7 +226,7 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
             <div>
               <p className="font-medium">{message.customerName}</p>
               {message.relatedOrder && (
-                <p className="text-xs text-muted-foreground">{message.relatedOrder.title}</p>
+                <p className="text-xs text-muted-foreground">{message.relatedOrder.product.title}</p>
               )}
             </div>
           </div>
@@ -223,6 +277,51 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
         {/* Input */}
         <div className="p-4 border-t">
           <form onSubmit={handleSubmit(handleSend)} className="space-y-2">
+            {message.relatedOrder && (
+              <div className="mb-2 p-2 bg-muted rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium">Order: {message.relatedOrder.orderNumber}</p>
+                    <p className="text-xs text-muted-foreground">{message.relatedOrder.product.title}</p>
+                    <Badge variant="outline" className="text-xs mt-1">
+                      {message.relatedOrder.status}
+                    </Badge>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowOrderActions(!showOrderActions)}
+                  >
+                    Actions
+                  </Button>
+                </div>
+                {showOrderActions && (
+                  <div className="mt-2 space-y-2">
+                    {message.relatedOrder.status === 'INQUIRY_PENDING' && (
+                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
+                        Send Custom Quote
+                      </Button>
+                    )}
+                    {message.relatedOrder.type === 'RENTAL' && message.relatedOrder.status === 'INQUIRY_PENDING' && (
+                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
+                        Propose Alternative Dates
+                      </Button>
+                    )}
+                    {message.relatedOrder.type === 'CUSTOM_TAILORING' && message.relatedOrder.status === 'APPROVED_RESERVED' && (
+                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
+                        Update Milestone
+                      </Button>
+                    )}
+                    {message.relatedOrder.type === 'RENTAL' && message.relatedOrder.extensionDaysRequested > 0 && message.relatedOrder.extensionApproved === null && (
+                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
+                        Respond to Extension Request
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -242,14 +341,6 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
               </Button>
             </div>
             {errors.content && <p className="text-destructive text-xs">{errors.content.message}</p>}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="text-xs" type="button">
-                Send Custom Quote
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs" type="button">
-                Send Rental Counter-Offer
-              </Button>
-            </div>
           </form>
         </div>
       </div>
@@ -274,8 +365,51 @@ export default function MessagesPage() {
       unread: true,
       relatedOrder: {
         id: 'order-1',
-        title: 'Traditional Habesha Kemis',
-        model: 'custom',
+        orderNumber: 'ORD-001',
+        type: 'CUSTOM_TAILORING',
+        status: 'INQUIRY_PENDING',
+        buyerId: 'buyer-1',
+        sellerId: 'seller-1',
+        productId: 'prod-1',
+        conversationId: 'conv-1',
+        agreedPrice: 5000,
+        agreedDeposit: null,
+        offlineDepositRefunded: false,
+        customMeasurements: null,
+        fittingDate: null,
+        rentalStartDate: null,
+        rentalEndDate: null,
+        extensionDaysRequested: 0,
+        extensionApproved: null,
+        preHandoverPhotos: [],
+        postReturnPhotos: [],
+        disputeNotes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        buyer: {
+          id: 'buyer-1',
+          displayName: 'Abebe Kebede',
+          email: 'abebe@example.com',
+          phone: '+251911234567',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        seller: {
+          id: 'seller-1',
+          displayName: 'Seller Name',
+          email: 'seller@example.com',
+          phone: '+251911234568',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        product: {
+          id: 'prod-1',
+          title: 'Traditional Habesha Kemis',
+          slug: 'traditional-habesha-kemis',
+          price: 5000,
+          currency: 'ETB',
+          images: [],
+        },
       },
     },
     {
@@ -286,8 +420,51 @@ export default function MessagesPage() {
       unread: true,
       relatedOrder: {
         id: 'order-2',
-        title: 'Ethiopian Gabi',
-        model: 'rental',
+        orderNumber: 'ORD-002',
+        type: 'RENTAL',
+        status: 'RENTAL_ACTIVE',
+        buyerId: 'buyer-2',
+        sellerId: 'seller-1',
+        productId: 'prod-2',
+        conversationId: 'conv-2',
+        agreedPrice: 1000,
+        agreedDeposit: 500,
+        offlineDepositRefunded: false,
+        customMeasurements: null,
+        fittingDate: null,
+        rentalStartDate: new Date().toISOString(),
+        rentalEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        extensionDaysRequested: 2,
+        extensionApproved: null,
+        preHandoverPhotos: [],
+        postReturnPhotos: [],
+        disputeNotes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        buyer: {
+          id: 'buyer-2',
+          displayName: 'Tigist Haile',
+          email: 'tigist@example.com',
+          phone: '+251911234569',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        seller: {
+          id: 'seller-1',
+          displayName: 'Seller Name',
+          email: 'seller@example.com',
+          phone: '+251911234568',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        product: {
+          id: 'prod-2',
+          title: 'Ethiopian Gabi',
+          slug: 'ethiopian-gabi',
+          price: 1000,
+          currency: 'ETB',
+          images: [],
+        },
       },
     },
     {
@@ -298,8 +475,51 @@ export default function MessagesPage() {
       unread: false,
       relatedOrder: {
         id: 'order-3',
-        title: 'Modern Dress',
-        model: 'sale',
+        orderNumber: 'ORD-003',
+        type: 'SALE',
+        status: 'APPROVED_RESERVED',
+        buyerId: 'buyer-3',
+        sellerId: 'seller-1',
+        productId: 'prod-3',
+        conversationId: 'conv-3',
+        agreedPrice: 3000,
+        agreedDeposit: null,
+        offlineDepositRefunded: false,
+        customMeasurements: null,
+        fittingDate: null,
+        rentalStartDate: null,
+        rentalEndDate: null,
+        extensionDaysRequested: 0,
+        extensionApproved: null,
+        preHandoverPhotos: [],
+        postReturnPhotos: [],
+        disputeNotes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        buyer: {
+          id: 'buyer-3',
+          displayName: 'Dawit Abebe',
+          email: 'dawit@example.com',
+          phone: '+251911234570',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        seller: {
+          id: 'seller-1',
+          displayName: 'Seller Name',
+          email: 'seller@example.com',
+          phone: '+251911234568',
+          avatarUrl: null,
+          location: 'Addis Ababa',
+        },
+        product: {
+          id: 'prod-3',
+          title: 'Modern Dress',
+          slug: 'modern-dress',
+          price: 3000,
+          currency: 'ETB',
+          images: [],
+        },
       },
     },
     {

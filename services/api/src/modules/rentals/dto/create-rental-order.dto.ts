@@ -1,4 +1,11 @@
-import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+
+export enum RentalPricingTier {
+  DAILY = 'DAILY',
+  THREE_DAY_EVENT = 'THREE_DAY_EVENT',
+  WEEKLY = 'WEEKLY',
+  CUSTOM = 'CUSTOM',
+}
 
 export class CreateRentalOrderDto {
   @IsString()
@@ -12,9 +19,18 @@ export class CreateRentalOrderDto {
   endDate!: string;
 
   @IsOptional()
+  @IsEnum(RentalPricingTier)
+  pricingTier?: RentalPricingTier;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   handoverLocation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  pickupHub?: string;
 
   @IsOptional()
   @IsString()

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,6 +9,8 @@ import type { CreateRentalOrderDto } from './dto/create-rental-order.dto';
 import type { UpdateRentalOrderDto } from './dto/update-rental-order.dto';
 import type { RentalQueryDto } from './dto/rental-query.dto';
 import type { CreateRentalExtensionDto } from './dto/create-rental-extension.dto';
+import type { CreateConditionLogDto } from './dto/create-condition-log.dto';
+import type { CreateBlackoutDateDto } from './dto/create-blackout-date.dto';
 
 @Controller('rentals')
 @UseGuards(RolesGuard)
@@ -69,5 +71,52 @@ export class RentalsController {
   @Roles('seller', 'buyer')
   approveExtension(@Param('extensionId') extensionId: string, @CurrentUser() user: AuthenticatedUser) {
     return this.rentalsService.approveExtension(extensionId, user);
+  }
+
+  // Condition Log endpoints
+  @Post(':id/condition-logs')
+  @Roles('seller', 'buyer')
+  createConditionLog(
+    @Param('id') id: string,
+    @Body() dto: CreateConditionLogDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rentalsService.createConditionLog(id, dto, user);
+  }
+
+  @Get(':id/condition-logs')
+  @Roles('seller', 'buyer')
+  getConditionLogs(@Param('id') id: string) {
+    return this.rentalsService.getConditionLogs(id);
+  }
+
+  // Blackout Date endpoints
+  @Post('blackout-dates')
+  @Roles('seller')
+  createBlackoutDate(@Body() dto: CreateBlackoutDateDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.rentalsService.createBlackoutDate(dto, user);
+  }
+
+  @Get('blackout-dates/:listingId')
+  @Roles('seller', 'buyer')
+  getBlackoutDates(@Param('listingId') listingId: string) {
+    return this.rentalsService.getBlackoutDates(listingId);
+  }
+
+  @Delete('blackout-dates/:id')
+  @Roles('seller')
+  deleteBlackoutDate(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.rentalsService.deleteBlackoutDate(id, user);
+  }
+
+  // Dispute endpoint
+  @Patch(':id/dispute')
+  @Roles('seller', 'buyer')
+  flagAsDisputed(
+    @Param('id') id: string,
+    @Body() body: { reason: string; evidencePhotos: string[] },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rentalsService.flagAsDisputed(id, body.reason, body.evidencePhotos, user);
   }
 }

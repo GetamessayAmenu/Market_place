@@ -38,6 +38,18 @@ interface AdminListing {
   customOrderAvailable: boolean
   rentalPricePerDay?: number | null
   rentalDeposit?: number | null
+  rentalPricingTier?: string | null
+  rentalThreeDayRate?: number | null
+  rentalWeeklyRate?: number | null
+  cleaningPolicy?: string | null
+  fabricCareTags?: string[]
+  minRentalDurationDays?: number
+  maxRentalDurationDays?: number | null
+  supportsReadyMade?: boolean
+  supportsCustomDesign?: boolean
+  startingCustomPrice?: number | null
+  estimatedProductionDays?: number | null
+  customizationOptions?: any
   rejectedReason?: string | null
   primaryImageUrl?: string | null
   images?: { url: string; isPrimary: boolean; cloudinaryPublicId?: string; id?: string }[]
@@ -74,9 +86,16 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
   const [error, setError] = useState<string | null>(null)
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('pending_review')
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
+
+  // Status counts for badges
+  const [statusCounts, setStatusCounts] = useState<{ pending: number; approved: number; rejected: number }>({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  })
 
   // Bulk actions
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -94,6 +113,7 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
   // Moderation state
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [showChangesForm, setShowChangesForm] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
@@ -120,6 +140,23 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
     }
   }, [])
 
+  const fetchStatusCounts = useCallback(async () => {
+    try {
+      const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
+        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'pending_review', limit: 1 })),
+        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'active', limit: 1 })),
+        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'rejected', limit: 1 })),
+      ])
+      setStatusCounts({
+        pending: pendingRes.meta.total,
+        approved: approvedRes.meta.total,
+        rejected: rejectedRes.meta.total,
+      })
+    } catch {
+      // Silently fail for counts
+    }
+  }, [])
+
   const fetchHistory = useCallback(async (listingId: string) => {
     setHistoryLoading(true)
     try {
@@ -143,6 +180,10 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
       setHistory(null)
     }
   }, [detailListing, fetchHistory])
+
+  useEffect(() => {
+    void fetchStatusCounts()
+  }, [fetchStatusCounts])
 
   const handlePageChange = (p: number) => {
     setPage(p)
@@ -193,7 +234,7 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
     }
   }
 
-  const handleAction = async (action: 'approve' | 'hide' | 'delete' | 'feature' | 'reject') => {
+  const handleAction = async (action: 'approve' | 'hide' | 'delete' | 'feature' | 'reject' | 'request_changes') => {
     if (!detailListing) return
     setActionLoading(true)
     setError(null)
@@ -230,9 +271,23 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
         setShowRejectForm(false)
         setRejectReason('')
         setListings(prev => prev.map(l => l.id === detailListing.id ? { ...l, status: 'rejected' } : l))
+      } else if (action === 'request_changes') {
+        if (!rejectReason.trim()) {
+          setError('Feedback reason is required.')
+          setActionLoading(false)
+          return
+        }
+        const updated = await clientPost<any>(`/admin/listings/${detailListing.id}/request-changes`, {
+          reason: rejectReason
+        })
+        setDetailListing(updated)
+        setShowChangesForm(false)
+        setRejectReason('')
+        setListings(prev => prev.map(l => l.id === detailListing.id ? { ...l, status: 'pending_review' } : l))
       }
       void fetchHistory(detailListing.id)
       void fetchData(page, statusFilter, typeFilter, search)
+      void fetchStatusCounts()
     } catch {
       setError(`Failed to perform action: ${action}`)
     } finally {
@@ -242,26 +297,57 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
+      {/* Status Filter Tabs with Badge Counters */}
+      <div className="flex flex-wrap items-center gap-2 border-b">
+        <button
+          onClick={() => { setStatusFilter('pending_review'); setPage(1); void fetchData(1, 'pending_review', typeFilter, search) }}
+          className={`px-4 py-2.5 font-medium text-sm border-b-2 transition-all flex items-center gap-2 ${
+            statusFilter === 'pending_review'
+              ? 'border-yellow-500 text-yellow-600 dark:text-yellow-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🟡 Pending Review
+          {statusCounts.pending > 0 && (
+            <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {statusCounts.pending}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setStatusFilter('active'); setPage(1); void fetchData(1, 'active', typeFilter, search) }}
+          className={`px-4 py-2.5 font-medium text-sm border-b-2 transition-all flex items-center gap-2 ${
+            statusFilter === 'active'
+              ? 'border-green-500 text-green-600 dark:text-green-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🟢 Approved Listings
+          {statusCounts.approved > 0 && (
+            <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {statusCounts.approved}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => { setStatusFilter('rejected'); setPage(1); void fetchData(1, 'rejected', typeFilter, search) }}
+          className={`px-4 py-2.5 font-medium text-sm border-b-2 transition-all flex items-center gap-2 ${
+            statusFilter === 'rejected'
+              ? 'border-red-500 text-red-600 dark:text-red-400'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          🔴 Rejected / Changes Requested
+          {statusCounts.rejected > 0 && (
+            <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {statusCounts.rejected}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Additional Filters */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="w-48">
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Status</label>
-          <Select
-            options={[
-              { label: 'All Statuses', value: '' },
-              { label: 'Draft', value: 'draft' },
-              { label: 'Pending Review', value: 'pending_review' },
-              { label: 'Active', value: 'active' },
-              { label: 'Sold', value: 'sold' },
-              { label: 'Expired', value: 'expired' },
-              { label: 'Rejected', value: 'rejected' },
-              { label: 'Archived', value: 'archived' },
-            ]}
-            value={statusFilter}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value) }}
-            size="sm"
-          />
-        </div>
         <div className="w-48">
           <label className="block text-xs font-semibold text-muted-foreground mb-1">Type</label>
           <Select
@@ -280,7 +366,7 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
           <label className="block text-xs font-semibold text-muted-foreground mb-1">Search</label>
           <input
             type="text"
-            placeholder="Search listings..."
+            placeholder="Search by Product Title, Seller Business Name..."
             value={search}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value) }}
             className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -433,250 +519,358 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
         </div>
       </Modal>
 
-      {/* Detail Modal */}
-      <Modal open={detailListing !== null} onClose={() => { setDetailListing(null) }} title="Listing Moderation" size="lg">
+      {/* Detail Modal - Split View */}
+      <Modal open={detailListing !== null} onClose={() => { setDetailListing(null) }} title="" size="full" className="max-w-6xl">
         {detailListing && (
-          <div className="space-y-6">
-            {/* Listing basic details */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {detailListing.primaryImageUrl ? (
-                <img src={detailListing.primaryImageUrl} alt="" className="h-40 w-40 rounded-lg object-cover bg-muted border flex-shrink-0" />
-              ) : (
-                <div className="h-40 w-40 rounded-lg bg-muted flex items-center justify-center text-xs text-muted-foreground border flex-shrink-0">No image</div>
-              )}
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-xl truncate max-w-full" title={detailListing.title}>{detailListing.title}</h3>
-                  {detailListing.isFeatured && (
-                    <Badge className="bg-amber-500 text-white font-bold text-[10px] uppercase">Featured</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={detailListing.status} domain="listing" />
-                  <span className="text-xs text-muted-foreground">&middot;</span>
-                  <span className="text-sm font-medium text-muted-foreground">{detailListing.category?.name ?? 'N/A'}</span>
-                </div>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(detailListing.price, detailListing.currency)}</p>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground pt-1">
-                  <span>Created: {formatDateTime(detailListing.createdAt)}</span>
-                  <span>&middot;</span>
-                  <span>Condition: <strong className="capitalize text-foreground">{detailListing.condition}</strong></span>
-                  {detailListing.city && (
-                    <>
-                      <span>&middot;</span>
-                      <span>City: <strong className="text-foreground">{detailListing.city}</strong></span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex border-b">
-              <button
-                className={`py-2.5 px-4 font-semibold text-sm border-b-2 transition-all -mb-px ${
-                  activeTab === 'details'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('details')}
-              >
-                Detailed Information
-              </button>
-              <button
-                className={`py-2.5 px-4 font-semibold text-sm border-b-2 transition-all -mb-px ${
-                  activeTab === 'history'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('history')}
-              >
-                Moderation History
-              </button>
-            </div>
-
-            {/* Tab content */}
-            {activeTab === 'details' ? (
-              <div className="space-y-5">
-                {/* Description */}
+          <div className="flex flex-col lg:flex-row h-[85vh]">
+            {/* LEFT SIDE - Product Details Review */}
+            <div className="flex-1 overflow-y-auto border-r p-6 space-y-6">
+              {/* Header */}
+              <div className="flex items-start justify-between">
                 <div>
-                  <h4 className="font-semibold text-sm text-foreground mb-1">Description</h4>
-                  <p className="text-sm text-muted-foreground bg-muted/20 p-3 rounded-lg border whitespace-pre-wrap max-h-48 overflow-y-auto">
-                    {detailListing.description || 'No description provided.'}
-                  </p>
-                </div>
-
-                {/* Listing Type pricing options */}
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm text-foreground">Type & Pricing Specifications</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-3.5 rounded-lg border bg-muted/10 flex flex-col justify-between space-y-2">
-                      <div>
-                        <span className="font-medium block text-xs text-muted-foreground mb-1">Product (Buy)</span>
-                        <Badge variant={detailListing.availableForPurchase ? 'success' : 'secondary'}>
-                          {detailListing.availableForPurchase ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </div>
-                      {detailListing.availableForPurchase && (
-                        <span className="text-lg font-bold block text-foreground">{formatCurrency(detailListing.price, detailListing.currency)}</span>
-                      )}
-                    </div>
-
-                    <div className="p-3.5 rounded-lg border bg-muted/10 flex flex-col justify-between space-y-2">
-                      <div>
-                        <span className="font-medium block text-xs text-muted-foreground mb-1">Rental (Rent)</span>
-                        <Badge variant={detailListing.availableForRent ? 'success' : 'secondary'}>
-                          {detailListing.availableForRent ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </div>
-                      {detailListing.availableForRent && (
-                        <div className="text-xs space-y-0.5">
-                          <span className="font-bold text-foreground block">{formatCurrency(detailListing.rentalPricePerDay || 0, detailListing.currency)} / day</span>
-                          <span className="text-muted-foreground block">Deposit: {formatCurrency(detailListing.rentalDeposit || 0, detailListing.currency)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3.5 rounded-lg border bg-muted/10 flex flex-col justify-between space-y-2">
-                      <div>
-                        <span className="font-medium block text-xs text-muted-foreground mb-1">Custom Orders</span>
-                        <Badge variant={detailListing.customOrderAvailable ? 'success' : 'secondary'}>
-                          {detailListing.customOrderAvailable ? 'Supported' : 'Unsupported'}
-                        </Badge>
-                      </div>
-                      {detailListing.customOrderAvailable && (
-                        <span className="text-xs text-muted-foreground block">Accepts custom order customizations.</span>
-                      )}
-                    </div>
+                  <h2 className="text-2xl font-bold text-foreground">{detailListing.title}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                    <StatusBadge status={detailListing.status} domain="listing" />
+                    {detailListing.isFeatured && (
+                      <Badge className="bg-amber-500 text-white font-bold text-[10px] uppercase">Featured</Badge>
+                    )}
                   </div>
                 </div>
+                <Button variant="outline" size="sm" onClick={() => setActiveTab(activeTab === 'details' ? 'history' : 'details')}>
+                  {activeTab === 'details' ? 'View History' : 'View Details'}
+                </Button>
+              </div>
 
-                {/* Seller information card */}
-                <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
-                  <h4 className="font-semibold text-sm text-foreground">Seller Profile Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground text-xs block">Display Name</span>
-                      <span className="font-medium text-foreground">{detailListing.seller?.displayName || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs block">Email Address</span>
-                      <span className="font-medium text-foreground">{detailListing.seller?.email || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs block">Contact Phone</span>
-                      <span className="font-medium text-foreground">{detailListing.seller?.phone || '-'}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground text-xs block">Seller Location</span>
-                      <span className="font-medium text-foreground">{detailListing.seller?.location || '-'}</span>
-                    </div>
+              {/* Image Carousel */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm text-foreground">Product Images</h3>
+                {detailListing.images && detailListing.images.length > 0 ? (
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {detailListing.images.map((img, idx) => (
+                      <img
+                        key={img.id || idx}
+                        src={img.url}
+                        alt={`Product image ${idx + 1}`}
+                        className="h-48 w-48 rounded-lg object-cover bg-muted border flex-shrink-0"
+                      />
+                    ))}
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-muted-foreground/10">
-                    <Badge variant={detailListing.seller?.emailVerifiedAt ? 'success' : 'secondary'} className="text-[10px]">
-                      {detailListing.seller?.emailVerifiedAt ? 'Email Verified' : 'Email Unverified'}
-                    </Badge>
-                    <Badge variant={detailListing.seller?.phoneVerifiedAt ? 'success' : 'secondary'} className="text-[10px]">
-                      {detailListing.seller?.phoneVerifiedAt ? 'Phone Verified' : 'Phone Unverified'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Rejected reason, if applicable */}
-                {detailListing.status === 'rejected' && detailListing.rejectedReason && (
-                  <div className="border border-destructive/20 bg-destructive/5 rounded-lg p-3 text-sm">
-                    <span className="font-semibold text-destructive block mb-0.5">Rejection Reason:</span>
-                    <p className="text-foreground">{detailListing.rejectedReason}</p>
+                ) : detailListing.primaryImageUrl ? (
+                  <img src={detailListing.primaryImageUrl} alt="" className="h-48 w-48 rounded-lg object-cover bg-muted border" />
+                ) : (
+                  <div className="h-48 w-48 rounded-lg bg-muted flex items-center justify-center text-sm text-muted-foreground border">
+                    No images
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
-                {historyLoading ? (
-                  <div className="flex justify-center p-8"><Spinner /></div>
-                ) : !history || history.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12">No moderation history recorded for this listing.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {history.map((log: any) => (
-                      <div key={log.id} className="border rounded-lg p-3 text-sm bg-muted/5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-primary capitalize">{log.action.replace('listing.', '').replace(/_/g, ' ')}</span>
-                          <span className="text-xs text-muted-foreground">{formatDateTime(log.createdAt)}</span>
+
+              {activeTab === 'details' ? (
+                <>
+                  {/* Description */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm text-foreground">Description</h3>
+                    <p className="text-sm text-muted-foreground bg-muted/20 p-4 rounded-lg border whitespace-pre-wrap">
+                      {detailListing.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  {/* Pricing Terms */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm text-foreground">Pricing Terms</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-lg border bg-muted/10">
+                        <span className="text-xs text-muted-foreground block mb-1">Base Price</span>
+                        <span className="text-xl font-bold text-foreground">{formatCurrency(detailListing.price, detailListing.currency)}</span>
+                      </div>
+                      {detailListing.availableForRent && (
+                        <div className="p-4 rounded-lg border bg-muted/10">
+                          <span className="text-xs text-muted-foreground block mb-1">Rental Price</span>
+                          <span className="text-xl font-bold text-foreground">{formatCurrency(detailListing.rentalPricePerDay || 0, detailListing.currency)} / day</span>
                         </div>
-                        <div className="text-xs text-muted-foreground flex gap-4">
-                          <span>Moderator: <strong className="text-foreground">{log.actor?.displayName || log.actor?.email || 'System'}</strong></span>
-                          {log.ipAddress && <span>IP: {log.ipAddress}</span>}
+                      )}
+                      {detailListing.rentalDeposit && (
+                        <div className="p-4 rounded-lg border bg-muted/10">
+                          <span className="text-xs text-muted-foreground block mb-1">Rental Deposit</span>
+                          <span className="text-xl font-bold text-foreground">{formatCurrency(detailListing.rentalDeposit, detailListing.currency)}</span>
                         </div>
-                        {log.metadata?.reason && (
-                          <div className="mt-2 bg-muted/40 p-2 rounded text-xs border border-muted-foreground/10 text-foreground">
-                            <span className="font-semibold text-muted-foreground block mb-0.5">Rejection Reason:</span>
-                            {String(log.metadata.reason)}
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rental Deposit Rules */}
+                  {detailListing.availableForRent && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-sm text-foreground">Rental Deposit Rules</h3>
+                      <div className="p-4 rounded-lg border bg-muted/10 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Min Duration:</span>
+                          <span className="font-medium">{detailListing.minRentalDurationDays} day(s)</span>
+                        </div>
+                        {detailListing.maxRentalDurationDays && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Max Duration:</span>
+                            <span className="font-medium">{detailListing.maxRentalDurationDays} day(s)</span>
+                          </div>
+                        )}
+                        {detailListing.cleaningPolicy && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cleaning Policy:</span>
+                            <span className="font-medium capitalize">{detailListing.cleaningPolicy}</span>
                           </div>
                         )}
                       </div>
-                    ))}
+                    </div>
+                  )}
+
+                  {/* Custom Tailoring Lead Times */}
+                  {detailListing.customOrderAvailable && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-sm text-foreground">Custom Tailoring Details</h3>
+                      <div className="p-4 rounded-lg border bg-muted/10 space-y-2 text-sm">
+                        {detailListing.estimatedProductionDays && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Production Time:</span>
+                            <span className="font-medium">{detailListing.estimatedProductionDays} days</span>
+                          </div>
+                        )}
+                        {detailListing.startingCustomPrice && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Starting Price:</span>
+                            <span className="font-medium">{formatCurrency(detailListing.startingCustomPrice, detailListing.currency)}</span>
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                          <Badge variant={detailListing.supportsReadyMade ? 'success' : 'secondary'} className="text-xs">
+                            Ready Made: {detailListing.supportsReadyMade ? 'Yes' : 'No'}
+                          </Badge>
+                          <Badge variant={detailListing.supportsCustomDesign ? 'success' : 'secondary'} className="text-xs">
+                            Custom Design: {detailListing.supportsCustomDesign ? 'Yes' : 'No'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Local Taxonomy Tags */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm text-foreground">Category & Tags</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Category:</span>
+                        <Badge variant="outline">{detailListing.category?.name || 'Uncategorized'}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Condition:</span>
+                        <Badge variant="outline" className="capitalize">{detailListing.condition}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Location:</span>
+                        <span className="text-sm font-medium">{detailListing.city || 'Not specified'}, {detailListing.country || 'ET'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seller Verification Badge */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm text-foreground">Seller Information</h3>
+                    <div className="p-4 rounded-lg border bg-muted/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-foreground">{detailListing.seller?.displayName || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">{detailListing.seller?.email || ''}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          {detailListing.seller?.emailVerifiedAt && (
+                            <Badge variant="success" className="text-[10px]">✓ Email Verified</Badge>
+                          )}
+                          {detailListing.seller?.phoneVerifiedAt && (
+                            <Badge variant="success" className="text-[10px]">✓ Phone Verified</Badge>
+                          )}
+                        </div>
+                      </div>
+                      {detailListing.seller?.location && (
+                        <p className="text-xs text-muted-foreground">📍 {detailListing.seller.location}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rejected Reason Display */}
+                  {detailListing.status === 'rejected' && detailListing.rejectedReason && (
+                    <div className="border border-destructive/20 bg-destructive/5 rounded-lg p-4">
+                      <h3 className="font-semibold text-sm text-destructive mb-2">Previous Rejection Reason</h3>
+                      <p className="text-sm text-foreground">{detailListing.rejectedReason}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm text-foreground">Moderation History</h3>
+                  {historyLoading ? (
+                    <div className="flex justify-center p-8"><Spinner /></div>
+                  ) : !history || history.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-12">No moderation history recorded.</p>
+                  ) : (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {history.map((log: any) => (
+                        <div key={log.id} className="border rounded-lg p-4 text-sm bg-muted/5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-primary capitalize">{log.action.replace('listing.', '').replace(/_/g, ' ')}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(log.createdAt)}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Moderator: <strong className="text-foreground">{log.actor?.displayName || log.actor?.email || 'System'}</strong>
+                          </div>
+                          {log.metadata?.reason && (
+                            <div className="mt-2 bg-muted/40 p-3 rounded text-xs border border-muted-foreground/10 text-foreground">
+                              <span className="font-semibold text-muted-foreground block mb-1">Reason:</span>
+                              {String(log.metadata.reason)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT SIDE - Action Form */}
+            <div className="w-full lg:w-96 p-6 bg-muted/30 border-l space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-foreground mb-1">Moderation Actions</h3>
+                <p className="text-sm text-muted-foreground">Review and take action on this listing</p>
+              </div>
+
+              {/* Quick Status Info */}
+              <div className="p-4 rounded-lg bg-background border space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Current Status:</span>
+                  <StatusBadge status={detailListing.status} domain="listing" />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Created:</span>
+                  <span className="text-sm font-medium">{formatDate(detailListing.createdAt)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Price:</span>
+                  <span className="text-sm font-medium">{formatCurrency(detailListing.price, detailListing.currency)}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {showRejectForm ? (
+                  <div className="border border-destructive/20 rounded-lg p-4 bg-destructive/5 space-y-3">
+                    <label className="block text-sm font-semibold text-destructive">Rejection Reason (Required)</label>
+                    <textarea
+                      placeholder="Provide a detailed reason explaining why this listing is being rejected..."
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background p-3 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-destructive"
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setShowRejectForm(false); setRejectReason('') }} className="flex-1">
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleAction('reject')} disabled={actionLoading || !rejectReason.trim()} className="flex-1">
+                        {actionLoading ? 'Processing...' : 'Confirm Reject'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : showChangesForm ? (
+                  <div className="border border-yellow-200 dark:border-yellow-900/30 rounded-lg p-4 bg-yellow-50 dark:bg-yellow-900/10 space-y-3">
+                    <label className="block text-sm font-semibold text-yellow-700 dark:text-yellow-300">Request Changes - Feedback (Required)</label>
+                    <textarea
+                      placeholder="Describe the changes needed before approval (e.g., better photos, more details, pricing adjustments)..."
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      className="w-full rounded-md border border-input bg-background p-3 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setShowChangesForm(false); setRejectReason('') }} className="flex-1">
+                        Cancel
+                      </Button>
+                      <Button variant="primary" size="sm" onClick={() => handleAction('request_changes')} disabled={actionLoading || !rejectReason.trim()} className="flex-1">
+                        {actionLoading ? 'Processing...' : 'Request Changes'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : deleteConfirm ? (
+                  <div className="border border-destructive/20 rounded-lg p-4 bg-destructive/5 space-y-3">
+                    <p className="text-sm font-semibold text-destructive">Are you sure you want to delete this listing?</p>
+                    <p className="text-xs text-muted-foreground">This action will archive and soft-delete the listing.</p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(false)} className="flex-1">
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleAction('delete')} disabled={actionLoading} className="flex-1">
+                        {actionLoading ? 'Processing...' : 'Delete'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Button
+                      onClick={() => handleAction('approve')}
+                      disabled={actionLoading || detailListing.status === 'active'}
+                      size="lg"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      ✓ Approve Listing
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowChangesForm(true)}
+                      disabled={actionLoading || detailListing.status === 'rejected' || detailListing.status === 'active'}
+                      size="lg"
+                      className="w-full border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                    >
+                      ⚠ Request Changes
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowRejectForm(true)}
+                      disabled={actionLoading || detailListing.status === 'rejected'}
+                      size="lg"
+                      className="w-full"
+                    >
+                      ✕ Reject Listing
+                    </Button>
+                    <div className="border-t pt-2 space-y-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => handleAction('hide')}
+                        disabled={actionLoading || detailListing.status === 'archived'}
+                        size="sm"
+                        className="w-full"
+                      >
+                        Hide / Archive
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleAction('feature')}
+                        disabled={actionLoading}
+                        size="sm"
+                        className="w-full"
+                      >
+                        {detailListing.isFeatured ? 'Unfeature' : 'Feature'} Listing
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setDeleteConfirm(true)}
+                        disabled={actionLoading}
+                        size="sm"
+                        className="w-full"
+                      >
+                        Delete Permanently
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
-            )}
 
-            {/* Moderation Controls footer */}
-            <div className="pt-4 border-t">
-              {showRejectForm ? (
-                <div className="border border-destructive/20 rounded-lg p-4 bg-destructive/5 space-y-3">
-                  <label className="block text-sm font-semibold text-destructive">Enter Rejection Reason</label>
-                  <textarea
-                    placeholder="Provide a detailed reason explaining why this listing is being rejected..."
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background p-3 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setShowRejectForm(false); setRejectReason('') }}>Cancel</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleAction('reject')} disabled={actionLoading}>
-                      {actionLoading ? 'Processing...' : 'Confirm Rejection'}
-                    </Button>
-                  </div>
-                </div>
-              ) : deleteConfirm ? (
-                <div className="border border-destructive/20 rounded-lg p-4 bg-destructive/5 space-y-3">
-                  <p className="text-sm font-semibold text-destructive">Are you sure you want to delete this listing? This action will archive and soft-delete it.</p>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleAction('delete')} disabled={actionLoading}>
-                      {actionLoading ? 'Processing...' : 'Yes, Delete Listing'}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap justify-between items-center gap-3">
-                  <div className="flex gap-2">
-                    {detailListing.status !== 'active' && (
-                      <Button onClick={() => handleAction('approve')} disabled={actionLoading} size="sm">
-                        Approve
-                      </Button>
-                    )}
-                    {detailListing.status !== 'rejected' && (
-                      <Button variant="destructive" onClick={() => setShowRejectForm(true)} disabled={actionLoading} size="sm">
-                        Reject
-                      </Button>
-                    )}
-                    {detailListing.status !== 'archived' && (
-                      <Button variant="outline" onClick={() => handleAction('hide')} disabled={actionLoading} size="sm">
-                        Hide
-                      </Button>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => handleAction('feature')} disabled={actionLoading} size="sm">
-                      {detailListing.isFeatured ? 'Unfeature Listing' : 'Feature Listing'}
-                    </Button>
-                    <Button variant="destructive" onClick={() => setDeleteConfirm(true)} disabled={actionLoading} size="sm">
-                      Delete
-                    </Button>
-                  </div>
-                </div>
+              {error && (
+                <Alert variant="error">{error}</Alert>
               )}
             </div>
           </div>

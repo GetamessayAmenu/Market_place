@@ -65,6 +65,11 @@ export class CreateCustomOrderDto {
   listingId!: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  selectedSize?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => MeasurementsDto)
   measurements?: MeasurementsDto;
@@ -72,35 +77,33 @@ export class CreateCustomOrderDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  fabricChoice?: string;
+  selectedFabric?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  colorChoice?: string;
+  selectedColor?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(5000)
-  designNotes?: string;
+  embroideryNotes?: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @MaxLength(500, { each: true })
-  referenceImages?: string[];
+  inspirationImages?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  buyerNotes?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(99_999_999.99)
-  estimatedPrice?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(365)
-  estimatedDays?: number;
+  agreedPrice?: number;
 }

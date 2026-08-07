@@ -123,7 +123,10 @@ export class RentalsRepository {
   }
 
   async count(where?: Prisma.RentalOrderWhereInput) {
-    return this.prisma.rentalOrder.count({ where });
+    if (where) {
+      return this.prisma.rentalOrder.count({ where });
+    }
+    return this.prisma.rentalOrder.count();
   }
 
   // Check availability for a listing during a date range
@@ -133,13 +136,35 @@ export class RentalsRepository {
     endDate: Date,
     excludeOrderId?: string,
   ) {
+    const where: Prisma.RentalOrderWhereInput = {
+      listingId,
+      status: {
+        in: ['APPROVED', 'HANDOVER_PENDING', 'ACTIVE'],
+      },
+      OR: [
+        {
+          startDate: { lte: endDate },
+          endDate: { gte: startDate },
+        },
+      ],
+    };
+
+    if (excludeOrderId) {
+      where.id = { not: excludeOrderId };
+    }
+
     const conflictingOrders = await this.prisma.rentalOrder.findMany({
+      where,
+    });
+
+    if (conflictingOrders.length > 0) {
+      return false;
+    }
+
+    // Check blackout dates
+    const conflictingBlackoutDates = await this.prisma.rentalBlackoutDate.findMany({
       where: {
         listingId,
-        status: {
-          in: ['APPROVED', 'HANDOVER_PENDING', 'ACTIVE'],
-        },
-        id: excludeOrderId ? { not: excludeOrderId } : undefined,
         OR: [
           {
             startDate: { lte: endDate },
@@ -149,7 +174,7 @@ export class RentalsRepository {
       },
     });
 
-    return conflictingOrders.length === 0;
+    return conflictingBlackoutDates.length === 0;
   }
 
   // Get rental orders for a user (as renter or seller)
@@ -214,6 +239,114 @@ export class RentalsRepository {
             displayName: true,
           },
         },
+      },
+    });
+  }
+
+  // Condition Log methods
+  async createConditionLog(data: any) {
+    return this.prisma.rentalConditionLog.create({
+      data,
+      include: {
+        booking: {
+          select: {
+            id: true,
+            orderNumber: true,
+            listing: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+          },
+        },
+        loggedByUser: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findConditionLogsByBooking(bookingId: string) {
+    return this.prisma.rentalConditionLog.findMany({
+      where: { bookingId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        loggedByUser: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+  }
+
+  // Blackout Date methods
+  async createBlackoutDate(data: any) {
+    return this.prisma.rentalBlackoutDate.create({
+      data,
+      include: {
+        listing: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findBlackoutDatesByListing(listingId: string) {
+    return this.prisma.rentalBlackoutDate.findMany({
+      where: { listingId },
+      orderBy: { startDate: 'asc' },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async deleteBlackoutDate(id: string, userId: string) {
+    return this.prisma.rentalBlackoutDate.deleteMany({
+      where: {
+        id,
+        createdByUserId: userId,
+      },
+    });
+  }
+
+  // Cancel concurrent pending requests when a booking is approved
+  async cancelConcurrentPendingRequests(listingId: string, startDate: Date, endDate: Date, approvedBookingId: string) {
+    return this.prisma.rentalOrder.updateMany({
+      where: {
+        listingId,
+        status: 'REQUESTED',
+        id: { not: approvedBookingId },
+        OR: [
+          {
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+          },
+        ],
+      },
+      data: {
+        status: 'DECLINED',
+        cancellationReason: 'Automatically declined due to conflicting approved booking',
       },
     });
   }

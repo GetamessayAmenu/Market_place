@@ -23,7 +23,17 @@ export default function SeasonalSuggestionsSection({
   useEffect(() => {
     // Client-side only to avoid hydration mismatch with dates
     const upcoming = getUpcomingEthiopianEvents();
-    setEvents(upcoming.filter((e) => !dismissedIds.includes(e.id)));
+    setEvents(
+      upcoming
+        .filter((e) => !dismissedIds.includes(e.id))
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          date: e.gregorianDate,
+          daysAway: e.daysUntil,
+          suggestion: e.suggestion,
+        }))
+    );
   }, [dismissedIds]);
 
   if (events.length === 0) return null;
@@ -48,9 +58,9 @@ export default function SeasonalSuggestionsSection({
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {event.gregorianDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                    {event.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
                     {' • '}
-                    {toEthiopianDateString(event.gregorianDate)}
+                    {toEthiopianDateString(event.date)}
                   </p>
                   <p className="mt-2 text-sm font-medium text-foreground">
                     💡 Suggestion: <span className="font-normal text-muted-foreground">{event.suggestion}</span>

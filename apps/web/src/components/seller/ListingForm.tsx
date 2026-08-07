@@ -33,6 +33,18 @@ export interface ListingFormData {
   images: UploadedImage[];
   pricing: PricingData;
   delivery: DeliveryData;
+  // Unified custom design fields
+  supportsReadyMade?: boolean;
+  supportsCustomDesign?: boolean;
+  startingCustomPrice?: string;
+  estimatedProductionDays?: string;
+  customizationOptions?: {
+    requiresMeasurements: boolean;
+    fabricTypes: string[];
+    colors: string[];
+    embroideryTypes: string[];
+    customNotesAllowed: boolean;
+  };
 }
 
 interface ListingFormProps {
@@ -263,7 +275,20 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
   const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
   const [images, setImages] = useState<UploadedImage[]>(initialData?.images ?? []);
   const [pricing, setPricing] = useState<PricingData>(initialData?.pricing ?? { ...DEFAULT_PRICING, price: initialData?.price ?? '' });
-  const [delivery, setDelivery] = useState<DeliveryData>(initialData?.delivery ?? { ...DEFAULT_DELIVERY });
+  const [delivery, setDelivery] = useState<DeliveryData>(initialData?.delivery ?? {
+    ...DEFAULT_DELIVERY,
+    supportsReadyMade: initialData?.supportsReadyMade ?? true,
+    supportsCustomDesign: initialData?.supportsCustomDesign ?? false,
+    startingCustomPrice: initialData?.startingCustomPrice ?? '',
+    estimatedProductionDays: initialData?.estimatedProductionDays ?? '',
+    customizationOptions: initialData?.customizationOptions ?? {
+      requiresMeasurements: false,
+      fabricTypes: [],
+      colors: [],
+      embroideryTypes: [],
+      customNotesAllowed: true,
+    },
+  });
   const [contactOptions, setContactOptions] = useState(initialData?.contactOptions ?? {
     showPhone: false,
     whatsapp: '',
@@ -316,8 +341,11 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
 
     if (stepIndex === 3) {
       // Delivery
-      if (!delivery.availableForPurchase && !delivery.availableForRent && !delivery.customOrderAvailable) {
+      if (!delivery.supportsReadyMade && !delivery.supportsCustomDesign && !delivery.availableForRent) {
         errs.availability = 'Select at least one availability option';
+      }
+      if (delivery.supportsCustomDesign && (!delivery.estimatedProductionDays || Number(delivery.estimatedProductionDays) <= 0)) {
+        errs.estimatedProductionDays = 'Estimated production days is required for custom design';
       }
       if ((delivery.deliveryMethod === 'delivery' || delivery.deliveryMethod === 'both') && !delivery.deliveryFee) {
         errs.deliveryFee = 'Delivery fee is required when delivery is selected';
@@ -372,6 +400,11 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
       images,
       pricing,
       delivery,
+      supportsReadyMade: delivery.supportsReadyMade,
+      supportsCustomDesign: delivery.supportsCustomDesign,
+      startingCustomPrice: delivery.startingCustomPrice,
+      estimatedProductionDays: delivery.estimatedProductionDays,
+      customizationOptions: delivery.customizationOptions,
     });
   }
 
@@ -387,9 +420,11 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
               setListingType(type);
               // Set type-appropriate defaults
               if (type === 'rent') {
-                setDelivery((prev) => ({ ...prev, availableForRent: true, availableForPurchase: false }));
+                setDelivery((prev) => ({ ...prev, availableForRent: true, supportsReadyMade: false, supportsCustomDesign: false }));
               } else if (type === 'custom') {
-                setDelivery((prev) => ({ ...prev, customOrderAvailable: true, availableForRent: false }));
+                setDelivery((prev) => ({ ...prev, supportsCustomDesign: true, supportsReadyMade: false, availableForRent: false }));
+              } else {
+                setDelivery((prev) => ({ ...prev, supportsReadyMade: true, supportsCustomDesign: false, availableForRent: false }));
               }
             }}
           />

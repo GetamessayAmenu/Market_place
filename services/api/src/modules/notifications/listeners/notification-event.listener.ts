@@ -61,6 +61,13 @@ export class NotificationEventListener implements OnModuleInit {
           payload.listingId,
           listing.title,
         );
+        // Emit domain event for realtime Socket.IO delivery
+        this.eventEmitter.emit('listing.moderated', {
+          sellerId: payload.sellerId,
+          listingId: payload.listingId,
+          status: 'active',
+          title: listing.title,
+        });
       } else if (listing.status === 'rejected') {
         // Listing was rejected
         const reason = listing.rejectedReason ?? undefined;
@@ -70,6 +77,24 @@ export class NotificationEventListener implements OnModuleInit {
           listing.title,
           reason,
         );
+        // Emit domain event for realtime Socket.IO delivery
+        this.eventEmitter.emit('listing.moderated', {
+          sellerId: payload.sellerId,
+          listingId: payload.listingId,
+          status: 'rejected',
+          reason,
+          title: listing.title,
+        });
+      } else if (listing.status === 'pending_review') {
+        // Changes requested - emit event for realtime delivery
+        const reason = listing.rejectedReason ?? undefined;
+        this.eventEmitter.emit('listing.moderated', {
+          sellerId: payload.sellerId,
+          listingId: payload.listingId,
+          status: 'pending_review',
+          reason,
+          title: listing.title,
+        });
       }
     } catch (error) {
       this.logger.error(`Failed to handle listing update: ${(error as Error).message}`);

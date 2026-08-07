@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth'
 
 import OrderChoiceModal from './OrderChoiceModal'
 import RentDatePicker from './RentDatePicker'
+import CustomOrderForm from './CustomOrderForm'
 
 export interface ListingActionsProps {
   listingId: string
@@ -19,6 +20,18 @@ export interface ListingActionsProps {
   rentalDeposit: number | null
   sellerId: string
   className?: string
+  // Unified custom design fields
+  supportsReadyMade?: boolean
+  supportsCustomDesign?: boolean
+  startingCustomPrice?: number | null
+  estimatedProductionDays?: number | null
+  customizationOptions?: {
+    requiresMeasurements: boolean
+    fabricTypes: string[]
+    colors: string[]
+    embroideryTypes: string[]
+    customNotesAllowed: boolean
+  }
 }
 
 export default function ListingActions({
@@ -32,25 +45,36 @@ export default function ListingActions({
   rentalDeposit,
   sellerId,
   className,
+  supportsReadyMade = true,
+  supportsCustomDesign = false,
+  startingCustomPrice,
+  estimatedProductionDays,
+  customizationOptions,
 }: ListingActionsProps) {
   const router = useRouter()
   const { user } = useAuth()
   const [showChoiceModal, setShowChoiceModal] = useState(false)
   const [showRentPicker, setShowRentPicker] = useState(false)
+  const [showCustomOrderForm, setShowCustomOrderForm] = useState(false)
   const [rentStart, setRentStart] = useState('')
   const [rentEnd, setRentEnd] = useState('')
+  const [orderType, setOrderType] = useState<'ready-made' | 'custom'>('ready-made')
 
   const isOwnListing = user?.id === sellerId
+  const hasBothOptions = supportsReadyMade && supportsCustomDesign
 
   const handleBuyClick = () => {
     if (!user) {
       router.push(`/login?redirect=/listings/${listingId}`)
       return
     }
-    if (customOrderAvailable) {
+    if (hasBothOptions) {
+      setOrderType('ready-made')
       setShowChoiceModal(true)
-    } else {
+    } else if (supportsReadyMade) {
       router.push(`/checkout/buy/${listingId}`)
+    } else {
+      setShowCustomOrderForm(true)
     }
   }
 
@@ -66,10 +90,15 @@ export default function ListingActions({
 
   const handleCustomOrderClick = () => {
     if (!user) {
-      router.push(`/login?redirect=/custom-order/${listingId}`)
+      router.push(`/login?redirect=/listings/${listingId}`)
       return
     }
-    router.push(`/custom-order/${listingId}`)
+    if (hasBothOptions) {
+      setOrderType('custom')
+      setShowChoiceModal(true)
+    } else {
+      setShowCustomOrderForm(true)
+    }
   }
 
   const handleRentConfirm = () => {
@@ -91,46 +120,124 @@ export default function ListingActions({
 
   return (
     <div className={cn('space-y-4', className)}>
+      {/* Order Type Selector - shown when both options are available */}
+      {hasBothOptions && (
+        <div className="flex gap-2 p-1 bg-muted rounded-lg">
+          <button
+            onClick={() => setOrderType('ready-made')}
+            className={cn(
+              'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all',
+              orderType === 'ready-made'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Buy Ready-Made
+          </button>
+          <button
+            onClick={() => setOrderType('custom')}
+            className={cn(
+              'flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all',
+              orderType === 'custom'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Order Custom Design
+          </button>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex flex-col gap-3">
-        {availableForPurchase && (
-          <Button
-            onClick={handleBuyClick}
-            disabled={isOwnListing}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isOwnListing ? 'Your Listing' : `Buy Now — ${currency} ${price.toLocaleString()}`}
-          </Button>
+        {orderType === 'ready-made' && supportsReadyMade && (
+          <>
+            {availableForPurchase && (
+              <Button
+                onClick={handleBuyClick}
+                disabled={isOwnListing}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isOwnListing ? 'Your Listing' : `Buy Now — ${currency} ${price.toLocaleString()}`}
+              </Button>
+            )}
+
+            {availableForRent && rentalPricePerDay != null && (
+              <Button
+                variant="outline"
+                onClick={handleRentClick}
+                disabled={isOwnListing}
+                className="w-full border-2 border-brand-gold text-brand-gold hover:bg-brand-gold/10"
+              >
+                Rent — {currency} {rentalPricePerDay.toLocaleString()}/day
+              </Button>
+            )}
+          </>
         )}
 
-        {availableForRent && rentalPricePerDay != null && (
-          <Button
-            variant="outline"
-            onClick={handleRentClick}
-            disabled={isOwnListing}
-            className="w-full border-2 border-brand-gold text-brand-gold hover:bg-brand-gold/10"
-          >
-            Rent — {currency} {rentalPricePerDay.toLocaleString()}/day
-          </Button>
+        {orderType === 'custom' && supportsCustomDesign && (
+          <div className="space-y-3">
+            <div className="p-3 bg-brand-wine/5 border border-brand-wine/20 rounded-lg">
+              <p className="text-sm font-medium text-brand-wine">Starting from {currency} {startingCustomPrice?.toLocaleString() || 'Contact for price'}</p>
+              {estimatedProductionDays && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estimated production: {estimatedProductionDays} days
+                </p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleCustomOrderClick}
+              disabled={isOwnListing}
+              className="w-full border-2 border-brand-wine text-brand-wine hover:bg-brand-wine/10"
+            >
+              Order Custom Design
+            </Button>
+          </div>
         )}
 
-        {customOrderAvailable && (
-          <Button
-            variant="outline"
-            onClick={handleCustomOrderClick}
-            disabled={isOwnListing}
-            className="w-full border-2 border-brand-wine text-brand-wine hover:bg-brand-wine/10"
-          >
-            Order Custom Made
-          </Button>
+        {!hasBothOptions && (
+          <>
+            {supportsReadyMade && availableForPurchase && (
+              <Button
+                onClick={handleBuyClick}
+                disabled={isOwnListing}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isOwnListing ? 'Your Listing' : `Buy Now — ${currency} ${price.toLocaleString()}`}
+              </Button>
+            )}
+
+            {availableForRent && rentalPricePerDay != null && (
+              <Button
+                variant="outline"
+                onClick={handleRentClick}
+                disabled={isOwnListing}
+                className="w-full border-2 border-brand-gold text-brand-gold hover:bg-brand-gold/10"
+              >
+                Rent — {currency} {rentalPricePerDay.toLocaleString()}/day
+              </Button>
+            )}
+
+            {supportsCustomDesign && (
+              <Button
+                variant="outline"
+                onClick={handleCustomOrderClick}
+                disabled={isOwnListing}
+                className="w-full border-2 border-brand-wine text-brand-wine hover:bg-brand-wine/10"
+              >
+                Order Custom Made
+              </Button>
+            )}
+          </>
         )}
       </div>
 
       {/* Availability badges */}
       <div className="flex flex-wrap gap-2">
-        {availableForPurchase && <Badge variant="success">Available to Buy</Badge>}
+        {supportsReadyMade && <Badge variant="success">Ready-made</Badge>}
+        {supportsCustomDesign && <Badge variant="info">Custom Design</Badge>}
         {availableForRent && <Badge variant="warning">Available to Rent</Badge>}
-        {customOrderAvailable && <Badge variant="info">Custom Orders</Badge>}
       </div>
 
       {/* Rent date picker */}
@@ -170,9 +277,22 @@ export default function ListingActions({
         buyPrice={price}
         currency={currency}
         onBuy={() => { setShowChoiceModal(false); router.push(`/checkout/buy/${listingId}`) }}
-        onCustomOrder={() => { setShowChoiceModal(false); router.push(`/custom-order/${listingId}`) }}
+        onCustomOrder={() => { setShowChoiceModal(false); setShowCustomOrderForm(true) }}
         onClose={() => { setShowChoiceModal(false) }}
       />
+
+      {/* Custom Order Form */}
+      {showCustomOrderForm && (
+        <CustomOrderForm
+          listingId={listingId}
+          sellerId={sellerId}
+          startingPrice={startingCustomPrice}
+          estimatedDays={estimatedProductionDays}
+          customizationOptions={customizationOptions}
+          onClose={() => { setShowCustomOrderForm(false) }}
+          onSuccess={() => { setShowCustomOrderForm(false) }}
+        />
+      )}
     </div>
   )
 }

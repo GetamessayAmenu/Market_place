@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 
 import type { RevenueChartPoint } from '../../../lib/dashboardApi';
 import { formatETB } from '../../../lib/formatters';
-import type { Lang } from '../../../lib/i18n';
 
 // Lazy load the chart for performance
 const MiniBarChart = React.lazy(() => import('../../dashboard/MiniBarChart'));

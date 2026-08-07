@@ -46,6 +46,11 @@ export interface CreateListingData {
   readonly availableForPurchase?: boolean;
   readonly availableForRent?: boolean;
   readonly customOrderAvailable?: boolean;
+  readonly supportsReadyMade?: boolean;
+  readonly supportsCustomDesign?: boolean;
+  readonly startingCustomPrice?: Prisma.Decimal;
+  readonly estimatedProductionDays?: number;
+  readonly customizationOptions?: Prisma.InputJsonValue;
   readonly rentalPricePerDay?: Prisma.Decimal;
   readonly rentalDeposit?: Prisma.Decimal;
   readonly attributes?: Prisma.InputJsonValue;

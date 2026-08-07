@@ -7,7 +7,7 @@ export default async function ListingsPage() {
 
   let initialData
   try {
-    initialData = await fetchAdminListings({ page: 1, limit: 10 })
+    initialData = await fetchAdminListings({ page: 1, limit: 10, status: 'pending_review' })
   } catch {
     initialData = { success: true, data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
   }

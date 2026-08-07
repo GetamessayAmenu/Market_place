@@ -54,8 +54,8 @@ export class VerificationAdminService {
 
     const where: Prisma.VerificationRequestWhereInput = {
       deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.type ? { type: query.type } : {}),
+      ...(query.status ? { status: query.status as any } : {}),
+      ...(query.type ? { type: query.type as any } : {}),
       ...(query.userId ? { userId: query.userId } : {}),
     };
 
@@ -91,10 +91,11 @@ export class VerificationAdminService {
     const updated = await this.prisma.verificationRequest.update({
       where: { id: verificationId },
       data: {
-        status: dto.decision,
+        status: dto.decision as any,
         reviewedById: admin.id,
         reviewedAt: new Date(),
         ...(dto.decision === 'rejected' && dto.reason ? { rejectionReason: dto.reason } : {}),
+        ...(dto.notes ? { reviewerNotes: dto.notes } : {}),
       },
       include: {
         user: { select: { id: true, displayName: true, email: true } },
@@ -108,6 +109,29 @@ export class VerificationAdminService {
           verification.type,
         );
       }
+    } else if (dto.decision === 'rejected') {
+      // Send rejection notification
+      await this.notificationsService.createCustomNotification(
+        verification.userId,
+        'verification_rejected',
+        'Verification Rejected',
+        `Your ${verification.type} verification was rejected: ${dto.reason || dto.notes || 'No reason provided'}`,
+        {
+          verificationType: verification.type,
+          reason: dto.reason || dto.notes,
+        },
+      );
+    } else if (dto.decision === 'changes_requested') {
+      await this.notificationsService.createCustomNotification(
+        verification.userId,
+        'verification_changes_requested',
+        'Verification Changes Requested',
+        `Your ${verification.type} verification requires changes: ${dto.notes || 'Please review and update your submission'}`,
+        {
+          verificationType: verification.type,
+          reason: dto.notes,
+        },
+      );
     }
 
     try {
@@ -120,6 +144,95 @@ export class VerificationAdminService {
           type: verification.type,
           decision: dto.decision,
           reason: dto.reason,
+          notes: dto.notes,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    return updated;
+  }
+
+  async getVerificationDetail(id: string) {
+    const verification = await this.prisma.verificationRequest.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        user: { select: { id: true, displayName: true, email: true } },
+        reviewedBy: { select: { id: true, displayName: true } },
+      },
+    });
+
+    if (!verification) {
+      throw new NotFoundException('Verification request not found');
+    }
+
+    // Fetch verification history - using raw query until schema is updated
+    const history = await this.prisma.$queryRaw`
+      SELECT vh.id, vh.action, vh.status, vh.notes, vh.actor_id as "actorId", u.display_name as "actorName", vh.created_at as "createdAt"
+      FROM verification_history vh
+      LEFT JOIN users u ON vh.actor_id = u.id
+      WHERE vh.verification_request_id = ${id}
+      ORDER BY vh.created_at DESC
+    `;
+
+    return {
+      item: verification,
+      history: (history as any[]).map((h: any) => ({
+        id: h.id,
+        action: h.action,
+        status: h.status,
+        notes: h.notes,
+        actorId: h.actorId,
+        actorName: h.actorName,
+        createdAt: h.createdAt,
+      })),
+    };
+  }
+
+  async updateVerificationStatus(
+    admin: { id: string },
+    verificationId: string,
+    dto: { status: string; action?: string; notes?: string },
+  ) {
+    const verification = await this.prisma.verificationRequest.findFirst({
+      where: { id: verificationId, deletedAt: null },
+    });
+    if (!verification) {
+      throw new NotFoundException('Verification request not found');
+    }
+
+    const updated = await this.prisma.verificationRequest.update({
+      where: { id: verificationId },
+      data: {
+        status: dto.status as any,
+        ...(dto.notes ? { reviewerNotes: dto.notes } : {}),
+      },
+      include: {
+        user: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+
+    // Create history entry - using raw query until schema is updated
+    try {
+      await this.prisma.$queryRaw`
+        INSERT INTO verification_history (id, verification_request_id, action, status, notes, actor_id, created_at)
+        VALUES (gen_random_uuid(), ${verificationId}, ${dto.action || 'status_update'}, ${dto.status}, ${dto.notes || null}, ${admin.id}, NOW())
+      `;
+    } catch (err) {
+      // Table might not exist yet, ignore error
+      console.warn('Could not create verification history entry:', err);
+    }
+
+    try {
+      await this.adminLogsService.createLog({
+        actorId: admin.id,
+        action: dto.action || 'status_update',
+        resource: 'verification_request',
+        resourceId: verificationId,
+        metadata: {
+          status: dto.status,
+          notes: dto.notes,
         },
       });
     } catch {
@@ -154,7 +267,13 @@ export class VerificationAdminService {
       },
     });
 
-    await this.notificationsService.createSellerVerifiedNotification(userId, 'verified_designer');
+    await this.notificationsService.createCustomNotification(
+      userId,
+      'verified_designer',
+      'Designer Verified',
+      'Your designer profile has been verified',
+      { userId },
+    );
 
     try {
       await this.adminLogsService.createLog({
@@ -338,8 +457,35 @@ export class VerificationAdminService {
       },
     });
 
+    // If approved, mark user as business verified to enable publishing
+    if (dto.decision === 'APPROVED') {
+      await this.prisma.user.update({
+        where: { id: profile.userId },
+        data: {
+          emailVerifiedAt: profile.user.emailVerifiedAt || new Date(),
+        },
+      });
+    }
+
     // Notify user about KYC decision
-    await this.notificationsService.createSellerVerifiedNotification(profile.userId, 'business');
+    try {
+      if (dto.decision === 'APPROVED') {
+        await this.notificationsService.createSellerVerifiedNotification(profile.userId, 'business');
+      } else if (dto.decision === 'REJECTED') {
+        await this.notificationsService.createCustomNotification(
+          profile.userId,
+          'vendor_kyc_rejected',
+          'Vendor KYC Rejected',
+          `Your vendor KYC profile for ${profile.businessName} was rejected: ${dto.reason || 'No reason provided'}`,
+          {
+            businessName: profile.businessName,
+            reason: dto.reason,
+          },
+        );
+      }
+    } catch (err) {
+      console.warn('Failed to send notification for vendor KYC review:', err);
+    }
 
     try {
       await this.adminLogsService.createLog({

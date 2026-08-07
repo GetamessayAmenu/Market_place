@@ -32,6 +32,7 @@ export class OrdersRepository extends BaseRepository<any> {
             email: true,
             phone: true,
             avatarUrl: true,
+            location: true,
           },
         },
         seller: {
@@ -41,9 +42,10 @@ export class OrdersRepository extends BaseRepository<any> {
             email: true,
             phone: true,
             avatarUrl: true,
+            location: true,
           },
         },
-        listing: {
+        product: {
           select: {
             id: true,
             title: true,
@@ -57,6 +59,8 @@ export class OrdersRepository extends BaseRepository<any> {
             },
           },
         },
+        conversation: true,
+        customQuotes: true,
       },
     });
   }
@@ -92,7 +96,7 @@ export class OrdersRepository extends BaseRepository<any> {
             location: true,
           },
         },
-        listing: {
+        product: {
           select: {
             id: true,
             title: true,
@@ -105,7 +109,8 @@ export class OrdersRepository extends BaseRepository<any> {
             },
           },
         },
-        customOrder: true,
+        conversation: true,
+        customQuotes: true,
       },
     });
   }
@@ -121,6 +126,7 @@ export class OrdersRepository extends BaseRepository<any> {
             email: true,
             phone: true,
             avatarUrl: true,
+            location: true,
           },
         },
         seller: {
@@ -130,17 +136,24 @@ export class OrdersRepository extends BaseRepository<any> {
             email: true,
             phone: true,
             avatarUrl: true,
+            location: true,
           },
         },
-        listing: {
+        product: {
           select: {
             id: true,
             title: true,
             slug: true,
             price: true,
             currency: true,
+            images: {
+              where: { deletedAt: null },
+              orderBy: { isPrimary: 'desc' },
+            },
           },
         },
+        conversation: true,
+        customQuotes: true,
       },
     });
   }

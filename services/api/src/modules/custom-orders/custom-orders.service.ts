@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { CustomOrderStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import { ListingsRepository } from '../listings/listings.repository';
+import { CustomOrderCreatedEvent, CustomOrderStatusUpdatedEvent } from '../events/notification.domain-events';
 
 import { CustomOrdersRepository } from './custom-orders.repository';
 import type { CreateCustomOrderDto } from './dto/create-custom-order.dto';
@@ -18,6 +20,7 @@ import {
 import { serializeCustomOrder } from './serializers/custom-order.serializer';
 
 const VALID_TRANSITIONS: Record<string, CustomOrderStatus[]> = {
+  // Legacy transitions for backward compatibility
   submitted: ['under_review', 'cancelled'],
   under_review: ['confirmed', 'cancelled'],
   confirmed: ['in_production', 'cancelled'],
@@ -32,6 +35,7 @@ export class CustomOrdersService {
   constructor(
     private readonly customOrdersRepository: CustomOrdersRepository,
     private readonly listingsRepository: ListingsRepository,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateCustomOrderDto) {
@@ -39,7 +43,9 @@ export class CustomOrdersService {
     if (!listing || listing.deletedAt) {
       throw new ListingNotCustomOrderableException();
     }
-    if (!listing.customOrderAvailable) {
+    // Check if listing supports custom design (new unified model)
+    const supportsCustomDesign = (listing as any).supportsCustomDesign ?? listing.customOrderAvailable;
+    if (!supportsCustomDesign) {
       throw new ListingNotCustomOrderableException();
     }
     if (listing.sellerId === user.id) {
@@ -50,18 +56,32 @@ export class CustomOrdersService {
       listingId: dto.listingId,
       buyerId: user.id,
       sellerId: listing.sellerId,
+      ...(dto.selectedSize !== undefined ? { selectedSize: dto.selectedSize } : {}),
       ...(dto.measurements !== undefined
         ? { measurements: dto.measurements as unknown as Prisma.InputJsonValue }
         : {}),
-      ...(dto.fabricChoice !== undefined ? { fabricChoice: dto.fabricChoice } : {}),
-      ...(dto.colorChoice !== undefined ? { colorChoice: dto.colorChoice } : {}),
-      ...(dto.designNotes !== undefined ? { designNotes: dto.designNotes } : {}),
-      ...(dto.referenceImages !== undefined ? { referenceImages: dto.referenceImages } : {}),
-      ...(dto.estimatedPrice !== undefined
-        ? { estimatedPrice: new Prisma.Decimal(dto.estimatedPrice) }
+      ...(dto.selectedFabric !== undefined ? { selectedFabric: dto.selectedFabric } : {}),
+      ...(dto.selectedColor !== undefined ? { selectedColor: dto.selectedColor } : {}),
+      ...(dto.embroideryNotes !== undefined ? { embroideryNotes: dto.embroideryNotes } : {}),
+      ...(dto.inspirationImages !== undefined ? { inspirationImages: dto.inspirationImages } : {}),
+      ...(dto.buyerNotes !== undefined ? { buyerNotes: dto.buyerNotes } : {}),
+      ...(dto.agreedPrice !== undefined
+        ? { agreedPrice: new Prisma.Decimal(dto.agreedPrice) }
         : {}),
-      ...(dto.estimatedDays !== undefined ? { estimatedDays: dto.estimatedDays } : {}),
     });
+
+    // Emit event for Socket.IO notification and conversation creation
+    this.eventEmitter.emit(
+      'custom_order.created',
+      new CustomOrderCreatedEvent(
+        listing.sellerId,
+        user.id,
+        order.id,
+        listing.id,
+        listing.title || 'Unknown Listing',
+        order.conversationId!,
+      ),
+    );
 
     return serializeCustomOrder(order);
   }
@@ -126,13 +146,27 @@ export class CustomOrdersService {
 
     const updated = await this.customOrdersRepository.updateStatus(id, {
       status: dto.status,
-      ...(dto.finalPrice !== undefined
-        ? { finalPrice: new Prisma.Decimal(dto.finalPrice) }
+      ...(dto.agreedPrice !== undefined
+        ? { agreedPrice: new Prisma.Decimal(dto.agreedPrice) }
         : {}),
       ...(dto.cancelledReason !== undefined
         ? { cancelledReason: dto.cancelledReason }
         : {}),
     });
+
+    // Emit event for status update notification
+    this.eventEmitter.emit(
+      'custom_order.status_updated',
+      new CustomOrderStatusUpdatedEvent(
+        order.sellerId,
+        order.buyerId,
+        order.id,
+        order.listingId,
+        order.listing?.title || 'Unknown Listing',
+        dto.status,
+        order.conversationId!,
+      ),
+    );
 
     return serializeCustomOrder(updated);
   }

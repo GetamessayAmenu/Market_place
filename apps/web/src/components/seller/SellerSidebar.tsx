@@ -32,6 +32,12 @@ const IconOrders = () => (
   </svg>
 );
 
+const IconRentalQueue = () => (
+  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z" />
+  </svg>
+);
+
 const IconMessages = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -55,7 +61,8 @@ const IconInsights = () => (
 const sellerHubItems: SidebarItem[] = [
   { label: 'Overview', href: '/seller/dashboard', icon: <IconDashboard /> },
   { label: 'Catalog & Stock', href: '/seller/catalog', icon: <IconCatalog /> },
-  { label: 'Orders & Requests', href: '/seller/orders', icon: <IconOrders /> },
+  { label: 'Orders & Requests Pipeline', href: '/seller/orders', icon: <IconOrders /> },
+  { label: 'Rental Queue', href: '/seller/orders/rental-queue', icon: <IconRentalQueue /> },
   { label: 'Messages', href: '/seller/messages', icon: <IconMessages />, badge: 0 },
   { label: 'Store & Profile', href: '/seller/store', icon: <IconStore /> },
   { label: 'Insights & Feedback', href: '/seller/insights', icon: <IconInsights /> },
@@ -121,7 +128,9 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Seller hub navigation">
         <div className="space-y-0.5">
           {items.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            const isActive = item.href === '/seller/orders'
+              ? pathname === '/seller/orders'
+              : pathname === item.href || pathname.startsWith(item.href + '/');
             return (
               <Link
                 key={item.href}

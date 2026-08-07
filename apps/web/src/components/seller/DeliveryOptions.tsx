@@ -1,6 +1,6 @@
 "use client"
 import { Alert, Checkbox, FormInput, RadioGroup } from '@marketplace/ui';
-import React from 'react';
+import React, { useState } from 'react';
 
 import type { ListingType } from './ListingTypeSelector';
 
@@ -13,6 +13,18 @@ export interface DeliveryData {
   availableForPurchase: boolean;
   availableForRent: boolean;
   customOrderAvailable: boolean;
+  // Unified custom design fields
+  supportsReadyMade: boolean;
+  supportsCustomDesign: boolean;
+  startingCustomPrice: string;
+  estimatedProductionDays: string;
+  customizationOptions: {
+    requiresMeasurements: boolean;
+    fabricTypes: string[];
+    colors: string[];
+    embroideryTypes: string[];
+    customNotesAllowed: boolean;
+  };
 }
 
 export const DEFAULT_DELIVERY: DeliveryData = {
@@ -22,6 +34,17 @@ export const DEFAULT_DELIVERY: DeliveryData = {
   availableForPurchase: true,
   availableForRent: false,
   customOrderAvailable: false,
+  supportsReadyMade: true,
+  supportsCustomDesign: false,
+  startingCustomPrice: '',
+  estimatedProductionDays: '',
+  customizationOptions: {
+    requiresMeasurements: false,
+    fabricTypes: [],
+    colors: [],
+    embroideryTypes: [],
+    customNotesAllowed: true,
+  },
 };
 
 interface DeliveryOptionsProps {
@@ -48,26 +71,46 @@ const PROCESSING_OPTIONS = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function DeliveryOptions({ listingType, data, onChange, errors }: DeliveryOptionsProps) {
+  const [showCustomConfig, setShowCustomConfig] = useState(false);
+
   function update<K extends keyof DeliveryData>(key: K, value: DeliveryData[K]) {
     onChange({ ...data, [key]: value });
   }
 
+  function updateCustomOptions<K extends keyof DeliveryData['customizationOptions']>(key: K, value: DeliveryData['customizationOptions'][K]) {
+    onChange({ ...data, customizationOptions: { ...data.customizationOptions, [key]: value } });
+  }
+
   return (
     <div className="space-y-6">
-      {/* Availability toggles */}
+      {/* Unified Selling & Fulfillment Options */}
       <div>
-        <h3 className="text-sm font-medium text-foreground">How can this item be obtained?</h3>
+        <h3 className="text-sm font-medium text-foreground">Selling & Fulfillment Options</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">Select all that apply. At least one must be enabled.</p>
 
         <div className="mt-3 space-y-2.5">
           <label className="flex items-start gap-3">
             <Checkbox
-              checked={data.availableForPurchase}
-              onChange={(e) => { update('availableForPurchase', e.target.checked); }}
+              checked={data.supportsReadyMade}
+              onChange={(e) => { update('supportsReadyMade', e.target.checked); }}
             />
             <div>
-              <span className="text-sm font-medium text-foreground">Available for Purchase</span>
-              <p className="text-xs text-muted-foreground">Buyers can buy this item at the listed price</p>
+              <span className="text-sm font-medium text-foreground">Ready-made for Sale</span>
+              <p className="text-xs text-muted-foreground">Buyers can purchase this item as-is</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3">
+            <Checkbox
+              checked={data.supportsCustomDesign}
+              onChange={(e) => {
+                update('supportsCustomDesign', e.target.checked);
+                setShowCustomConfig(e.target.checked);
+              }}
+            />
+            <div>
+              <span className="text-sm font-medium text-foreground">Accept Custom Design Orders</span>
+              <p className="text-xs text-muted-foreground">Buyers can request bespoke customization of this item</p>
             </div>
           </label>
 
@@ -83,25 +126,93 @@ export default function DeliveryOptions({ listingType, data, onChange, errors }:
               </div>
             </label>
           )}
-
-          {listingType !== 'rent' && (
-            <label className="flex items-start gap-3">
-              <Checkbox
-                checked={data.customOrderAvailable}
-                onChange={(e) => { update('customOrderAvailable', e.target.checked); }}
-              />
-              <div>
-                <span className="text-sm font-medium text-foreground">Accept Custom Orders</span>
-                <p className="text-xs text-muted-foreground">Buyers can request custom designs based on this listing</p>
-              </div>
-            </label>
-          )}
         </div>
 
         {errors?.availability !== undefined && (
           <p className="mt-2 text-xs text-destructive">{errors.availability}</p>
         )}
       </div>
+
+      {/* Progressive Disclosure: Custom Design Configuration Panel */}
+      {showCustomConfig && (
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div>
+            <h4 className="text-sm font-medium text-foreground">Custom Design Configuration</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">Configure the customization options for this listing</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormInput
+              label="Starting Custom Price (ETB)"
+              type="number"
+              placeholder="0.00"
+              value={data.startingCustomPrice}
+              onChange={(e) => { update('startingCustomPrice', e.target.value); }}
+              {...(errors?.startingCustomPrice !== undefined && { error: errors.startingCustomPrice })}
+            />
+
+            <FormInput
+              label="Estimated Production Time (Days)"
+              type="number"
+              placeholder="14"
+              value={data.estimatedProductionDays}
+              onChange={(e) => { update('estimatedProductionDays', e.target.value); }}
+              {...(errors?.estimatedProductionDays !== undefined && { error: errors.estimatedProductionDays })}
+            />
+          </div>
+
+          <div>
+            <h5 className="text-xs font-medium text-foreground mb-2">Required Customer Inputs</h5>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={data.customizationOptions.requiresMeasurements}
+                  onChange={(e) => { updateCustomOptions('requiresMeasurements', e.target.checked); }}
+                />
+                <span className="text-sm text-foreground">Body Measurements</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={data.customizationOptions.fabricTypes.length > 0}
+                  onChange={(e) => {
+                    updateCustomOptions('fabricTypes', e.target.checked ? ['Cotton', 'Silk', 'Linen'] : []);
+                  }}
+                />
+                <span className="text-sm text-foreground">Fabric Choice</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={data.customizationOptions.colors.length > 0}
+                  onChange={(e) => {
+                    updateCustomOptions('colors', e.target.checked ? ['Black', 'White', 'Red', 'Blue', 'Green'] : []);
+                  }}
+                />
+                <span className="text-sm text-foreground">Color Customization</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={data.customizationOptions.embroideryTypes.length > 0}
+                  onChange={(e) => {
+                    updateCustomOptions('embroideryTypes', e.target.checked ? ['Tibeb', 'Cross-stitch', 'Beading'] : []);
+                  }}
+                />
+                <span className="text-sm text-foreground">Embroidery/Tilf Style Notes</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={data.customizationOptions.customNotesAllowed}
+                  onChange={(e) => { updateCustomOptions('customNotesAllowed', e.target.checked); }}
+                />
+                <span className="text-sm text-foreground">Allow Custom Notes</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delivery method */}
       <div>
