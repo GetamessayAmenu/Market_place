@@ -27,6 +27,12 @@ export class CategoriesController {
   }
 
   @Public()
+  @Get('regional-hubs/all')
+  getRegionalHubs() {
+    return this.categoriesService.getRegionalHubs();
+  }
+
+  @Public()
   @Get(':slug')
   getBySlug(@Param('slug') slug: string) {
     return this.categoriesService.getCategoryBySlug(slug);

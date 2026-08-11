@@ -108,4 +108,11 @@ export class CategoriesRepository extends BaseRepository<Category> {
     }
     return this.prisma.category.count();
   }
+
+  async findRegionalHubs() {
+    return this.prisma.regionHub.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+  }
 }

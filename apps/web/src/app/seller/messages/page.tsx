@@ -1,79 +1,59 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button, Card, CardContent, Badge } from '@marketplace/ui';
 import useAuth from '../../../hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { messageSchema, type MessageInput } from '../../../lib/validations/seller';
+import { apiGet, apiPost } from '../../../lib/api';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type OrderType = 'SALE' | 'RENTAL' | 'CUSTOM_TAILORING';
-
-type OrderStatus = 'INQUIRY_PENDING' | 'QUOTE_PROPOSED' | 'APPROVED_RESERVED' | 'READY_FOR_HANDOVER' | 
-  'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'MEASUREMENTS_SUBMITTED' | 'FABRIC_CUTTING' | 
-  'TAILORING_IN_PROGRESS' | 'FITTING_READY' | 'HANDOVER_PENDING_DEPOSIT' | 'RENTAL_ACTIVE' | 
-  'RETURN_INITIATED' | 'RETURNED_INSPECTED';
-
-interface Order {
+interface SerializedMessage {
   id: string;
-  orderNumber: string;
-  type: OrderType;
-  status: OrderStatus;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+  sender: {
+    id: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string | null;
+  };
+}
+
+interface SerializedConversation {
+  id: string;
   buyerId: string;
   sellerId: string;
-  productId: string;
-  conversationId: string | null;
-  agreedPrice: number;
-  agreedDeposit: number | null;
-  offlineDepositRefunded: boolean;
-  customMeasurements: any;
-  fittingDate: string | null;
-  rentalStartDate: string | null;
-  rentalEndDate: string | null;
-  extensionDaysRequested: number;
-  extensionApproved: boolean | null;
-  preHandoverPhotos: string[];
-  postReturnPhotos: string[];
-  disputeNotes: string | null;
+  listingId: string | null;
+  lastMessageAt: string | null;
   createdAt: string;
   updatedAt: string;
   buyer: {
     id: string;
     displayName: string;
     email: string;
-    phone: string | null;
     avatarUrl: string | null;
-    location: string | null;
   };
   seller: {
     id: string;
     displayName: string;
     email: string;
-    phone: string | null;
     avatarUrl: string | null;
-    location: string | null;
   };
-  product: {
+  listing: {
     id: string;
     title: string;
     slug: string;
-    price: number;
-    currency: string;
     images: any[];
-  };
-  customQuotes?: any[];
-}
-
-interface Message {
-  id: string;
-  customerName: string;
-  customerAvatar?: string;
-  lastMessage: string;
-  timestamp: string;
-  unread: boolean;
-  relatedOrder?: Order;
+  } | null;
+  lastMessage: SerializedMessage | null;
+  messageCount: number;
+  unreadCount: number;
 }
 
 interface QuickResponse {
@@ -105,32 +85,39 @@ const IconSend = () => (
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
-function MessageThreadCard({ message, onSelect }: { message: Message; onSelect: (message: Message) => void }) {
+function ConversationCard({ conversation, onSelect }: { conversation: SerializedConversation; onSelect: (conversation: SerializedConversation) => void }) {
+  const customerName = conversation.buyer.displayName;
+  const lastMessage = conversation.lastMessage?.body || 'No messages yet';
+  const timestamp = conversation.lastMessageAt 
+    ? new Date(conversation.lastMessageAt).toLocaleDateString()
+    : new Date(conversation.createdAt).toLocaleDateString();
+  const unread = conversation.unreadCount > 0;
+
   return (
     <Card
-      className={`hover:border-primary/50 transition-colors cursor-pointer ${message.unread ? 'border-primary/30 bg-primary/5' : ''}`}
-      onClick={() => onSelect(message)}
+      className={`hover:border-primary/50 transition-colors cursor-pointer ${unread ? 'border-primary/30 bg-primary/5' : ''}`}
+      onClick={() => onSelect(conversation)}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-            {message.customerName.charAt(0)}
+            {customerName.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <p className="font-medium text-sm">{message.customerName}</p>
-              <span className="text-xs text-muted-foreground">{message.timestamp}</span>
+              <p className="font-medium text-sm">{customerName}</p>
+              <span className="text-xs text-muted-foreground">{timestamp}</span>
             </div>
-            <p className="text-sm text-muted-foreground truncate">{message.lastMessage}</p>
-            {message.relatedOrder && (
+            <p className="text-sm text-muted-foreground truncate">{lastMessage}</p>
+            {conversation.listing && (
               <div className="mt-2">
                 <Badge variant="outline" className="text-xs">
-                  {message.relatedOrder.type}: {message.relatedOrder.product.title}
+                  {conversation.listing.title}
                 </Badge>
               </div>
             )}
           </div>
-          {message.unread && (
+          {unread && (
             <div className="h-2 w-2 rounded-full bg-primary" />
           )}
         </div>
@@ -152,9 +139,9 @@ function QuickResponseTemplate({ template, onSelect }: { template: QuickResponse
   );
 }
 
-function ChatInterface({ message, onClose }: { message: Message; onClose: () => void }) {
+function ChatInterface({ conversation, onClose }: { conversation: SerializedConversation; onClose: () => void }) {
   const [showQuickResponses, setShowQuickResponses] = useState(false);
-  const [showOrderActions, setShowOrderActions] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -192,10 +179,15 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
     },
   ];
 
-  const handleSend = (data: MessageInput) => {
-    // Send message logic
-    console.log('Send:', data.content);
-    reset();
+  const handleSend = async (data: MessageInput) => {
+    try {
+      await apiPost(`/chat/conversations/${conversation.id}/messages`, { body: data.content });
+      reset();
+      // Reload messages after sending
+      // await loadMessages(conversation.id);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
   const handleQuickResponse = (template: QuickResponse) => {
@@ -205,7 +197,7 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
 
   const handleWhatsApp = () => {
     // Open WhatsApp with pre-filled message
-    const url = `https://wa.me/?text=${encodeURIComponent(`Re: ${message.relatedOrder?.product.title || 'Inquiry'} - ${message.lastMessage}`)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(`Re: ${conversation.listing?.title || 'Inquiry'} - ${conversation.lastMessage?.body || ''}`)}`;
     window.open(url, '_blank');
   };
 
@@ -221,12 +213,12 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-              {message.customerName.charAt(0)}
+              {conversation.buyer.displayName.charAt(0)}
             </div>
             <div>
-              <p className="font-medium">{message.customerName}</p>
-              {message.relatedOrder && (
-                <p className="text-xs text-muted-foreground">{message.relatedOrder.product.title}</p>
+              <p className="font-medium">{conversation.buyer.displayName}</p>
+              {conversation.listing && (
+                <p className="text-xs text-muted-foreground">{conversation.listing.title}</p>
               )}
             </div>
           </div>
@@ -244,17 +236,9 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Sample conversation */}
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg p-3 max-w-[70%]">
-              <p className="text-sm">{message.lastMessage}</p>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <div className="bg-primary text-primary-foreground rounded-lg p-3 max-w-[70%]">
-              <p className="text-sm">Hello! Thank you for reaching out. I'd be happy to help you with that.</p>
-            </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={messagesEndRef}>
+          <div className="flex justify-center">
+            <p className="text-sm text-muted-foreground">Real-time chat integration coming soon. Use the API to send messages.</p>
           </div>
         </div>
 
@@ -277,49 +261,13 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
         {/* Input */}
         <div className="p-4 border-t">
           <form onSubmit={handleSubmit(handleSend)} className="space-y-2">
-            {message.relatedOrder && (
+            {conversation.listing && (
               <div className="mb-2 p-2 bg-muted rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium">Order: {message.relatedOrder.orderNumber}</p>
-                    <p className="text-xs text-muted-foreground">{message.relatedOrder.product.title}</p>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      {message.relatedOrder.status}
-                    </Badge>
+                    <p className="text-xs font-medium">Listing: {conversation.listing.title}</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowOrderActions(!showOrderActions)}
-                  >
-                    Actions
-                  </Button>
                 </div>
-                {showOrderActions && (
-                  <div className="mt-2 space-y-2">
-                    {message.relatedOrder.status === 'INQUIRY_PENDING' && (
-                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
-                        Send Custom Quote
-                      </Button>
-                    )}
-                    {message.relatedOrder.type === 'RENTAL' && message.relatedOrder.status === 'INQUIRY_PENDING' && (
-                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
-                        Propose Alternative Dates
-                      </Button>
-                    )}
-                    {message.relatedOrder.type === 'CUSTOM_TAILORING' && message.relatedOrder.status === 'APPROVED_RESERVED' && (
-                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
-                        Update Milestone
-                      </Button>
-                    )}
-                    {message.relatedOrder.type === 'RENTAL' && message.relatedOrder.extensionDaysRequested > 0 && message.relatedOrder.extensionApproved === null && (
-                      <Button type="button" variant="outline" size="sm" className="w-full text-xs">
-                        Respond to Extension Request
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
             <div className="flex gap-2">
@@ -352,188 +300,32 @@ function ChatInterface({ message, onClose }: { message: Message; onClose: () => 
 
 export default function MessagesPage() {
   const user = useAuth((s) => s.user);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'with_order'>('all');
+  const [selectedConversation, setSelectedConversation] = useState<SerializedConversation | null>(null);
+  const [conversations, setConversations] = useState<SerializedConversation[]>([]);
+  const [filter, setFilter] = useState<'all' | 'unread' | 'with_listing'>('all');
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with actual API calls
-  const messages: Message[] = [
-    {
-      id: '1',
-      customerName: 'Abebe Kebede',
-      lastMessage: 'Is the Habesha Kemis still available for custom order?',
-      timestamp: '2h ago',
-      unread: true,
-      relatedOrder: {
-        id: 'order-1',
-        orderNumber: 'ORD-001',
-        type: 'CUSTOM_TAILORING',
-        status: 'INQUIRY_PENDING',
-        buyerId: 'buyer-1',
-        sellerId: 'seller-1',
-        productId: 'prod-1',
-        conversationId: 'conv-1',
-        agreedPrice: 5000,
-        agreedDeposit: null,
-        offlineDepositRefunded: false,
-        customMeasurements: null,
-        fittingDate: null,
-        rentalStartDate: null,
-        rentalEndDate: null,
-        extensionDaysRequested: 0,
-        extensionApproved: null,
-        preHandoverPhotos: [],
-        postReturnPhotos: [],
-        disputeNotes: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        buyer: {
-          id: 'buyer-1',
-          displayName: 'Abebe Kebede',
-          email: 'abebe@example.com',
-          phone: '+251911234567',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        seller: {
-          id: 'seller-1',
-          displayName: 'Seller Name',
-          email: 'seller@example.com',
-          phone: '+251911234568',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        product: {
-          id: 'prod-1',
-          title: 'Traditional Habesha Kemis',
-          slug: 'traditional-habesha-kemis',
-          price: 5000,
-          currency: 'ETB',
-          images: [],
-        },
-      },
-    },
-    {
-      id: '2',
-      customerName: 'Tigist Haile',
-      lastMessage: 'Can I extend the rental for 2 more days?',
-      timestamp: '5h ago',
-      unread: true,
-      relatedOrder: {
-        id: 'order-2',
-        orderNumber: 'ORD-002',
-        type: 'RENTAL',
-        status: 'RENTAL_ACTIVE',
-        buyerId: 'buyer-2',
-        sellerId: 'seller-1',
-        productId: 'prod-2',
-        conversationId: 'conv-2',
-        agreedPrice: 1000,
-        agreedDeposit: 500,
-        offlineDepositRefunded: false,
-        customMeasurements: null,
-        fittingDate: null,
-        rentalStartDate: new Date().toISOString(),
-        rentalEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        extensionDaysRequested: 2,
-        extensionApproved: null,
-        preHandoverPhotos: [],
-        postReturnPhotos: [],
-        disputeNotes: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        buyer: {
-          id: 'buyer-2',
-          displayName: 'Tigist Haile',
-          email: 'tigist@example.com',
-          phone: '+251911234569',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        seller: {
-          id: 'seller-1',
-          displayName: 'Seller Name',
-          email: 'seller@example.com',
-          phone: '+251911234568',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        product: {
-          id: 'prod-2',
-          title: 'Ethiopian Gabi',
-          slug: 'ethiopian-gabi',
-          price: 1000,
-          currency: 'ETB',
-          images: [],
-        },
-      },
-    },
-    {
-      id: '3',
-      customerName: 'Dawit Abebe',
-      lastMessage: 'Thank you! I\'ll pick it up tomorrow.',
-      timestamp: '1d ago',
-      unread: false,
-      relatedOrder: {
-        id: 'order-3',
-        orderNumber: 'ORD-003',
-        type: 'SALE',
-        status: 'APPROVED_RESERVED',
-        buyerId: 'buyer-3',
-        sellerId: 'seller-1',
-        productId: 'prod-3',
-        conversationId: 'conv-3',
-        agreedPrice: 3000,
-        agreedDeposit: null,
-        offlineDepositRefunded: false,
-        customMeasurements: null,
-        fittingDate: null,
-        rentalStartDate: null,
-        rentalEndDate: null,
-        extensionDaysRequested: 0,
-        extensionApproved: null,
-        preHandoverPhotos: [],
-        postReturnPhotos: [],
-        disputeNotes: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        buyer: {
-          id: 'buyer-3',
-          displayName: 'Dawit Abebe',
-          email: 'dawit@example.com',
-          phone: '+251911234570',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        seller: {
-          id: 'seller-1',
-          displayName: 'Seller Name',
-          email: 'seller@example.com',
-          phone: '+251911234568',
-          avatarUrl: null,
-          location: 'Addis Ababa',
-        },
-        product: {
-          id: 'prod-3',
-          title: 'Modern Dress',
-          slug: 'modern-dress',
-          price: 3000,
-          currency: 'ETB',
-          images: [],
-        },
-      },
-    },
-    {
-      id: '4',
-      customerName: 'Sara Tekle',
-      lastMessage: 'Where is your shop located?',
-      timestamp: '2d ago',
-      unread: false,
-    },
-  ];
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    }
+  }, [user]);
 
-  const filteredMessages = messages.filter((msg) => {
-    if (filter === 'unread') return msg.unread;
-    if (filter === 'with_order') return !!msg.relatedOrder;
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const data = await apiGet<SerializedConversation[]>('/chat/conversations');
+      setConversations(data);
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredConversations = conversations.filter((conv) => {
+    if (filter === 'unread') return conv.unreadCount > 0;
+    if (filter === 'with_listing') return !!conv.listing;
     return true;
   });
 
@@ -555,7 +347,7 @@ export default function MessagesPage() {
 
       {/* Filters */}
       <div className="flex gap-2">
-        {(['all', 'unread', 'with_order'] as const).map((f) => (
+        {(['all', 'unread', 'with_listing'] as const).map((f) => (
           <button
             key={f}
             type="button"
@@ -566,27 +358,33 @@ export default function MessagesPage() {
                 : 'bg-muted hover:bg-muted/80'
             }`}
           >
-            {f === 'all' ? 'All Messages' : f === 'unread' ? 'Unread' : 'With Orders'}
+            {f === 'all' ? 'All Messages' : f === 'unread' ? 'Unread' : 'With Listings'}
           </button>
         ))}
       </div>
 
-      {/* Message Threads */}
+      {/* Conversation Threads */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredMessages.map((message) => (
-          <MessageThreadCard key={message.id} message={message} onSelect={setSelectedMessage} />
+        {filteredConversations.map((conversation) => (
+          <ConversationCard key={conversation.id} conversation={conversation} onSelect={setSelectedConversation} />
         ))}
       </div>
 
-      {filteredMessages.length === 0 && (
+      {loading && (
         <div className="text-center py-12 text-muted-foreground">
-          No messages found for this filter.
+          Loading conversations...
+        </div>
+      )}
+
+      {!loading && filteredConversations.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          No conversations found for this filter.
         </div>
       )}
 
       {/* Chat Interface */}
-      {selectedMessage && (
-        <ChatInterface message={selectedMessage} onClose={() => setSelectedMessage(null)} />
+      {selectedConversation && (
+        <ChatInterface conversation={selectedConversation} onClose={() => setSelectedConversation(null)} />
       )}
     </div>
   );

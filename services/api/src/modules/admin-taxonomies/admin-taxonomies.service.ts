@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 import { AdminLogsService } from '../admin-logs/admin-logs.service';
 import { AdminTaxonomiesRepository } from './admin-taxonomies.repository';
 import type { CreateRegionalHubDto } from './dto/create-regional-hub.dto';
@@ -11,11 +14,15 @@ export class AdminTaxonomiesService {
   constructor(
     private readonly repository: AdminTaxonomiesRepository,
     private readonly adminLogsService: AdminLogsService,
+    @InjectQueue(QUEUE_NAMES.TAXONOMY_CACHE) private readonly taxonomyCacheQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.AUDIT_LOG) private readonly auditLogQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.MEILISEARCH_SYNC) private readonly meilisearchSyncQueue: Queue,
   ) {}
 
   // Categories
   async findCategories(query: any) {
-    return this.repository.findCategories(query);
+    const result = await this.repository.findCategories(query);
+    return result.data;
   }
 
   async findCategory(id: string) {
@@ -37,6 +44,26 @@ export class AdminTaxonomiesService {
       metadata: { name: category.name, type: category.type },
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+      categoryId: category.id,
+      action: 'create',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'category',
+      resourceId: category.id,
+      action: 'create',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'create_category',
+      resource: 'category',
+      resourceId: category.id,
+      timestamp: new Date().toISOString(),
+      metadata: { name: category.name, type: category.type },
+    });
+
     return category;
   }
 
@@ -50,6 +77,26 @@ export class AdminTaxonomiesService {
       action: 'update_category',
       resource: 'category',
       resourceId: id,
+      metadata: { changes: dto },
+    });
+
+    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+      categoryId: id,
+      action: 'update',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'category',
+      resourceId: id,
+      action: 'update',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'update_category',
+      resource: 'category',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
       metadata: { changes: dto },
     });
 
@@ -68,12 +115,32 @@ export class AdminTaxonomiesService {
       resourceId: id,
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+      categoryId: id,
+      action: 'delete',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'category',
+      resourceId: id,
+      action: 'delete',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'delete_category',
+      resource: 'category',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
+    });
+
     return deleted;
   }
 
   // Attributes
   async findAttributes(query: any) {
-    return this.repository.findAttributes(query);
+    const result = await this.repository.findAttributes(query);
+    return result.data;
   }
 
   async findAttribute(id: string) {
@@ -98,6 +165,26 @@ export class AdminTaxonomiesService {
       metadata: { name: attribute.name, type: attribute.type },
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-attribute-cache', {
+      attributeId: attribute.id,
+      action: 'create',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'attribute',
+      resourceId: attribute.id,
+      action: 'create',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'create_attribute',
+      resource: 'attribute',
+      resourceId: attribute.id,
+      timestamp: new Date().toISOString(),
+      metadata: { name: attribute.name, type: attribute.type },
+    });
+
     return attribute;
   }
 
@@ -117,6 +204,26 @@ export class AdminTaxonomiesService {
       metadata: { changes: dto },
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-attribute-cache', {
+      attributeId: id,
+      action: 'update',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'attribute',
+      resourceId: id,
+      action: 'update',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'update_attribute',
+      resource: 'attribute',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
+      metadata: { changes: dto },
+    });
+
     return updated;
   }
 
@@ -132,12 +239,32 @@ export class AdminTaxonomiesService {
       resourceId: id,
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-attribute-cache', {
+      attributeId: id,
+      action: 'delete',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'attribute',
+      resourceId: id,
+      action: 'delete',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'delete_attribute',
+      resource: 'attribute',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
+    });
+
     return deleted;
   }
 
   // Regional Hubs
   async getRegionalHubs(query?: any) {
-    return this.repository.getRegionalHubs(query);
+    const result = await this.repository.getRegionalHubs(query);
+    return result.data;
   }
 
   async createRegionalHub(user: AuthenticatedUser, dto: CreateRegionalHubDto) {
@@ -148,6 +275,26 @@ export class AdminTaxonomiesService {
       action: 'create_regional_hub',
       resource: 'regional_hub',
       resourceId: hub.id,
+      metadata: { name: hub.name, type: dto.type },
+    });
+
+    await this.taxonomyCacheQueue.add('invalidate-regional-hub-cache', {
+      hubId: hub.id,
+      action: 'create',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'regional_hub',
+      resourceId: hub.id,
+      action: 'create',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'create_regional_hub',
+      resource: 'regional_hub',
+      resourceId: hub.id,
+      timestamp: new Date().toISOString(),
       metadata: { name: hub.name, type: dto.type },
     });
 
@@ -165,6 +312,26 @@ export class AdminTaxonomiesService {
       metadata: { changes: dto },
     });
 
+    await this.taxonomyCacheQueue.add('invalidate-regional-hub-cache', {
+      hubId: id,
+      action: 'update',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'regional_hub',
+      resourceId: id,
+      action: 'update',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'update_regional_hub',
+      resource: 'regional_hub',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
+      metadata: { changes: dto },
+    });
+
     return updated;
   }
 
@@ -176,6 +343,25 @@ export class AdminTaxonomiesService {
       action: 'delete_regional_hub',
       resource: 'regional_hub',
       resourceId: id,
+    });
+
+    await this.taxonomyCacheQueue.add('invalidate-regional-hub-cache', {
+      hubId: id,
+      action: 'delete',
+    });
+
+    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+      resourceType: 'regional_hub',
+      resourceId: id,
+      action: 'delete',
+    });
+
+    await this.auditLogQueue.add('create-audit-log', {
+      adminId: user.id,
+      action: 'delete_regional_hub',
+      resource: 'regional_hub',
+      resourceId: id,
+      timestamp: new Date().toISOString(),
     });
 
     return deleted;

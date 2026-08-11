@@ -233,20 +233,36 @@ async function main(): Promise<void> {
 
   // ── Categories ────────────────────────────────────────────────────
   const CATEGORIES = [
-    { name: 'Traditional Wear', slug: 'traditional-wear', sortOrder: 1 },
-    { name: 'Modern Fashion', slug: 'modern-fashion', sortOrder: 2 },
-    { name: "Men's Fashion", slug: 'mens-fashion', sortOrder: 3 },
+    { name: "Women's Fashion", nameAm: 'የሴት ልብስ', slug: 'womens-fashion', sortOrder: 1 },
+    { name: "Men's Fashion", nameAm: 'የወንድ ልብስ', slug: 'mens-fashion', sortOrder: 2 },
+    { name: 'Baby & Kids Fashion', nameAm: 'የልጅ ልብስ', slug: 'baby-kids-fashion', sortOrder: 3 },
   ];
 
   const SUBCATEGORIES = [
-    { name: 'Habesha Kemis', slug: 'habesha-kemis', parentSlug: 'traditional-wear', sortOrder: 1 },
-    { name: 'Gabi & Netela', slug: 'gabi-netela', parentSlug: 'traditional-wear', sortOrder: 2 },
-    { name: 'Zuria', slug: 'zuria', parentSlug: 'traditional-wear', sortOrder: 3 },
-    { name: 'Dresses', slug: 'dresses', parentSlug: 'modern-fashion', sortOrder: 1 },
-    { name: 'Tops & Blouses', slug: 'tops-blouses', parentSlug: 'modern-fashion', sortOrder: 2 },
-    { name: 'Accessories', slug: 'accessories', parentSlug: 'modern-fashion', sortOrder: 3 },
-    { name: 'Suits & Formal', slug: 'suits-formal', parentSlug: 'mens-fashion', sortOrder: 1 },
-    { name: 'Casual Wear', slug: 'casual-wear', parentSlug: 'mens-fashion', sortOrder: 2 },
+    // Women's Fashion
+    { name: 'Cultural Dresses (Habesha Kemis)', nameAm: 'ባህላዊ አልባሳት (ሐበሻ ከሚስ)', slug: 'cultural-dresses-habesha-kemis', parentSlug: 'womens-fashion', sortOrder: 1 },
+    { name: 'Bride Cultural Dresses', nameAm: 'የሙሽት ባህላዊ አልባሳት', slug: 'bride-cultural-dresses', parentSlug: 'womens-fashion', sortOrder: 2 },
+    { name: 'Bridesmaids Dresses', nameAm: 'የሙሽት አጋሮች አልባሳት', slug: 'bridesmaids-dresses', parentSlug: 'womens-fashion', sortOrder: 3 },
+    { name: 'Family Matching Outfits', nameAm: 'የቤተሰብ የተመሳሳይ አልባሳት', slug: 'family-matching-outfits', parentSlug: 'womens-fashion', sortOrder: 4 },
+    { name: 'Engagement Outfits', nameAm: 'የግልም አልባሳት', slug: 'engagement-outfits', parentSlug: 'womens-fashion', sortOrder: 5 },
+    { name: 'Modern Dresses', nameAm: 'ዘመናዊ አልባሳት', slug: 'modern-dresses', parentSlug: 'womens-fashion', sortOrder: 6 },
+    { name: "Women's Skirts", nameAm: 'የሴት ቀሚሶች', slug: 'womens-skirts', parentSlug: 'womens-fashion', sortOrder: 7 },
+    { name: "Women's Accessories", nameAm: 'የሴት ቁጠባዎች', slug: 'womens-accessories', parentSlug: 'womens-fashion', sortOrder: 8 },
+    // Men's Fashion
+    { name: 'Cultural Shirts', nameAm: 'ባህላዊ ሸሚዛቶች', slug: 'cultural-shirts', parentSlug: 'mens-fashion', sortOrder: 1 },
+    { name: 'Cultural Suits', nameAm: 'ባህላዊ ሱቶች', slug: 'cultural-suits', parentSlug: 'mens-fashion', sortOrder: 2 },
+    { name: 'Traditional Kuta / Gabi', nameAm: 'ባህላዊ ኩታ / ጋቢ', slug: 'traditional-kuta-gabi', parentSlug: 'mens-fashion', sortOrder: 3 },
+    { name: 'Custom Shirts', nameAm: 'የተለየ ሸሚዛቶች', slug: 'custom-shirts', parentSlug: 'mens-fashion', sortOrder: 4 },
+    { name: 'Groom Cultural Wear', nameAm: 'የሙሽት ባህላዊ ልብስ', slug: 'groom-cultural-wear', parentSlug: 'mens-fashion', sortOrder: 5 },
+    { name: 'Bridesmaids Clothes', nameAm: 'የሙሽት አጋሮች ልብስ', slug: 'bridesmaids-clothes', parentSlug: 'mens-fashion', sortOrder: 6 },
+    { name: 'Family Matching Outfits', nameAm: 'የቤተሰብ የተመሳሳይ ልብስ', slug: 'family-matching-outfits-men', parentSlug: 'mens-fashion', sortOrder: 7 },
+    { name: 'Engagement Outfits', nameAm: 'የግልም ልብስ', slug: 'engagement-outfits-men', parentSlug: 'mens-fashion', sortOrder: 8 },
+    { name: "Men's Accessories", nameAm: 'የወንድ ቁጠባዎች', slug: 'mens-accessories', parentSlug: 'mens-fashion', sortOrder: 9 },
+    // Baby & Kids Fashion
+    { name: 'Girls Cultural Dresses', nameAm: 'የልጅ ሴቶች ባህላዊ አልባሳት', slug: 'girls-cultural-dresses', parentSlug: 'baby-kids-fashion', sortOrder: 1 },
+    { name: 'Boys Cultural Wear', nameAm: 'የልጅ ወንዶች ባህላዊ ልብስ', slug: 'boys-cultural-wear', parentSlug: 'baby-kids-fashion', sortOrder: 2 },
+    { name: 'Special Occasion Outfits', nameAm: 'ለልዩ በዓሎች አልባሳት', slug: 'special-occasion-outfits', parentSlug: 'baby-kids-fashion', sortOrder: 3 },
+    { name: 'Accessories', nameAm: 'ቁጠባዎች', slug: 'kids-accessories', parentSlug: 'baby-kids-fashion', sortOrder: 4 },
   ];
 
   // Upsert parent categories
@@ -254,8 +270,8 @@ async function main(): Promise<void> {
   for (const c of CATEGORIES) {
     const created = await prisma.category.upsert({
       where: { slug: c.slug },
-      update: {},
-      create: { name: c.name, slug: c.slug, sortOrder: c.sortOrder },
+      update: { name: c.name, nameAm: c.nameAm },
+      create: { name: c.name, nameAm: c.nameAm, slug: c.slug, sortOrder: c.sortOrder },
     });
     catBySlug.set(c.slug, created.id);
   }
@@ -265,8 +281,8 @@ async function main(): Promise<void> {
     const parentId = catBySlug.get(sc.parentSlug);
     const created = await prisma.category.upsert({
       where: { slug: sc.slug },
-      update: {},
-      create: { name: sc.name, slug: sc.slug, parentId, sortOrder: sc.sortOrder },
+      update: { name: sc.name, nameAm: sc.nameAm },
+      create: { name: sc.name, nameAm: sc.nameAm, slug: sc.slug, parentId, sortOrder: sc.sortOrder },
     });
     catBySlug.set(sc.slug, created.id);
   }
@@ -314,7 +330,7 @@ async function main(): Promise<void> {
   }> = [
     // Kidane — seller@habesha.com
     {
-      sellerEmail: 'seller@habesha.com', categorySlug: 'habesha-kemis',
+      sellerEmail: 'seller@habesha.com', categorySlug: 'cultural-dresses-habesha-kemis',
       title: 'Handwoven Habesha Kemis — Classic White', slug: 'handwoven-habesha-kemis-classic-white',
       description: 'A stunning handwoven Habesha Kemis made from premium Ethiopian cotton. Features intricate tibeb embroidery along the neckline and hem in vibrant gold and green threads. Perfect for holidays, weddings, and cultural celebrations. Each piece takes approximately 3 weeks to weave by skilled artisans.',
       price: 4500, condition: 'new', city: 'Addis Ababa', isFeatured: true,
@@ -322,7 +338,7 @@ async function main(): Promise<void> {
       rentalPricePerDay: 500, rentalDeposit: 2000, imageUrl: IMG.k1, status: 'active',
     },
     {
-      sellerEmail: 'seller@habesha.com', categorySlug: 'gabi-netela',
+      sellerEmail: 'seller@habesha.com', categorySlug: 'traditional-kuta-gabi',
       title: 'Handwoven Cotton Gabi — Winter Weight', slug: 'handwoven-cotton-gabi-winter',
       description: 'A warm, heavy cotton Gabi perfect for cool evenings. Handwoven by artisans in Dorze using traditional techniques passed down through generations. This thick Gabi features subtle geometric patterns along the border. Measures approximately 2.5m × 1.8m.',
       price: 2800, condition: 'new', city: 'Addis Ababa', isFeatured: true,
@@ -330,7 +346,7 @@ async function main(): Promise<void> {
       imageUrl: IMG.k2, status: 'active',
     },
     {
-      sellerEmail: 'seller@habesha.com', categorySlug: 'dresses',
+      sellerEmail: 'seller@habesha.com', categorySlug: 'modern-dresses',
       title: 'Modern Ethiopian Evening Dress — Emerald Silk', slug: 'modern-ethiopian-evening-dress-emerald',
       description: 'A contemporary evening dress inspired by Ethiopian design motifs. Crafted from emerald green silk with delicate gold thread detailing at the bodice. Features a flattering A-line silhouette with a modern high-low hemline. Available in sizes S-XL.',
       price: 3200, condition: 'new', city: 'Addis Ababa', isFeatured: true,
@@ -339,7 +355,7 @@ async function main(): Promise<void> {
     },
     // Tigist — seller2@habesha.com
     {
-      sellerEmail: 'seller2@habesha.com', categorySlug: 'accessories',
+      sellerEmail: 'seller2@habesha.com', categorySlug: 'womens-accessories',
       title: 'Beaded Tibeb Necklace — Multicolor', slug: 'beaded-tibeb-necklace-multicolor',
       description: 'A gorgeous hand-beaded necklace inspired by traditional Ethiopian tibeb patterns. Features colorful glass beads arranged in a geometric design with brass clasp. Each necklace is unique — slight variations in bead color may occur. Length: adjustable 40-50cm.',
       price: 650, condition: 'new', city: 'Bahir Dar', isFeatured: false,
@@ -347,15 +363,15 @@ async function main(): Promise<void> {
       imageUrl: IMG.k4, status: 'active',
     },
     {
-      sellerEmail: 'seller2@habesha.com', categorySlug: 'zuria',
-      title: 'Premium Silk Zuria Set — Ivory & Gold', slug: 'premium-silk-zuria-set-ivory-gold',
-      description: 'An elegant three-piece Zuria set crafted from pure Ethiopian silk. The set includes the main wrap, a matching shawl (netela), and a head piece. Adorned with gold-thread embroidery featuring traditional cross motifs. Ideal for weddings and religious ceremonies.',
+      sellerEmail: 'seller2@habesha.com', categorySlug: 'bride-cultural-dresses',
+      title: 'Premium Silk Bride Cultural Dress — Ivory & Gold', slug: 'premium-silk-bride-dress-ivory-gold',
+      description: 'An elegant three-piece bride cultural dress crafted from pure Ethiopian silk. The set includes the main wrap, a matching shawl (netela), and a head piece. Adorned with gold-thread embroidery featuring traditional cross motifs. Ideal for weddings and religious ceremonies.',
       price: 6500, condition: 'new', city: 'Bahir Dar', isFeatured: true,
       availableForPurchase: true, availableForRent: true, customOrderAvailable: false,
       rentalPricePerDay: 800, rentalDeposit: 3000, imageUrl: IMG.k5, status: 'active',
     },
     {
-      sellerEmail: 'seller2@habesha.com', categorySlug: 'gabi-netela',
+      sellerEmail: 'seller2@habesha.com', categorySlug: 'traditional-kuta-gabi',
       title: 'Embroidered Netela Shawl — Delicate Lace', slug: 'embroidered-netela-shawl-lace',
       description: 'A lightweight, sheer netela shawl with delicate hand-embroidered borders. Made from fine cotton muslin, this versatile piece can be worn as a shawl, head covering, or decorative accent. The intricate cross-stitch border features traditional Ethiopian motifs in deep blue thread.',
       price: 1200, condition: 'like_new', city: 'Bahir Dar', isFeatured: false,
@@ -364,15 +380,15 @@ async function main(): Promise<void> {
     },
     // Yohannes — seller3@habesha.com
     {
-      sellerEmail: 'seller3@habesha.com', categorySlug: 'suits-formal',
-      title: 'Custom-Tailored Ethiopian Formal Suit', slug: 'custom-tailored-ethiopian-formal-suit',
+      sellerEmail: 'seller3@habesha.com', categorySlug: 'cultural-suits',
+      title: 'Custom-Tailored Ethiopian Cultural Suit', slug: 'custom-tailored-ethiopian-cultural-suit',
       description: 'A bespoke three-piece suit hand-tailored to your measurements. Features a modern slim-fit cut with subtle Ethiopian-inspired embroidery on the lapel and cuffs. Fabric is premium Italian wool blend in charcoal grey. Includes jacket, vest, and trousers. Allow 4-6 weeks for custom tailoring.',
       price: 8500, condition: 'new', city: 'Hawassa', isFeatured: true,
       availableForPurchase: true, availableForRent: true, customOrderAvailable: true,
       rentalPricePerDay: 1200, rentalDeposit: 4000, imageUrl: IMG.k7, status: 'active',
     },
     {
-      sellerEmail: 'seller3@habesha.com', categorySlug: 'casual-wear',
+      sellerEmail: 'seller3@habesha.com', categorySlug: 'custom-shirts',
       title: 'Casual Cotton Shirt — Tibeb Collar Design', slug: 'casual-cotton-shirt-tibeb-collar',
       description: 'A comfortable everyday cotton shirt featuring a unique tibeb-patterned collar inspired by traditional Ethiopian weaving. Made from breathable 100% organic cotton in a relaxed fit. Available in white, sky blue, and olive. Machine washable.',
       price: 950, condition: 'new', city: 'Hawassa', isFeatured: false,
@@ -380,7 +396,7 @@ async function main(): Promise<void> {
       imageUrl: IMG.k8, status: 'active',
     },
     {
-      sellerEmail: 'seller3@habesha.com', categorySlug: 'habesha-kemis',
+      sellerEmail: 'seller3@habesha.com', categorySlug: 'cultural-dresses-habesha-kemis',
       title: 'Designer Habesha Kemis — Royal Purple', slug: 'designer-habesha-kemis-royal-purple',
       description: 'A show-stopping designer Habesha Kemis in rich royal purple fabric. Features hand-stitched silver thread embroidery with modern geometric patterns blending traditional and contemporary aesthetics. The dress falls below the knee with a slight flare. Comes with matching netela.',
       price: 5800, condition: 'new', city: 'Hawassa', isFeatured: true,
@@ -389,7 +405,7 @@ async function main(): Promise<void> {
     },
     // Additional listings for variety - Kidane
     {
-      sellerEmail: 'seller@habesha.com', categorySlug: 'habesha-kemis',
+      sellerEmail: 'seller@habesha.com', categorySlug: 'cultural-dresses-habesha-kemis',
       title: 'Vintage Habesha Kemis — Antique Collection', slug: 'vintage-habesha-kemis-antique',
       description: 'A rare vintage Habesha Kemis from the 1960s, featuring traditional weaving patterns no longer commonly practiced. This piece has been carefully preserved and is in excellent condition. A true collector\'s item for Ethiopian textile enthusiasts.',
       price: 12000, condition: 'good', city: 'Addis Ababa', isFeatured: true,
@@ -397,7 +413,7 @@ async function main(): Promise<void> {
       imageUrl: IMG.k1, status: 'active',
     },
     {
-      sellerEmail: 'seller@habesha.com', categorySlug: 'dresses',
+      sellerEmail: 'seller@habesha.com', categorySlug: 'modern-dresses',
       title: 'Modern Fusion Dress — Coffee Bean Brown', slug: 'modern-fusion-dress-coffee-brown',
       description: 'A contemporary dress that fuses Ethiopian coffee culture inspiration with modern silhouette. The rich coffee brown fabric features subtle coffee bean embroidery. Perfect for casual outings and cultural events.',
       price: 1800, condition: 'new', city: 'Addis Ababa', isFeatured: false,
@@ -406,7 +422,7 @@ async function main(): Promise<void> {
     },
     // Additional listings - Tigist
     {
-      sellerEmail: 'seller2@habesha.com', categorySlug: 'accessories',
+      sellerEmail: 'seller2@habesha.com', categorySlug: 'womens-accessories',
       title: 'Handcrafted Leather Bag — Ethiopian Motifs', slug: 'handcrafted-leather-bag-ethiopian-motifs',
       description: 'A beautifully crafted leather bag featuring hand-tooled Ethiopian patterns. Made from genuine Ethiopian leather with adjustable strap and multiple compartments. Each bag is unique and showcases traditional craftsmanship.',
       price: 2200, condition: 'new', city: 'Bahir Dar', isFeatured: false,
@@ -414,7 +430,7 @@ async function main(): Promise<void> {
       imageUrl: IMG.k4, status: 'active',
     },
     {
-      sellerEmail: 'seller2@habesha.com', categorySlug: 'accessories',
+      sellerEmail: 'seller2@habesha.com', categorySlug: 'womens-accessories',
       title: 'Silver Jewelry Set — Axum Inspiration', slug: 'silver-jewelry-set-axum-inspiration',
       description: 'A stunning silver jewelry set inspired by ancient Axumite designs. Includes necklace, earrings, and bracelet. Handcrafted by local silversmiths using traditional techniques. Sterling silver with modern safety clasps.',
       price: 3500, condition: 'new', city: 'Bahir Dar', isFeatured: true,
@@ -423,7 +439,7 @@ async function main(): Promise<void> {
     },
     // Additional listings - Yohannes
     {
-      sellerEmail: 'seller3@habesha.com', categorySlug: 'suits-formal',
+      sellerEmail: 'seller3@habesha.com', categorySlug: 'cultural-suits',
       title: 'Ethiopian Festival Suit — Multi-Color', slug: 'ethiopian-festival-suit-multi-color',
       description: 'A vibrant festival suit featuring traditional Ethiopian colors in modern tailoring. The jacket has subtle tribal patterns woven into the fabric. Perfect for Meskel, Timket, and other cultural celebrations.',
       price: 5500, condition: 'new', city: 'Hawassa', isFeatured: false,
@@ -431,7 +447,7 @@ async function main(): Promise<void> {
       rentalPricePerDay: 800, rentalDeposit: 2500, imageUrl: IMG.k7, status: 'active',
     },
     {
-      sellerEmail: 'seller3@habesha.com', categorySlug: 'casual-wear',
+      sellerEmail: 'seller3@habesha.com', categorySlug: 'custom-shirts',
       title: 'Ethiopian Print T-Shirt Collection', slug: 'ethiopian-print-tshirt-collection',
       description: 'A set of 3 casual t-shirts featuring modern Ethiopian prints and patterns. Made from breathable cotton with comfortable fit. Designs include flag colors, Amharic script, and cultural symbols. Machine washable.',
       price: 1200, condition: 'new', city: 'Hawassa', isFeatured: false,
@@ -440,7 +456,7 @@ async function main(): Promise<void> {
     },
     // Almaz - seller4@habesha.com (new seller)
     {
-      sellerEmail: 'seller4@habesha.com', categorySlug: 'habesha-kemis',
+      sellerEmail: 'seller4@habesha.com', categorySlug: 'bride-cultural-dresses',
       title: 'Luxury Wedding Habesha Kemis — Gold Thread', slug: 'luxury-wedding-habesha-kemis-gold',
       description: 'An exquisite wedding Habesha Kemis with extensive gold thread embroidery. The dress features traditional wedding motifs and can be customized with bride\'s initials. Made from premium fabric with silk lining.',
       price: 15000, condition: 'new', city: 'Dire Dawa', isFeatured: true,
@@ -448,7 +464,7 @@ async function main(): Promise<void> {
       rentalPricePerDay: 2000, rentalDeposit: 5000, imageUrl: IMG.k9, status: 'pending_review',
     },
     {
-      sellerEmail: 'seller4@habesha.com', categorySlug: 'dresses',
+      sellerEmail: 'seller4@habesha.com', categorySlug: 'bridesmaids-dresses',
       title: 'Bridal Party Collection — matching set', slug: 'bridal-party-collection-matching-set',
       description: 'A complete bridal party collection featuring 4 matching dresses in different sizes. Each dress has subtle variations while maintaining cohesive design. Perfect for Ethiopian weddings with multiple bridesmaids.',
       price: 25000, condition: 'new', city: 'Dire Dawa', isFeatured: true,
@@ -1556,7 +1572,7 @@ async function main(): Promise<void> {
 
     const docs = activeListings.map((l) => {
       const parentCatSlug = CATEGORIES.find((c) =>
-        SUBCATEGORIES.some((sc) => sc.parentSlug === c.slug && sc.slug === (l as any).category?.slug)
+        SUBCATEGORIES.some((sc) => sc.parentSlug === c.slug && sc.slug === l.category?.slug)
       );
       return {
         id: l.id,

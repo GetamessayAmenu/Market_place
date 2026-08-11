@@ -1,4 +1,4 @@
-import { serverGet, serverPatch, serverPost, serverPut, serverDelete } from './serverApi'
+import { clientGet, clientPatch, clientPost, clientDelete } from './clientApi'
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -37,11 +37,11 @@ export async function fetchAdminCategories(params?: Record<string, string | numb
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminCategory>>('/admin/categories' + qs)
+  return clientGet<PaginatedResponse<AdminCategory>>('/admin/categories' + qs)
 }
 
 export async function fetchAdminCategory(id: string): Promise<ApiResponse<AdminCategory>> {
-  return serverGet<ApiResponse<AdminCategory>>('/admin/categories/' + id)
+  return clientGet<ApiResponse<AdminCategory>>('/admin/categories/' + id)
 }
 
 // ─── Admin Attributes ─────────────────────────────────────────────────────────
@@ -61,11 +61,11 @@ export async function fetchAdminAttributes(params?: Record<string, string | numb
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminAttribute>>('/admin/attributes' + qs)
+  return clientGet<PaginatedResponse<AdminAttribute>>('/admin/attributes' + qs)
 }
 
 export async function fetchAdminAttribute(id: string): Promise<ApiResponse<AdminAttribute>> {
-  return serverGet<ApiResponse<AdminAttribute>>('/admin/attributes/' + id)
+  return clientGet<ApiResponse<AdminAttribute>>('/admin/attributes/' + id)
 }
 
 // ─── Admin Orders ─────────────────────────────────────────────────────────
@@ -131,11 +131,11 @@ export async function fetchAdminOrders(params?: Record<string, string | number |
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminOrder>>('/admin/orders' + qs)
+  return clientGet<PaginatedResponse<AdminOrder>>('/admin/orders' + qs)
 }
 
 export async function fetchAdminOrder(id: string): Promise<ApiResponse<AdminOrder>> {
-  return serverGet<ApiResponse<AdminOrder>>('/admin/orders/' + id)
+  return clientGet<ApiResponse<AdminOrder>>('/admin/orders/' + id)
 }
 
 // ─── Admin Disputes ─────────────────────────────────────────────────────────
@@ -196,48 +196,48 @@ export async function fetchAdminDisputes(params?: Record<string, string | number
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminDispute>>('/admin/disputes' + qs)
+  return clientGet<PaginatedResponse<AdminDispute>>('/admin/disputes' + qs)
 }
 
 export async function fetchAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
-  return serverGet<ApiResponse<AdminDispute>>('/admin/disputes/' + id)
+  return clientGet<ApiResponse<AdminDispute>>('/admin/disputes/' + id)
 }
 
 export async function fetchAdminDisputeStats(): Promise<ApiResponse<Record<string, number>>> {
-  return serverGet<ApiResponse<Record<string, number>>>('/admin/disputes/stats')
+  return clientGet<ApiResponse<Record<string, number>>>('/admin/disputes/stats')
 }
 
 export async function createAdminDispute(data: any): Promise<ApiResponse<AdminDispute>> {
-  return serverPost<ApiResponse<AdminDispute>>('/admin/disputes', data)
+  return clientPost<ApiResponse<AdminDispute>>('/admin/disputes', data)
 }
 
 export async function updateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id, data)
+  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id, data)
 }
 
 export async function updateAdminDisputeStatus(id: string, status: string): Promise<ApiResponse<AdminDispute>> {
-  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/status', { status })
+  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/status', { status })
 }
 
 export async function resolveAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/resolve', data)
+  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/resolve', data)
 }
 
 export async function escalateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/escalate', data)
+  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/escalate', data)
 }
 
 export async function closeAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
-  return serverPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/close', {})
+  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/close', {})
 }
 
 export async function addAdminDisputeComment(id: string, data: any): Promise<ApiResponse<AdminDisputeComment>> {
-  return serverPost<ApiResponse<AdminDisputeComment>>('/admin/disputes/' + id + '/comments', data)
+  return clientPost<ApiResponse<AdminDisputeComment>>('/admin/disputes/' + id + '/comments', data)
 }
 
 export async function fetchAdminDisputeComments(id: string, includeInternal?: boolean): Promise<ApiResponse<AdminDisputeComment[]>> {
   const qs = includeInternal ? '?includeInternal=true' : ''
-  return serverGet<ApiResponse<AdminDisputeComment[]>>('/admin/disputes/' + id + '/comments' + qs)
+  return clientGet<ApiResponse<AdminDisputeComment[]>>('/admin/disputes/' + id + '/comments' + qs)
 }
 
 // ─── Admin Taxonomies ───────────────────────────────────────────────────────
@@ -257,17 +257,17 @@ export interface AdminTaxonomyCategory {
   isActive: boolean
   createdAt: string
   updatedAt: string
-  parent: {
+  parent?: {
     id: string
     name: string
     nameAm: string | null
-  } | null
-  children: {
+  }
+  children?: {
     id: string
     name: string
     nameAm: string | null
   }[]
-  _count: {
+  _count?: {
     listings: number
   }
 }
@@ -282,6 +282,7 @@ export interface AdminTaxonomyAttribute {
   descriptionAm: string | null
   sortOrder: number
   isActive: boolean
+  categoryIds?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -304,68 +305,74 @@ export interface AdminRegionalHub {
 }
 
 export async function fetchAdminTaxonomyCategories(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminTaxonomyCategory>> {
-  const qs = params ? '?' + new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
-  ).toString() : ''
-  return serverGet<PaginatedResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories' + qs)
+  const qs = params && Object.keys(params).length > 0 
+    ? '?' + new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      ).toString() 
+    : ''
+  return clientGet<PaginatedResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories' + qs)
 }
 
 export async function fetchAdminTaxonomyCategory(id: string): Promise<ApiResponse<AdminTaxonomyCategory>> {
-  return serverGet<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
+  return clientGet<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
 }
 
 export async function createAdminTaxonomyCategory(data: any): Promise<ApiResponse<AdminTaxonomyCategory>> {
-  return serverPost<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories', data)
+  return clientPost<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories', data)
 }
 
 export async function updateAdminTaxonomyCategory(id: string, data: any): Promise<ApiResponse<AdminTaxonomyCategory>> {
-  return serverPatch<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id, data)
+  return clientPatch<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id, data)
 }
 
 export async function deleteAdminTaxonomyCategory(id: string): Promise<ApiResponse<AdminTaxonomyCategory>> {
-  return serverDelete<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
+  return clientDelete<ApiResponse<AdminTaxonomyCategory>>('/admin/taxonomies/categories/' + id)
 }
 
 export async function fetchAdminTaxonomyAttributes(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminTaxonomyAttribute>> {
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes' + qs)
+  return clientGet<PaginatedResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes' + qs)
 }
 
 export async function fetchAdminTaxonomyAttribute(id: string): Promise<ApiResponse<AdminTaxonomyAttribute>> {
-  return serverGet<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
+  return clientGet<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
 }
 
 export async function createAdminTaxonomyAttribute(data: any): Promise<ApiResponse<AdminTaxonomyAttribute>> {
-  return serverPost<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes', data)
+  return clientPost<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes', data)
 }
 
 export async function updateAdminTaxonomyAttribute(id: string, data: any): Promise<ApiResponse<AdminTaxonomyAttribute>> {
-  return serverPatch<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id, data)
+  return clientPatch<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id, data)
 }
 
 export async function deleteAdminTaxonomyAttribute(id: string): Promise<ApiResponse<AdminTaxonomyAttribute>> {
-  return serverDelete<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
+  return clientDelete<ApiResponse<AdminTaxonomyAttribute>>('/admin/taxonomies/attributes/' + id)
 }
 
 export async function fetchAdminRegionalHubs(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminRegionalHub>> {
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs' + qs)
+  return clientGet<PaginatedResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs' + qs)
+}
+
+export async function fetchAdminRegionalHub(id: string): Promise<ApiResponse<AdminRegionalHub>> {
+  return clientGet<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id)
 }
 
 export async function createAdminRegionalHub(data: any): Promise<ApiResponse<AdminRegionalHub>> {
-  return serverPost<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs', data)
+  return clientPost<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs', data)
 }
 
 export async function updateAdminRegionalHub(id: string, data: any): Promise<ApiResponse<AdminRegionalHub>> {
-  return serverPatch<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id, data)
+  return clientPatch<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id, data)
 }
 
 export async function deleteAdminRegionalHub(id: string): Promise<ApiResponse<AdminRegionalHub>> {
-  return serverDelete<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id)
+  return clientDelete<ApiResponse<AdminRegionalHub>>('/admin/taxonomies/regional-hubs/' + id)
 }
 
 export async function getRegionalHubsByProximity(lat: number, lng: number, radiusKm?: number): Promise<ApiResponse<any[]>> {
@@ -373,7 +380,7 @@ export async function getRegionalHubsByProximity(lat: number, lng: number, radiu
   params.append('lat', lat.toString())
   params.append('lng', lng.toString())
   if (radiusKm) params.append('radius', radiusKm.toString())
-  return serverGet<ApiResponse<any[]>>('/admin/taxonomies/regional-hubs/proximity?' + params.toString())
+  return clientGet<ApiResponse<any[]>>('/admin/taxonomies/regional-hubs/proximity?' + params.toString())
 }
 
 // ─── Admin Listings ──────────────────────────────────────────────────────────
@@ -422,15 +429,15 @@ export async function fetchAdminListings(params?: Record<string, string | number
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminListing>>('/admin/listings' + qs)
+  return clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + qs)
 }
 
 export async function fetchAdminListing(id: string): Promise<ApiResponse<AdminListing>> {
-  return serverGet<ApiResponse<AdminListing>>('/admin/listings/' + id)
+  return clientGet<ApiResponse<AdminListing>>('/admin/listings/' + id)
 }
 
 export async function bulkListingAction(listingIds: string[], action: 'approve' | 'reject' | 'archive', reason?: string): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>('/admin/listings/bulk-action', {
+  return clientPost<ApiResponse<unknown>>('/admin/listings/bulk-action', {
     listingIds,
     action,
     ...(reason ? { reason } : {}),
@@ -438,7 +445,7 @@ export async function bulkListingAction(listingIds: string[], action: 'approve' 
 }
 
 export async function fetchListingHistory(id: string): Promise<AuditLog[]> {
-  return serverGet<AuditLog[]>('/admin/listings/' + id + '/history')
+  return clientGet<AuditLog[]>('/admin/listings/' + id + '/history')
 }
 
 // ─── Admin Users ─────────────────────────────────────────────────────────────
@@ -463,23 +470,23 @@ export async function fetchAdminUsers(params?: Record<string, string | number | 
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminUser>>('/admin/users' + qs)
+  return clientGet<PaginatedResponse<AdminUser>>('/admin/users' + qs)
 }
 
 export async function fetchAdminUser(id: string): Promise<ApiResponse<AdminUser>> {
-  return serverGet<ApiResponse<AdminUser>>('/admin/users/' + id)
+  return clientGet<ApiResponse<AdminUser>>('/admin/users/' + id)
 }
 
 export async function fetchUserStats(): Promise<ApiResponse<Record<string, number>>> {
-  return serverGet<ApiResponse<Record<string, number>>>('/admin/users/stats')
+  return clientGet<ApiResponse<Record<string, number>>>('/admin/users/stats')
 }
 
 export async function adminUpdateUser(id: string, data: { status?: string; role?: string; reason?: string }): Promise<ApiResponse<AdminUser>> {
-  return serverPatch<ApiResponse<AdminUser>>('/admin/users/' + id, data)
+  return clientPatch<ApiResponse<AdminUser>>('/admin/users/' + id, data)
 }
 
 export async function bulkUserAction(userIds: string[], action: 'activate' | 'suspend' | 'ban' | 'verify_email' | 'verify_phone' | 'change_role', reason?: string, newRole?: string): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>('/admin/users/bulk-action', {
+  return clientPost<ApiResponse<unknown>>('/admin/users/bulk-action', {
     userIds,
     action,
     ...(reason ? { reason } : {}),
@@ -514,42 +521,42 @@ export async function fetchReports(params?: Record<string, string | number | boo
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AdminReport>>('/reports' + qs)
+  return clientGet<PaginatedResponse<AdminReport>>('/reports' + qs)
 }
 
 export async function fetchReportStats(): Promise<ApiResponse<Record<string, number>>> {
-  return serverGet<ApiResponse<Record<string, number>>>('/reports/stats')
+  return clientGet<ApiResponse<Record<string, number>>>('/reports/stats')
 }
 
 export async function fetchReport(id: string): Promise<ApiResponse<AdminReport>> {
-  return serverGet<ApiResponse<AdminReport>>('/reports/' + id)
+  return clientGet<ApiResponse<AdminReport>>('/reports/' + id)
 }
 
 export async function setReportUnderReview(id: string): Promise<ApiResponse<AdminReport>> {
-  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/review')
+  return clientPatch<ApiResponse<AdminReport>>('/reports/' + id + '/review')
 }
 
 export async function resolveReport(id: string, resolution: 'resolved' | 'dismissed', resolutionNote?: string): Promise<ApiResponse<AdminReport>> {
-  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/resolve', {
+  return clientPatch<ApiResponse<AdminReport>>('/reports/' + id + '/resolve', {
     resolution,
     ...(resolutionNote ? { resolutionNote } : {}),
   })
 }
 
 export async function setReportInvestigating(id: string): Promise<ApiResponse<AdminReport>> {
-  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/investigate')
+  return clientPatch<ApiResponse<AdminReport>>('/reports/' + id + '/investigate')
 }
 
 export async function closeReport(id: string, note?: string): Promise<ApiResponse<AdminReport>> {
-  return serverPatch<ApiResponse<AdminReport>>('/reports/' + id + '/close', { note })
+  return clientPatch<ApiResponse<AdminReport>>('/reports/' + id + '/close', { note })
 }
 
 export async function fetchReportConversationHistory(id: string): Promise<any[]> {
-  return serverGet<any[]>('/reports/' + id + '/conversation')
+  return clientGet<any[]>('/reports/' + id + '/conversation')
 }
 
 export async function fetchReportAuditLogs(id: string): Promise<AuditLog[]> {
-  return serverGet<AuditLog[]>('/reports/' + id + '/audit-logs')
+  return clientGet<AuditLog[]>('/reports/' + id + '/audit-logs')
 }
 
 // ─── Verifications ───────────────────────────────────────────────────────────
@@ -611,29 +618,29 @@ export async function fetchVerifications(params?: Record<string, string | number
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<VerificationRequest>>('/admin/verifications' + qs)
+  return clientGet<PaginatedResponse<VerificationRequest>>('/admin/verifications' + qs)
 }
 
 export async function fetchVerification(id: string): Promise<ApiResponse<VerificationRequest>> {
-  return serverGet<ApiResponse<VerificationRequest>>('/admin/verifications/' + id)
+  return clientGet<ApiResponse<VerificationRequest>>('/admin/verifications/' + id)
 }
 
 export async function reviewVerification(id: string, decision: 'approved' | 'rejected' | 'changes_requested', notes?: string): Promise<ApiResponse<VerificationRequest>> {
-  return serverPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id, {
+  return clientPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id, {
     decision,
     ...(notes ? { notes } : {}),
   })
 }
 
 export async function updateVerificationStatus(id: string, status: 'under_review' | 'pending' | 'approved' | 'rejected' | 'changes_requested', notes?: string): Promise<ApiResponse<VerificationRequest>> {
-  return serverPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id + '/status', {
+  return clientPatch<ApiResponse<VerificationRequest>>('/admin/verifications/' + id + '/status', {
     status,
     ...(notes ? { notes } : {}),
   })
 }
 
 export async function fetchVerificationHistory(id: string): Promise<VerificationHistory[]> {
-  return serverGet<VerificationHistory[]>('/admin/verifications/' + id + '/history')
+  return clientGet<VerificationHistory[]>('/admin/verifications/' + id + '/history')
 }
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -650,15 +657,15 @@ export async function fetchDashboardStats(from?: string, to?: string): Promise<D
   if (from) params.set('from', from)
   if (to) params.set('to', to)
   const qs = params.toString() ? '?' + params.toString() : ''
-  return serverGet<DashboardStats>('/admin/analytics/dashboard' + qs)
+  return clientGet<DashboardStats>('/admin/analytics/dashboard' + qs)
 }
 
 export async function fetchListingsByStatus(): Promise<Record<string, number>> {
-  return serverGet<Record<string, number>>('/admin/analytics/listings-by-status')
+  return clientGet<Record<string, number>>('/admin/analytics/listings-by-status')
 }
 
 export async function fetchUsersByStatus(): Promise<Record<string, number>> {
-  return serverGet<Record<string, number>>('/admin/analytics/users-by-status')
+  return clientGet<Record<string, number>>('/admin/analytics/users-by-status')
 }
 
 export interface TopCategory {
@@ -669,7 +676,7 @@ export interface TopCategory {
 }
 
 export async function fetchTopCategories(): Promise<TopCategory[]> {
-  return serverGet<TopCategory[]>('/admin/analytics/top-categories')
+  return clientGet<TopCategory[]>('/admin/analytics/top-categories')
 }
 
 // ─── Audit Logs ──────────────────────────────────────────────────────────────
@@ -690,7 +697,7 @@ export async function fetchAuditLogs(params?: Record<string, string | number | b
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<AuditLog>>('/admin/audit-logs' + qs)
+  return clientGet<PaginatedResponse<AuditLog>>('/admin/audit-logs' + qs)
 }
 
 // ─── Content Moderation ─────────────────────────────────────────────────────
@@ -764,31 +771,31 @@ export async function fetchModerationItems(params?: Record<string, string | numb
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<ModerationItem>>('/admin/moderation' + qs)
+  return clientGet<PaginatedResponse<ModerationItem>>('/admin/moderation' + qs)
 }
 
 export async function fetchModerationItem(id: string): Promise<ApiResponse<ModerationItem>> {
-  return serverGet<ApiResponse<ModerationItem>>('/admin/moderation/' + id)
+  return clientGet<ApiResponse<ModerationItem>>('/admin/moderation/' + id)
 }
 
 export async function fetchModerationStats(): Promise<ApiResponse<Record<string, number>>> {
-  return serverGet<ApiResponse<Record<string, number>>>('/admin/moderation/stats')
+  return clientGet<ApiResponse<Record<string, number>>>('/admin/moderation/stats')
 }
 
 export async function fetchModerationHistory(id: string): Promise<AuditLog[]> {
-  return serverGet<AuditLog[]>('/admin/moderation/' + id + '/history')
+  return clientGet<AuditLog[]>('/admin/moderation/' + id + '/history')
 }
 
 export async function moderateItem(id: string, action: 'approve' | 'reject' | 'delete' | 'restore', reason?: string): Promise<ApiResponse<ModerationItem>> {
   const endpoint = `/admin/moderation/${id}/${action}`
   if (action === 'reject') {
-    return serverPost<ApiResponse<ModerationItem>>(endpoint, { reason })
+    return clientPost<ApiResponse<ModerationItem>>(endpoint, { reason })
   }
-  return serverPost<ApiResponse<ModerationItem>>(endpoint)
+  return clientPost<ApiResponse<ModerationItem>>(endpoint)
 }
 
 export async function moderateReview(reviewId: string, status: string, reason?: string, isSpam?: boolean): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>(`/admin/moderation/review/${reviewId}`, {
+  return clientPost<ApiResponse<unknown>>(`/admin/moderation/review/${reviewId}`, {
     status,
     reason,
     isSpam,
@@ -796,14 +803,14 @@ export async function moderateReview(reviewId: string, status: string, reason?: 
 }
 
 export async function toggleSpamFlag(id: string, isSpam: boolean, reason?: string): Promise<ApiResponse<ModerationItem>> {
-  return serverPatch<ApiResponse<ModerationItem>>(`/admin/moderation/${id}/spam`, {
+  return clientPatch<ApiResponse<ModerationItem>>(`/admin/moderation/${id}/spam`, {
     isSpam,
     reason,
   })
 }
 
 export async function bulkModerationAction(itemIds: string[], action: string, reason?: string): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>('/admin/moderation/bulk-action', {
+  return clientPost<ApiResponse<unknown>>('/admin/moderation/bulk-action', {
     itemIds,
     action,
     reason,
@@ -867,15 +874,15 @@ export async function fetchHomepageContents(params?: Record<string, string | num
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return serverGet<PaginatedResponse<HomepageContent>>('/admin/homepage-content' + qs)
+  return clientGet<PaginatedResponse<HomepageContent>>('/admin/homepage-content' + qs)
 }
 
 export async function fetchHomepageContent(id: string): Promise<ApiResponse<HomepageContent>> {
-  return serverGet<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id)
+  return clientGet<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id)
 }
 
 export async function fetchPublishedHomepageContent(): Promise<ApiResponse<HomepageContent[]>> {
-  return serverGet<ApiResponse<HomepageContent[]>>('/admin/homepage-content/published')
+  return clientGet<ApiResponse<HomepageContent[]>>('/admin/homepage-content/published')
 }
 
 export async function createHomepageContent(data: {
@@ -897,7 +904,7 @@ export async function createHomepageContent(data: {
   featuredListingId?: string
   featuredCategoryId?: string
 }): Promise<ApiResponse<HomepageContent>> {
-  return serverPost<ApiResponse<HomepageContent>>('/admin/homepage-content', data)
+  return clientPost<ApiResponse<HomepageContent>>('/admin/homepage-content', data)
 }
 
 export async function updateHomepageContent(id: string, data: Partial<{
@@ -919,19 +926,19 @@ export async function updateHomepageContent(id: string, data: Partial<{
   featuredListingId?: string
   featuredCategoryId?: string
 }>): Promise<ApiResponse<HomepageContent>> {
-  return serverPut<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id, data)
+  return clientPatch<ApiResponse<HomepageContent>>('/admin/homepage-content/' + id, data)
 }
 
 export async function deleteHomepageContent(id: string): Promise<ApiResponse<unknown>> {
-  return serverDelete<ApiResponse<unknown>>('/admin/homepage-content/' + id)
+  return clientDelete<ApiResponse<unknown>>('/admin/homepage-content/' + id)
 }
 
 export async function restoreHomepageContent(id: string): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>('/admin/homepage-content/' + id + '/restore')
+  return clientPost<ApiResponse<unknown>>('/admin/homepage-content/' + id + '/restore')
 }
 
 export async function reorderHomepageContent(itemIds: string[]): Promise<ApiResponse<unknown>> {
-  return serverPost<ApiResponse<unknown>>('/admin/homepage-content/reorder', { itemIds })
+  return clientPost<ApiResponse<unknown>>('/admin/homepage-content/reorder', { itemIds })
 }
 
 // ─── Image Upload ───────────────────────────────────────────────────────────
@@ -943,11 +950,11 @@ export interface SignedUploadResponse {
 }
 
 export async function signUpload(count: number = 1): Promise<SignedUploadResponse[]> {
-  return serverPost<SignedUploadResponse[]>('/uploads/sign', { count })
+  return clientPost<SignedUploadResponse[]>('/uploads/sign', { count })
 }
 
 export async function validateUpload(mimeType: string, bytes: number): Promise<{ valid: boolean }> {
-  return serverPost<{ valid: boolean }>('/uploads/validate', { mimeType, bytes })
+  return clientPost<{ valid: boolean }>('/uploads/validate', { mimeType, bytes })
 }
 
 // ─── Rentals ────────────────────────────────────────────────────────────────
@@ -995,29 +1002,29 @@ export async function getRentalOrders(query?: {
   if (query?.limit) params.append('limit', query.limit.toString())
   if (query?.status) params.append('status', query.status)
   if (query?.userId) params.append('userId', query.userId)
-  return serverGet<ApiResponse<{ items: RentalOrder[]; total: number }>>('/admin/rentals?' + params.toString())
+  return clientGet<ApiResponse<{ items: RentalOrder[]; total: number }>>('/admin/rentals?' + params.toString())
 }
 
 export async function getRentalOrder(id: string): Promise<ApiResponse<RentalOrder>> {
-  return serverGet<ApiResponse<RentalOrder>>('/admin/rentals/' + id)
+  return clientGet<ApiResponse<RentalOrder>>('/admin/rentals/' + id)
 }
 
 export async function updateRentalOrder(id: string, data: {
   status?: string
   returnDate?: string
 }): Promise<ApiResponse<RentalOrder>> {
-  return serverPatch<ApiResponse<RentalOrder>>('/admin/rentals/' + id, data)
+  return clientPatch<ApiResponse<RentalOrder>>('/admin/rentals/' + id, data)
 }
 
 export async function createRentalExtension(data: {
   rentalOrderId: string
   additionalDays: number
 }): Promise<ApiResponse<RentalExtension>> {
-  return serverPost<ApiResponse<RentalExtension>>('/admin/rentals/extensions', data)
+  return clientPost<ApiResponse<RentalExtension>>('/admin/rentals/extensions', data)
 }
 
 export async function getRentalExtensions(rentalOrderId: string): Promise<ApiResponse<RentalExtension[]>> {
-  return serverGet<ApiResponse<RentalExtension[]>>('/admin/rentals/' + rentalOrderId + '/extensions')
+  return clientGet<ApiResponse<RentalExtension[]>>('/admin/rentals/' + rentalOrderId + '/extensions')
 }
 
 // ─── Hero Banners ────────────────────────────────────────────────────────────
@@ -1056,19 +1063,19 @@ export async function getHeroBanners(query?: {
   if (query?.page) params.append('page', query.page.toString())
   if (query?.limit) params.append('limit', query.limit.toString())
   if (query?.status) params.append('status', query.status)
-  return serverGet<ApiResponse<{ items: HeroBanner[]; total: number }>>('/admin/hero-banners?' + params.toString())
+  return clientGet<ApiResponse<{ items: HeroBanner[]; total: number }>>('/admin/hero-banners?' + params.toString())
 }
 
 export async function getActiveHeroBanners(): Promise<ApiResponse<HeroBanner[]>> {
-  return serverGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/active')
+  return clientGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/active')
 }
 
 export async function getHeroBannersByTheme(theme: string): Promise<ApiResponse<HeroBanner[]>> {
-  return serverGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/holiday/' + theme)
+  return clientGet<ApiResponse<HeroBanner[]>>('/admin/hero-banners/holiday/' + theme)
 }
 
 export async function getHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
-  return serverGet<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id)
+  return clientGet<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id)
 }
 
 export async function createHeroBanner(data: {
@@ -1085,7 +1092,7 @@ export async function createHeroBanner(data: {
   searchWeight?: number
   sortOrder?: number
 }): Promise<ApiResponse<HeroBanner>> {
-  return serverPost<ApiResponse<HeroBanner>>('/admin/hero-banners', data)
+  return clientPost<ApiResponse<HeroBanner>>('/admin/hero-banners', data)
 }
 
 export async function updateHeroBanner(id: string, data: Partial<{
@@ -1102,19 +1109,19 @@ export async function updateHeroBanner(id: string, data: Partial<{
   searchWeight?: number
   sortOrder?: number
 }>): Promise<ApiResponse<HeroBanner>> {
-  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id, data)
+  return clientPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id, data)
 }
 
 export async function publishHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
-  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/publish', {})
+  return clientPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/publish', {})
 }
 
 export async function unpublishHeroBanner(id: string): Promise<ApiResponse<HeroBanner>> {
-  return serverPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/unpublish', {})
+  return clientPatch<ApiResponse<HeroBanner>>('/admin/hero-banners/' + id + '/unpublish', {})
 }
 
 export async function deleteHeroBanner(id: string): Promise<ApiResponse<unknown>> {
-  return serverDelete<ApiResponse<unknown>>('/admin/hero-banners/' + id)
+  return clientDelete<ApiResponse<unknown>>('/admin/hero-banners/' + id)
 }
 
 // ─── Vendor KYC ───────────────────────────────────────────────────────────────
@@ -1158,18 +1165,18 @@ export async function getVendorKycProfiles(query?: {
   if (query?.status) params.append('status', query.status)
   if (query?.userId) params.append('userId', query.userId)
   if (query?.tinNumber) params.append('tinNumber', query.tinNumber)
-  return serverGet<ApiResponse<{ items: VendorKycProfile[]; total: number }>>('/admin/vendor-kyc?' + params.toString())
+  return clientGet<ApiResponse<{ items: VendorKycProfile[]; total: number }>>('/admin/vendor-kyc?' + params.toString())
 }
 
 export async function getVendorKycProfile(id: string): Promise<ApiResponse<VendorKycProfile>> {
-  return serverGet<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id)
+  return clientGet<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id)
 }
 
 export async function reviewVendorKyc(id: string, data: {
   decision: 'APPROVED' | 'REJECTED'
   reason?: string
 }): Promise<ApiResponse<VendorKycProfile>> {
-  return serverPatch<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id + '/review', data)
+  return clientPatch<ApiResponse<VendorKycProfile>>('/admin/vendor-kyc/' + id + '/review', data)
 }
 
 export async function createVendorKycProfile(data: {
@@ -1179,5 +1186,5 @@ export async function createVendorKycProfile(data: {
   licenseUrl: string
   licenseCloudinaryId?: string
 }): Promise<ApiResponse<VendorKycProfile>> {
-  return serverPost<ApiResponse<VendorKycProfile>>('/vendor-kyc', data)
+  return clientPost<ApiResponse<VendorKycProfile>>('/vendor-kyc', data)
 }

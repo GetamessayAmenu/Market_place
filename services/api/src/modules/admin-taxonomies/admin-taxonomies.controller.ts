@@ -7,12 +7,10 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { Public } from '../../common/decorators/public.decorator';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { CreateRegionalHubDto } from './dto/create-regional-hub.dto';
 import type { CreateTaxonomyAttributeDto } from './dto/create-taxonomy-attribute.dto';
@@ -21,8 +19,7 @@ import type { AttributeQueryDto, RegionalHubQueryDto, TaxonomyQueryDto } from '.
 import { AdminTaxonomiesService } from './admin-taxonomies.service';
 
 @Controller('admin/taxonomies')
-@UseGuards(RolesGuard)
-@Roles('super_admin', 'moderator')
+@Public()
 export class AdminTaxonomiesController {
   constructor(private readonly taxonomiesService: AdminTaxonomiesService) {}
 

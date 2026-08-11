@@ -56,6 +56,16 @@ export function toListingSearchDocument(
     supportsReadyMade: (listing as any).supportsReadyMade ?? true,
     supportsCustomDesign: (listing as any).supportsCustomDesign ?? false,
     startingCustomPrice: (listing as any).startingCustomPrice ? Number((listing as any).startingCustomPrice) : null,
+    availableForRent: (listing as any).availableForRent ?? false,
+    rentalPricePerDay: (listing as any).rentalPricePerDay ? Number((listing as any).rentalPricePerDay) : null,
+    regionalHubId: (listing as any).regionalHubId ?? null,
+    hubType: (listing as any).hubType ?? null,
+    weavingPatterns: (listing as any).weavingPatterns ?? [],
+    fabricTypes: (listing as any).fabricTypes ?? [],
+    embroideryStyles: (listing as any).embroideryStyles ?? [],
+    occasionTypes: (listing as any).occasionTypes ?? [],
+    verifiedDesigner: (listing as any).verifiedDesigner ?? false,
+    rentalBlackoutDates: (listing as any).rentalBlackoutDates ?? [],
   };
 }
 

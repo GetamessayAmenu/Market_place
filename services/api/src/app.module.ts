@@ -32,6 +32,7 @@ import { AdminTaxonomiesModule } from './modules/admin-taxonomies/admin-taxonomi
 import { RentalsModule } from './modules/rentals/rentals.module';
 import { HeroBannersModule } from './modules/hero-banners/hero-banners.module';
 import { SellerModule } from './modules/seller/seller.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { SellerModule } from './modules/seller/seller.module';
     RentalsModule,
     HeroBannersModule,
     SellerModule,
+    ChatModule,
   ],
   controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [

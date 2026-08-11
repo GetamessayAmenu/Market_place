@@ -16,7 +16,7 @@ export class AdminTaxonomiesRepository {
   }) {
     const { skip = 0, take = 20, type, parentId, search, isActive } = query;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (type) where.type = type;
     if (parentId) where.parentId = parentId;
     if (isActive !== undefined) where.isActive = isActive;
@@ -105,13 +105,15 @@ export class AdminTaxonomiesRepository {
   }) {
     const { skip = 0, take = 20, type, search, isActive } = query;
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (type) where.type = type;
     if (isActive !== undefined) where.isActive = isActive;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { nameAm: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { descriptionAm: { contains: search, mode: 'insensitive' } },
       ];
     }
 

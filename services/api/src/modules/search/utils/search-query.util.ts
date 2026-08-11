@@ -50,6 +50,54 @@ export function buildMeilisearchFilter(dto: SearchListingsDto): string {
     parts.push(`price <= ${dto.maxPrice}`);
   }
 
+  // Transaction Model Filters
+  if (dto.supportsReadyMade === true) {
+    parts.push('supportsReadyMade = true');
+  }
+
+  if (dto.availableForRent === true) {
+    parts.push('availableForRent = true');
+  }
+
+  if (dto.supportsCustomDesign === true) {
+    parts.push('supportsCustomDesign = true');
+  }
+
+  // Geographic Hub Filter
+  if (dto.regionalHubId) {
+    parts.push(`regionalHubId = '${escapeFilterValue(dto.regionalHubId)}'`);
+  }
+
+  if (dto.hubType) {
+    parts.push(`hubType = '${escapeFilterValue(dto.hubType)}'`);
+  }
+
+  // Cultural Facet Filters
+  if (dto.weavingPatterns && dto.weavingPatterns.length > 0) {
+    const patternFilters = dto.weavingPatterns.map(p => `weavingPatterns = '${escapeFilterValue(p)}'`);
+    parts.push(`(${patternFilters.join(' OR ')})`);
+  }
+
+  if (dto.fabricTypes && dto.fabricTypes.length > 0) {
+    const fabricFilters = dto.fabricTypes.map(f => `fabricTypes = '${escapeFilterValue(f)}'`);
+    parts.push(`(${fabricFilters.join(' OR ')})`);
+  }
+
+  if (dto.embroideryStyles && dto.embroideryStyles.length > 0) {
+    const embroideryFilters = dto.embroideryStyles.map(e => `embroideryStyles = '${escapeFilterValue(e)}'`);
+    parts.push(`(${embroideryFilters.join(' OR ')})`);
+  }
+
+  if (dto.occasionTypes && dto.occasionTypes.length > 0) {
+    const occasionFilters = dto.occasionTypes.map(o => `occasionTypes = '${escapeFilterValue(o)}'`);
+    parts.push(`(${occasionFilters.join(' OR ')})`);
+  }
+
+  // Verified Designer Filter
+  if (dto.verifiedDesignerOnly === true) {
+    parts.push('verifiedDesigner = true');
+  }
+
   return parts.join(' AND ');
 }
 

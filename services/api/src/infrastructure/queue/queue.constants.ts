@@ -7,6 +7,9 @@ export const QUEUE_NAMES = {
   CMS_SCHEDULING: 'cms-scheduling',
   RENTAL_REMINDERS: 'rental-reminders',
   RENTAL_EXPIRATION: 'rental-expiration',
+  TAXONOMY_CACHE: 'taxonomy-cache',
+  AUDIT_LOG: 'audit-log',
+  MEILISEARCH_SYNC: 'meilisearch-sync',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

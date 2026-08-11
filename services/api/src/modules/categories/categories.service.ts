@@ -10,7 +10,11 @@ import type { UpdateCategoryDto } from './dto/update-category.dto';
 export interface SerializedCategory {
   readonly id: string;
   readonly name: string;
+  readonly nameAm: string | null;
   readonly slug: string;
+  readonly slugAm: string | null;
+  readonly description: string | null;
+  readonly descriptionAm: string | null;
   readonly parentId: string | null;
   readonly type: string;
   readonly iconUrl: string | null;
@@ -34,6 +38,24 @@ export class CategoriesService {
       throw new CategoryNotFoundException();
     }
     return this.serializeCategory(category);
+  }
+
+  async getRegionalHubs() {
+    const hubs = await this.categoriesRepository.findRegionalHubs();
+    return hubs.map(hub => ({
+      id: hub.id,
+      name: hub.name,
+      nameAm: hub.nameAm,
+      description: hub.description,
+      descriptionAm: hub.descriptionAm,
+      type: hub.type,
+      city: hub.city,
+      cityAm: hub.cityAm,
+      coordinates: hub.coordinates,
+      sortOrder: hub.sortOrder,
+      isActive: hub.isActive,
+      isPopular: hub.isPopular,
+    }));
   }
 
   async assertCategoryExists(categoryId: string): Promise<void> {
@@ -148,7 +170,11 @@ export class CategoriesService {
     return {
       id: category.id,
       name: category.name,
+      nameAm: (category as any).nameAm || null,
       slug: category.slug,
+      slugAm: (category as any).slugAm || null,
+      description: (category as any).description || null,
+      descriptionAm: (category as any).descriptionAm || null,
       parentId: category.parentId,
       type: (category as any).type || 'product',
       iconUrl: category.iconUrl,

@@ -25,7 +25,7 @@ export interface FilterValues {
 }
 
 export interface FilterPanelProps {
-  categories?: { value: string; label: string }[];
+  categories?: { value: string; label: string; children?: { value: string; label: string }[] }[];
   conditions?: { value: string; label: string }[];
   cities?: { value: string; label: string }[];
   designers?: { value: string; label: string }[];
@@ -168,6 +168,41 @@ export default function FilterPanel({
       </div>
 
       <div className="px-4">
+        {/* Product Type - Jiji Style (For Sale, Rent, Custom Order) */}
+        <FilterSection title="Product Type" defaultOpen={true}>
+          <div className="flex flex-col gap-2">
+            {LISTING_TYPE_OPTIONS.map((opt) => {
+              const isActive = (values.listingTypes ?? []).includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => { 
+                    // Clear other types and select this one (single selection like Jiji)
+                    setValues(prev => ({ ...prev, listingTypes: [opt.value] }));
+                  }}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3 rounded-lg border transition-all',
+                    isActive
+                      ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-medium'
+                      : 'border-border bg-background text-foreground hover:border-brand-gold/50 hover:bg-muted/50'
+                  )}
+                >
+                  <div className={cn(
+                    'h-4 w-4 rounded-full border-2 flex items-center justify-center',
+                    isActive ? 'border-brand-gold' : 'border-border'
+                  )}>
+                    {isActive && (
+                      <div className="h-2 w-2 rounded-full bg-brand-gold" />
+                    )}
+                  </div>
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FilterSection>
+
         {/* Search */}
         <FilterSection title="Search">
           <SearchBar
@@ -178,81 +213,78 @@ export default function FilterPanel({
           />
         </FilterSection>
 
-        {/* Listing type */}
-        <FilterSection title="Type">
-          <div className="flex flex-wrap gap-2">
-            {LISTING_TYPE_OPTIONS.map((opt) => {
-              const isActive = (values.listingTypes ?? []).includes(opt.value);
-              return (
-                <Tag
-                  key={opt.value}
-                  variant={opt.variant}
-                  size="sm"
-                  onClick={() => { toggleArrayValue('listingTypes', opt.value); }}
-                  className={cn(
-                    'cursor-pointer transition-opacity',
-                    !isActive && 'opacity-40 hover:opacity-70'
-                  )}
-                >
-                  {opt.label}
-                </Tag>
-              );
-            })}
-          </div>
-        </FilterSection>
 
-        {/* Capability Filter (Unified Custom Design) */}
-        <FilterSection title="Availability">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="capability"
-                value="both"
-                checked={values.capabilityFilter === 'both' || !values.capabilityFilter}
-                onChange={() => { updateValue('capabilityFilter', 'both'); }}
-                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
-              />
-              <span className="text-sm text-foreground">All Listings</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="capability"
-                value="ready-made"
-                checked={values.capabilityFilter === 'ready-made'}
-                onChange={() => { updateValue('capabilityFilter', 'ready-made'); }}
-                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
-              />
-              <span className="text-sm text-foreground">Ready-made Only</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="capability"
-                value="custom-design"
-                checked={values.capabilityFilter === 'custom-design'}
-                onChange={() => { updateValue('capabilityFilter', 'custom-design'); }}
-                className="h-4 w-4 border-border text-brand-gold focus:ring-brand-gold/50"
-              />
-              <span className="text-sm text-foreground">Custom Design Available</span>
-            </label>
-          </div>
-        </FilterSection>
-
-        {/* Category */}
+        {/* Category - Jiji Style with Parent Categories */}
         {categories.length > 0 && (
-          <FilterSection title="Category">
-            <select
-              value={values.category ?? ''}
-              onChange={(e) => { updateValue('category', e.target.value || undefined); }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+          <FilterSection title="Category" defaultOpen={true}>
+            {/* Parent Categories */}
+            <div className="space-y-3 mb-4">
+              {categories
+                .filter(c => ['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label))
+                .map((parentCat) => (
+                  <div key={parentCat.value} className="border border-border rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => { updateValue('category', parentCat.value); }}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors',
+                        values.category === parentCat.value
+                          ? 'bg-brand-gold/10 text-brand-gold'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      )}
+                    >
+                      <span>{parentCat.label}</span>
+                      {values.category === parentCat.value && (
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                    {/* Subcategories dropdown */}
+                    {values.category === parentCat.value && parentCat.children && parentCat.children.length > 0 && (
+                      <div className="border-t border-border bg-muted/30">
+                        <select
+                          value={values.category === parentCat.value ? '' : values.category}
+                          onChange={(e) => { updateValue('category', e.target.value || parentCat.value); }}
+                          className="w-full px-3 py-2 text-sm bg-transparent focus-visible:outline-none"
+                        >
+                          <option value="">All {parentCat.label}</option>
+                          {parentCat.children.map((child) => (
+                            <option key={child.value} value={child.value} className="pl-4">
+                              {child.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+            
+            {/* Other Categories */}
+            <div className="pt-3 border-t border-border">
+              <select
+                value={categories.some(c => ['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label) && values.category === c.value) 
+                  ? '' 
+                  : values.category ?? ''}
+                onChange={(e) => { updateValue('category', e.target.value || undefined); }}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
+              >
+                <option value="">Other categories</option>
+                {categories
+                  .filter(c => !['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label))
+                  .map((c) => (
+                    <React.Fragment key={c.value}>
+                      <option value={c.value}>{c.label}</option>
+                      {c.children && c.children.length > 0 && c.children.map((child) => (
+                        <option key={child.value} value={child.value} className="pl-6">
+                          &nbsp;&nbsp;{child.label}
+                        </option>
+                      ))}
+                    </React.Fragment>
+                  ))}
+              </select>
+            </div>
           </FilterSection>
         )}
 
@@ -377,21 +409,33 @@ export default function FilterPanel({
           </FilterSection>
         )}
 
-        {/* City */}
-        {cities.length > 0 && (
-          <FilterSection title="Location" defaultOpen={false}>
-            <select
-              value={values.city ?? ''}
-              onChange={(e) => { updateValue('city', e.target.value || undefined); }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-            >
-              <option value="">All cities</option>
-              {cities.map((c) => (
+        {/* City/Location */}
+        <FilterSection title="Location" defaultOpen={true}>
+          <select
+            value={values.city ?? ''}
+            onChange={(e) => { updateValue('city', e.target.value || undefined); }}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
+          >
+            <option value="">All locations</option>
+            {cities.length > 0 ? (
+              cities.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </FilterSection>
-        )}
+              ))
+            ) : (
+              // Default Ethiopian cities if none provided
+              <>
+                <option value="Addis Ababa">Addis Ababa</option>
+                <option value="Bahir Dar">Bahir Dar</option>
+                <option value="Hawassa">Hawassa</option>
+                <option value="Mekelle">Mekelle</option>
+                <option value="Dire Dawa">Dire Dawa</option>
+                <option value="Adama">Adama</option>
+                <option value="Gondar">Gondar</option>
+                <option value="Jimma">Jimma</option>
+              </>
+            )}
+          </select>
+        </FilterSection>
 
         {/* Sort */}
         <FilterSection title="Sort By">

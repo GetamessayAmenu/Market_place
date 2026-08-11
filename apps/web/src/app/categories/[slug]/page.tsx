@@ -8,12 +8,16 @@ import { serverGet } from '../../../lib/serverApi'
 interface CategoryData {
   id: string
   name: string
+  nameAm?: string | null
   slug: string
+  slugAm?: string | null
   description?: string | null
+  descriptionAm?: string | null
   imageUrl?: string | null
   children?: {
     id: string
     name: string
+    nameAm?: string | null
     slug: string
   }[]
 }
@@ -119,8 +123,16 @@ export default async function CategoryPage({ params, searchParams }: Props) {
             <span className="mx-2">/</span>
             <span className="text-foreground">{category.name}</span>
           </nav>
-          <h1 className="text-3xl font-bold text-foreground">{category.name}</h1>
-          {category.description && <p className="mt-2 text-muted-foreground">{category.description}</p>}
+          <h1 className="text-3xl font-bold text-foreground">
+            {category.name}
+            {category.nameAm && <span className="ml-2 text-xl text-muted-foreground" dir="rtl">{category.nameAm}</span>}
+          </h1>
+          {category.description && (
+            <p className="mt-2 text-muted-foreground">
+              {category.description}
+              {category.descriptionAm && <span className="block mt-1" dir="rtl">{category.descriptionAm}</span>}
+            </p>
+          )}
         </div>
 
         {/* Subcategory navigation */}
@@ -133,6 +145,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
                 className="inline-flex items-center rounded-full border bg-card px-4 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-accent"
               >
                 {child.name}
+                {child.nameAm && <span className="ml-2 text-muted-foreground" dir="rtl">{child.nameAm}</span>}
               </Link>
             ))}
           </div>

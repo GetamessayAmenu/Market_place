@@ -159,8 +159,11 @@ model Category {
 model Attribute {
   id                 String              @id @default(uuid()) @db.Uuid
   name               String              @db.VarChar(100)
+  nameAm             String?             @map("name_am") @db.VarChar(100)
   type               AttributeType
   values             Json
+  description        String?             @db.Text
+  descriptionAm      String?             @map("description_am") @db.Text
   sortOrder          Int                 @default(0) @map("sort_order")
   isActive           Boolean             @default(true) @map("is_active")
   deletedAt          DateTime?           @map("deleted_at")
@@ -888,20 +891,23 @@ model RegionHub {
   id            String   @id @default(uuid()) @db.Uuid
   name          String   @db.VarChar(100)
   nameAm        String?  @map("name_am") @db.VarChar(100)
-  description   String?
-  descriptionAm String?  @map("description_am")
+  description   String?  @db.Text
+  descriptionAm String?  @map("description_am") @db.Text
   type          String   @db.VarChar(50)
-  city          String   @db.VarChar(100)
+  city          String?  @db.VarChar(100)
   cityAm        String?  @map("city_am") @db.VarChar(100)
-  coordinates   String?  @db.VarChar(100)
+  coordinates   String?  @db.VarChar(200)
   sortOrder     Int      @default(0) @map("sort_order")
   isActive      Boolean  @default(true) @map("is_active")
   isPopular     Boolean  @default(false) @map("is_popular")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  @@index([type, isActive])
+  @@index([type])
   @@index([city])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([isPopular])
   @@map("region_hubs")
 }
 
@@ -965,6 +971,16 @@ enum AttributeType {
   material
   brand
   custom
+  weaving_pattern
+  fabric_type
+  embroidery_style
+}
+
+enum HubType {
+  sub_city
+  district
+  neighborhood
+  market_area
 }
 
 enum ListingCondition {

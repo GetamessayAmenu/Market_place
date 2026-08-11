@@ -22,6 +22,16 @@ export interface ListingSearchDocument extends Record<string, unknown> {
   readonly supportsReadyMade: boolean;
   readonly supportsCustomDesign: boolean;
   readonly startingCustomPrice: number | null;
+  readonly availableForRent: boolean;
+  readonly rentalPricePerDay: number | null;
+  readonly regionalHubId: string | null;
+  readonly hubType: string | null;
+  readonly weavingPatterns: string[];
+  readonly fabricTypes: string[];
+  readonly embroideryStyles: string[];
+  readonly occasionTypes: string[];
+  readonly verifiedDesigner: boolean;
+  readonly rentalBlackoutDates: Array<{ startDate: string; endDate: string }>;
 }
 
 export interface SearchIndexJobPayload {

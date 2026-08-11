@@ -42,9 +42,18 @@ export default function SearchClient() {
 
   const { data: categoriesRes } = useCategories()
 
-  const categoryOptions: SelectOption[] = useMemo(() => {
-    const cats = categoriesRes?.data ?? []
-    return cats.map((c) => ({ value: c.id, label: c.name }))
+  const categoryOptions = useMemo(() => {
+    const cats = categoriesRes ?? []
+    return cats.map((c) => ({
+      value: c.id,
+      label: c.name,
+      ...(c.children && c.children.length > 0 ? {
+        children: c.children.map((child) => ({
+          value: child.id,
+          label: child.name,
+        })),
+      } : {}),
+    }))
   }, [categoriesRes])
 
   const conditionOptions: SelectOption[] = [

@@ -16,12 +16,9 @@ interface Category {
 }
 
 export function useCategories() {
-  return useQuery<{ success: boolean; data: Category[] }>({
+  return useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: async () => {
-      const res = await apiGet<Category[]>('/categories')
-      return { success: true, data: res }
-    },
+    queryFn: () => apiGet<Category[]>('/categories'),
     staleTime: 5 * 60 * 1000,
   })
 }
