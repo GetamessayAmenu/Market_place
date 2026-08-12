@@ -6,7 +6,6 @@ import {
   IsOptional,
   IsString,
   IsUrl,
-  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -52,7 +51,6 @@ export class CreateTaxonomyCategoryDto {
   descriptionAm?: string;
 
   @IsOptional()
-  @IsUUID()
   parentId?: string;
 
   @IsOptional()

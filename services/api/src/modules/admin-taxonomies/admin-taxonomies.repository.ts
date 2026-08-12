@@ -70,8 +70,13 @@ export class AdminTaxonomiesRepository {
   }
 
   async createCategory(data: any) {
+    // Handle parentId: if empty string, convert to null
+    const createData = {
+      ...data,
+      parentId: data.parentId === '' ? null : data.parentId,
+    };
     return this.prisma.category.create({
-      data,
+      data: createData,
       include: {
         parent: true,
       },
@@ -79,9 +84,14 @@ export class AdminTaxonomiesRepository {
   }
 
   async updateCategory(id: string, data: any) {
+    // Handle parentId: if empty string, convert to null
+    const updateData = {
+      ...data,
+      parentId: data.parentId === '' ? null : data.parentId,
+    };
     return this.prisma.category.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         parent: true,
       },

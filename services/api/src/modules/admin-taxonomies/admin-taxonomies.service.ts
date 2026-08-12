@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { slugify } from '@marketplace/utils';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 import { AdminLogsService } from '../admin-logs/admin-logs.service';
@@ -34,35 +35,56 @@ export class AdminTaxonomiesService {
   }
 
   async createCategory(user: AuthenticatedUser, dto: CreateTaxonomyCategoryDto) {
-    const category = await this.repository.createCategory(dto);
+    // Generate slug if not provided
+    const createData = {
+      ...dto,
+      slug: dto.slug || slugify(dto.name),
+    };
+    const category = await this.repository.createCategory(createData);
 
-    await this.adminLogsService.createLog({
-      actorId: user.id,
-      action: 'create_category',
-      resource: 'category',
-      resourceId: category.id,
-      metadata: { name: category.name, type: category.type },
-    });
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'create_category',
+        resource: 'category',
+        resourceId: category.id,
+        metadata: { name: category.name, type: category.type },
+      });
+    } catch (error) {
+      console.error('Failed to create admin log:', error);
+    }
 
-    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
-      categoryId: category.id,
-      action: 'create',
-    });
+    try {
+      await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+        categoryId: category.id,
+        action: 'create',
+      });
+    } catch (error) {
+      console.error('Failed to add to taxonomy cache queue:', error);
+    }
 
-    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
-      resourceType: 'category',
-      resourceId: category.id,
-      action: 'create',
-    });
+    try {
+      await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+        resourceType: 'category',
+        resourceId: category.id,
+        action: 'create',
+      });
+    } catch (error) {
+      console.error('Failed to add to meilisearch sync queue:', error);
+    }
 
-    await this.auditLogQueue.add('create-audit-log', {
-      adminId: user.id,
-      action: 'create_category',
-      resource: 'category',
-      resourceId: category.id,
-      timestamp: new Date().toISOString(),
-      metadata: { name: category.name, type: category.type },
-    });
+    try {
+      await this.auditLogQueue.add('create-audit-log', {
+        adminId: user.id,
+        action: 'create_category',
+        resource: 'category',
+        resourceId: category.id,
+        timestamp: new Date().toISOString(),
+        metadata: { name: category.name, type: category.type },
+      });
+    } catch (error) {
+      console.error('Failed to add to audit log queue:', error);
+    }
 
     return category;
   }
@@ -72,33 +94,49 @@ export class AdminTaxonomiesService {
     
     const updated = await this.repository.updateCategory(id, dto);
 
-    await this.adminLogsService.createLog({
-      actorId: user.id,
-      action: 'update_category',
-      resource: 'category',
-      resourceId: id,
-      metadata: { changes: dto },
-    });
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'update_category',
+        resource: 'category',
+        resourceId: id,
+        metadata: { changes: dto },
+      });
+    } catch (error) {
+      console.error('Failed to create admin log:', error);
+    }
 
-    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
-      categoryId: id,
-      action: 'update',
-    });
+    try {
+      await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+        categoryId: id,
+        action: 'update',
+      });
+    } catch (error) {
+      console.error('Failed to add to taxonomy cache queue:', error);
+    }
 
-    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
-      resourceType: 'category',
-      resourceId: id,
-      action: 'update',
-    });
+    try {
+      await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+        resourceType: 'category',
+        resourceId: id,
+        action: 'update',
+      });
+    } catch (error) {
+      console.error('Failed to add to meilisearch sync queue:', error);
+    }
 
-    await this.auditLogQueue.add('create-audit-log', {
-      adminId: user.id,
-      action: 'update_category',
-      resource: 'category',
-      resourceId: id,
-      timestamp: new Date().toISOString(),
-      metadata: { changes: dto },
-    });
+    try {
+      await this.auditLogQueue.add('create-audit-log', {
+        adminId: user.id,
+        action: 'update_category',
+        resource: 'category',
+        resourceId: id,
+        timestamp: new Date().toISOString(),
+        metadata: { changes: dto },
+      });
+    } catch (error) {
+      console.error('Failed to add to audit log queue:', error);
+    }
 
     return updated;
   }
@@ -108,31 +146,47 @@ export class AdminTaxonomiesService {
     
     const deleted = await this.repository.deleteCategory(id);
 
-    await this.adminLogsService.createLog({
-      actorId: user.id,
-      action: 'delete_category',
-      resource: 'category',
-      resourceId: id,
-    });
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'delete_category',
+        resource: 'category',
+        resourceId: id,
+      });
+    } catch (error) {
+      console.error('Failed to create admin log:', error);
+    }
 
-    await this.taxonomyCacheQueue.add('invalidate-category-cache', {
-      categoryId: id,
-      action: 'delete',
-    });
+    try {
+      await this.taxonomyCacheQueue.add('invalidate-category-cache', {
+        categoryId: id,
+        action: 'delete',
+      });
+    } catch (error) {
+      console.error('Failed to add to taxonomy cache queue:', error);
+    }
 
-    await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
-      resourceType: 'category',
-      resourceId: id,
-      action: 'delete',
-    });
+    try {
+      await this.meilisearchSyncQueue.add('update-meilisearch-facets', {
+        resourceType: 'category',
+        resourceId: id,
+        action: 'delete',
+      });
+    } catch (error) {
+      console.error('Failed to add to meilisearch sync queue:', error);
+    }
 
-    await this.auditLogQueue.add('create-audit-log', {
-      adminId: user.id,
-      action: 'delete_category',
-      resource: 'category',
-      resourceId: id,
-      timestamp: new Date().toISOString(),
-    });
+    try {
+      await this.auditLogQueue.add('create-audit-log', {
+        adminId: user.id,
+        action: 'delete_category',
+        resource: 'category',
+        resourceId: id,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to add to audit log queue:', error);
+    }
 
     return deleted;
   }

@@ -14,7 +14,6 @@ import { Public } from '../../common/decorators/public.decorator';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { CreateRegionalHubDto } from './dto/create-regional-hub.dto';
 import type { CreateTaxonomyAttributeDto } from './dto/create-taxonomy-attribute.dto';
-import type { CreateTaxonomyCategoryDto } from './dto/create-taxonomy-category.dto';
 import type { AttributeQueryDto, RegionalHubQueryDto, TaxonomyQueryDto } from './dto/taxonomy-query.dto';
 import { AdminTaxonomiesService } from './admin-taxonomies.service';
 
@@ -35,12 +34,20 @@ export class AdminTaxonomiesController {
   }
 
   @Post('categories')
-  createCategory(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateTaxonomyCategoryDto) {
+  createCategory(@CurrentUser() user: AuthenticatedUser, @Body() dto: any) {
+    // Remove parentId if it's empty string or null
+    if (dto.parentId === '' || dto.parentId === null) {
+      delete dto.parentId;
+    }
     return this.taxonomiesService.createCategory(user, dto);
   }
 
   @Patch('categories/:id')
-  updateCategory(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: Partial<CreateTaxonomyCategoryDto>) {
+  updateCategory(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: any) {
+    // Remove parentId if it's empty string or null
+    if (dto.parentId === '' || dto.parentId === null) {
+      delete dto.parentId;
+    }
     return this.taxonomiesService.updateCategory(user, id, dto);
   }
 

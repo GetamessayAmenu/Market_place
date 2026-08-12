@@ -103,38 +103,60 @@ export default function TaxonomiesPage() {
 
   const handleSave = async (data: any) => {
     try {
-      if (editingItem) {
+      console.log('Saving item:', { type: modalType, data, editingItem })
+      
+      // Check if this is an update (has an id) or create (no id)
+      const isUpdate = editingItem && editingItem.id
+      
+      if (isUpdate) {
         // Update
         if (modalType === 'category') {
-          const updated = await updateAdminTaxonomyCategory(editingItem.id, data)
-          setCategories(categories.map(c => c.id === editingItem.id ? updated.data : c))
+          await updateAdminTaxonomyCategory(editingItem.id, data)
         } else if (modalType === 'attribute') {
-          const updated = await updateAdminTaxonomyAttribute(editingItem.id, data)
-          setAttributes(attributes.map(a => a.id === editingItem.id ? updated.data : a))
+          await updateAdminTaxonomyAttribute(editingItem.id, data)
         } else if (modalType === 'hub') {
-          const updated = await updateAdminRegionalHub(editingItem.id, data)
-          setRegionalHubs(regionalHubs.map(h => h.id === editingItem.id ? updated.data : h))
+          await updateAdminRegionalHub(editingItem.id, data)
         }
         showToast('Item updated successfully', 'success')
       } else {
         // Create
         if (modalType === 'category') {
-          const created = await createAdminTaxonomyCategory(data)
-          setCategories([...categories, created.data])
+          await createAdminTaxonomyCategory(data)
         } else if (modalType === 'attribute') {
-          const created = await createAdminTaxonomyAttribute(data)
-          setAttributes([...attributes, created.data])
+          await createAdminTaxonomyAttribute(data)
         } else if (modalType === 'hub') {
-          const created = await createAdminRegionalHub(data)
-          setRegionalHubs([...regionalHubs, created.data])
+          await createAdminRegionalHub(data)
         }
         showToast('Item created successfully', 'success')
       }
       setIsModalOpen(false)
       setEditingItem(null)
-    } catch (error) {
+      // Reload data to ensure UI reflects latest state
+      await loadData()
+    } catch (error: any) {
       console.error('Save error:', error)
-      showToast('Failed to save item', 'error')
+      console.error('Error details:', error?.response?.data || error?.message || error)
+      showToast(`Failed to save item: ${error?.response?.data?.message || error?.message || 'Unknown error'}`, 'error')
+    }
+  }
+
+  const loadData = async () => {
+    try {
+      console.log('Loading taxonomies data...')
+      const [categoriesData, attributesData, hubsData] = await Promise.all([
+        fetchAdminTaxonomyCategories(),
+        fetchAdminTaxonomyAttributes(),
+        fetchAdminRegionalHubs(),
+      ])
+      console.log('Categories data:', categoriesData)
+      console.log('Attributes data:', attributesData)
+      console.log('Hubs data:', hubsData)
+      setCategories(Array.isArray(categoriesData) ? categoriesData : Array.isArray(categoriesData.data) ? categoriesData.data : [])
+      setAttributes(Array.isArray(attributesData) ? attributesData : Array.isArray(attributesData.data) ? attributesData.data : [])
+      setRegionalHubs(Array.isArray(hubsData) ? hubsData : Array.isArray(hubsData.data) ? hubsData.data : [])
+    } catch (error) {
+      console.error('Failed to load taxonomies:', error)
+      showToast('Failed to load data', 'error')
     }
   }
 
