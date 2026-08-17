@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import type { CustomOrderStatus } from '@prisma/client';
 import {
   IsIn,
   IsNumber,
@@ -18,8 +19,6 @@ const CUSTOM_ORDER_STATUSES = [
   'delivered',
   'cancelled',
 ] as const;
-
-export type CustomOrderStatus = (typeof CUSTOM_ORDER_STATUSES)[number];
 
 export class UpdateCustomOrderStatusDto {
   @IsIn([...CUSTOM_ORDER_STATUSES])

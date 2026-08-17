@@ -43,7 +43,7 @@ export class MessagesRepository {
   async create(data: {
     conversationId: string;
     senderId: string;
-    body: string;
+    content: string;
   }) {
     return this.prisma.message.create({
       data,

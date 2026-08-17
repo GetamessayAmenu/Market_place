@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { CustomOrderStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import { ListingsRepository } from '../listings/listings.repository';
-import { CustomOrderCreatedEvent, CustomOrderStatusUpdatedEvent } from '../events/notification.domain-events';
 
 import { CustomOrdersRepository } from './custom-orders.repository';
 import type { CreateCustomOrderDto } from './dto/create-custom-order.dto';
@@ -20,7 +18,6 @@ import {
 import { serializeCustomOrder } from './serializers/custom-order.serializer';
 
 const VALID_TRANSITIONS: Record<string, CustomOrderStatus[]> = {
-  // Legacy transitions for backward compatibility
   submitted: ['under_review', 'cancelled'],
   under_review: ['confirmed', 'cancelled'],
   confirmed: ['in_production', 'cancelled'],
@@ -35,7 +32,6 @@ export class CustomOrdersService {
   constructor(
     private readonly customOrdersRepository: CustomOrdersRepository,
     private readonly listingsRepository: ListingsRepository,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateCustomOrderDto) {
@@ -69,19 +65,6 @@ export class CustomOrdersService {
         ? { agreedPrice: new Prisma.Decimal(dto.agreedPrice) }
         : {}),
     });
-
-    // Emit event for Socket.IO notification and conversation creation
-    this.eventEmitter.emit(
-      'custom_order.created',
-      new CustomOrderCreatedEvent(
-        listing.sellerId,
-        user.id,
-        order.id,
-        listing.id,
-        listing.title || 'Unknown Listing',
-        order.conversationId!,
-      ),
-    );
 
     return serializeCustomOrder(order);
   }
@@ -132,10 +115,10 @@ export class CustomOrdersService {
     }
 
     // Only seller can advance status; buyer can only cancel
-    if (dto.status !== 'cancelled' && order.sellerId !== user.id) {
+    if (dto.status !== 'cancelled' as CustomOrderStatus && order.sellerId !== user.id) {
       throw new CustomOrderForbiddenException('Only the seller can update order status');
     }
-    if (dto.status === 'cancelled' && order.buyerId !== user.id && order.sellerId !== user.id) {
+    if (dto.status === 'cancelled' as CustomOrderStatus && order.buyerId !== user.id && order.sellerId !== user.id) {
       throw new CustomOrderForbiddenException();
     }
 
@@ -153,20 +136,6 @@ export class CustomOrdersService {
         ? { cancelledReason: dto.cancelledReason }
         : {}),
     });
-
-    // Emit event for status update notification
-    this.eventEmitter.emit(
-      'custom_order.status_updated',
-      new CustomOrderStatusUpdatedEvent(
-        order.sellerId,
-        order.buyerId,
-        order.id,
-        order.listingId,
-        order.listing?.title || 'Unknown Listing',
-        dto.status,
-        order.conversationId!,
-      ),
-    );
 
     return serializeCustomOrder(updated);
   }

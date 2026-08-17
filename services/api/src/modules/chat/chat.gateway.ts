@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
+import { ChatSafetyService } from './chat.safety.service';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
@@ -27,6 +28,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private readonly chatService: ChatService,
+    private readonly chatSafetyService: ChatSafetyService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -112,13 +114,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; body: string }
+    @MessageBody() data: { conversationId: string; content: string; mediaUrls?: string[] }
   ) {
     const user = client.data.user as AuthenticatedUser;
     if (!user) return;
 
     try {
-      const message = await this.chatService.sendMessage(data.conversationId, user, data.body);
+      const message = await this.chatService.sendMessage(
+        data.conversationId,
+        user,
+        data.content
+      );
+      
+      // Scan message for safety violations
+      await this.chatSafetyService.scanMessage(message.id, data.conversationId, data.content);
       
       // Broadcast message to all users in the conversation
       this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);

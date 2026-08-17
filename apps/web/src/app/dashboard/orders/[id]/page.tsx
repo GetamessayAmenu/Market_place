@@ -17,16 +17,11 @@ interface Order {
   status: OrderStatus;
   agreedPrice: number;
   agreedDeposit: number | null;
-  offlineDepositRefunded: boolean;
   customMeasurements: any;
   fittingDate: string | null;
   rentalStartDate: string | null;
   rentalEndDate: string | null;
-  extensionDaysRequested: number;
-  extensionApproved: boolean | null;
-  preHandoverPhotos: string[];
-  postReturnPhotos: string[];
-  disputeNotes: string | null;
+  conversationId: string | null;
   createdAt: string;
   updatedAt: string;
   buyer: {
@@ -52,9 +47,7 @@ interface Order {
     price: number;
     currency: string;
     images: any[];
-  };
-  conversation?: any;
-  customQuotes?: any[];
+  } | null;
 }
 
 export default function OrderDetailPage() {
@@ -113,18 +106,18 @@ export default function OrderDetailPage() {
       INQUIRY_PENDING: 'bg-yellow-100 text-yellow-800',
       QUOTE_PROPOSED: 'bg-blue-100 text-blue-800',
       APPROVED_RESERVED: 'bg-green-100 text-green-800',
-      READY_FOR_HANDOVER: 'bg-purple-100 text-purple-800',
+      READY_FOR_HANDOVER: 'bg-indigo-100 text-indigo-800',
       COMPLETED: 'bg-gray-100 text-gray-800',
       CANCELLED: 'bg-red-100 text-red-800',
       DISPUTED: 'bg-orange-100 text-orange-800',
-      MEASUREMENTS_SUBMITTED: 'bg-teal-100 text-teal-800',
-      FABRIC_CUTTING: 'bg-indigo-100 text-indigo-800',
-      TAILORING_IN_PROGRESS: 'bg-pink-100 text-pink-800',
-      FITTING_READY: 'bg-cyan-100 text-cyan-800',
+      MEASUREMENTS_SUBMITTED: 'bg-purple-100 text-purple-800',
+      FABRIC_CUTTING: 'bg-pink-100 text-pink-800',
+      TAILORING_IN_PROGRESS: 'bg-violet-100 text-violet-800',
+      FITTING_READY: 'bg-teal-100 text-teal-800',
       HANDOVER_PENDING_DEPOSIT: 'bg-amber-100 text-amber-800',
-      RENTAL_ACTIVE: 'bg-emerald-100 text-emerald-800',
-      RETURN_INITIATED: 'bg-violet-100 text-violet-800',
-      RETURNED_INSPECTED: 'bg-slate-100 text-slate-800',
+      RENTAL_ACTIVE: 'bg-cyan-100 text-cyan-800',
+      RETURN_INITIATED: 'bg-lime-100 text-lime-800',
+      RETURNED_INSPECTED: 'bg-emerald-100 text-emerald-800',
     };
     return statusColors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -195,267 +188,186 @@ export default function OrderDetailPage() {
           onAction={(action) => handleStatusUpdate(action)}
         />
 
-        {/* Order Details */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Order Information</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order Number:</span>
-                  <span className="font-medium">{order.orderNumber}</span>
+        {/* Split-Screen Layout */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Pane: Order Specification & State Bar */}
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4">Order Information</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order Number:</span>
+                    <span className="font-medium">{order.orderNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Type:</span>
+                    <span className="font-medium">{order.type.replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge className={getStatusColor(order.status)}>
+                      {order.status.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Created:</span>
+                    <span className="font-medium">{new Date(order.createdAt).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Type:</span>
-                  <span className="font-medium">{order.type.replace(/_/g, ' ')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  <Badge className={getStatusColor(order.status)}>
-                    {order.status.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Created:</span>
-                  <span className="font-medium">{new Date(order.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Product Information</h3>
-              <div className="flex gap-4 mb-4">
-                {order.product.images[0] && (
-                  <img
-                    src={order.product.images[0].url}
-                    alt={order.product.title}
-                    className="h-20 w-20 rounded-md object-cover"
-                  />
-                )}
-                <div>
-                  <h4 className="font-medium">{order.product.title}</h4>
-                  <p className="text-sm text-muted-foreground">{order.product.currency} {order.agreedPrice.toLocaleString()}</p>
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4">Financial Terms</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Agreed Price:</span>
+                    <span className="font-medium">
+                      ETB {order.agreedPrice.toLocaleString()}
+                    </span>
+                  </div>
+                  {order.agreedDeposit && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Deposit:</span>
+                      <span className="font-medium">ETB {order.agreedDeposit.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">Financial Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Agreed Price:</span>
-                  <span className="font-medium">{order.product.currency} {order.agreedPrice.toLocaleString()}</span>
-                </div>
-                {order.agreedDeposit && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Deposit:</span>
-                    <span className="font-medium">{order.product.currency} {order.agreedDeposit.toLocaleString()}</span>
-                  </div>
-                )}
-                {order.offlineDepositRefunded && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Deposit Refunded:</span>
-                    <span className="font-medium text-green-600">Yes</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            {/* Type-specific specifications */}
+            {order.type === 'CUSTOM_TAILORING' && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">Custom Tailoring Details</h3>
+                  {order.fittingDate && (
+                    <div className="mb-4">
+                      <span className="text-muted-foreground">Fitting Date:</span>
+                      <span className="ml-2 font-medium">{new Date(order.fittingDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {order.customMeasurements && (
+                    <div className="mb-4">
+                      <span className="text-muted-foreground">Custom Measurements:</span>
+                      <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto">
+                        {JSON.stringify(order.customMeasurements, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  <Button variant="outline" size="sm">
+                    Update Measurements
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-          <Card>
+            {order.type === 'RENTAL' && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-4">Rental Details</h3>
+                  {order.rentalStartDate && (
+                    <div className="mb-2">
+                      <span className="text-muted-foreground">Start Date:</span>
+                      <span className="ml-2 font-medium">{new Date(order.rentalStartDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {order.rentalEndDate && (
+                    <div className="mb-2">
+                      <span className="text-muted-foreground">End Date:</span>
+                      <span className="ml-2 font-medium">{new Date(order.rentalEndDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4">
+                  {isSeller ? 'Buyer' : 'Seller'} Information
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Name:</span>
+                    <span className="font-medium">{otherParty.displayName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">{otherParty.email}</span>
+                  </div>
+                  {otherParty.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Phone:</span>
+                      <span className="font-medium">{otherParty.phone}</span>
+                    </div>
+                  )}
+                  {otherParty.location && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location:</span>
+                      <span className="font-medium">{otherParty.location}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Status Actions */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-semibold mb-4">Update Order Status</h3>
+                <div className="flex flex-wrap gap-2">
+                  {nextStates.map((status) => (
+                    <Button
+                      key={status}
+                      variant="outline"
+                      onClick={() => handleStatusUpdate(status)}
+                    >
+                      {status.replace(/_/g, ' ')}
+                    </Button>
+                  ))}
+                </div>
+                {nextStates.length === 0 && (
+                  <p className="text-muted-foreground mt-4">No status transitions available</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Pane: Conversation */}
+          <Card className="h-fit sticky top-4">
             <CardContent className="p-6">
-              <h3 className="font-semibold mb-4">
-                {isSeller ? 'Buyer' : 'Seller'} Information
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Name:</span>
-                  <span className="font-medium">{otherParty.displayName}</span>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold">Conversation</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    WhatsApp
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    Call
+                  </Button>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Email:</span>
-                  <span className="font-medium">{otherParty.email}</span>
-                </div>
-                {otherParty.phone && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Phone:</span>
-                    <span className="font-medium">{otherParty.phone}</span>
-                  </div>
-                )}
-                {otherParty.location && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Location:</span>
-                    <span className="font-medium">{otherParty.location}</span>
-                  </div>
-                )}
               </div>
+              <p className="text-muted-foreground text-sm">
+                {order.conversationId 
+                  ? 'View conversation in the Messages tab' 
+                  : 'No conversation started yet'}
+              </p>
+              {order.conversationId && (
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  className="mt-4"
+                  onClick={() => router.push(`/dashboard/messages?conversation=${order.conversationId}`)}
+                >
+                  Open Conversation
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
-
-        {/* Status Actions */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Update Order Status</h3>
-            <div className="flex flex-wrap gap-2">
-              {nextStates.map((status) => (
-                <Button
-                  key={status}
-                  variant="outline"
-                  onClick={() => handleStatusUpdate(status)}
-                >
-                  {status.replace(/_/g, ' ')}
-                </Button>
-              ))}
-            </div>
-            {nextStates.length === 0 && (
-              <p className="text-muted-foreground mt-4">No status transitions available</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quotes */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Quotes</h3>
-            {order.customQuotes && order.customQuotes.length > 0 ? (
-              <div className="space-y-4">
-                {order.customQuotes.map((quote: any) => (
-                  <div key={quote.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-medium">{order.product.currency} {quote.proposedPrice.toLocaleString()}</p>
-                        {quote.proposedDeposit && (
-                          <p className="text-sm text-muted-foreground">
-                            Deposit: {order.product.currency} {quote.proposedDeposit.toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                      {quote.isAccepted && (
-                        <Badge className="bg-green-100 text-green-800">Accepted</Badge>
-                      )}
-                    </div>
-                    {quote.notes && (
-                      <p className="text-sm text-muted-foreground">{quote.notes}</p>
-                    )}
-                    {!quote.isAccepted && isSeller && (
-                      <Button size="sm" className="mt-2" disabled>
-                        Quote Pending
-                      </Button>
-                    )}
-                    {!quote.isAccepted && !isSeller && (
-                      <Button 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={async () => {
-                          try {
-                            await apiPost(`/orders/${order.id}/quotes/${quote.id}/accept`);
-                            const data = await apiGet<Order>(`/orders/${order.id}`);
-                            setOrder(data);
-                            setSuccessMessage('Quote accepted successfully');
-                          } catch (err) {
-                            setError('Failed to accept quote');
-                            console.error(err);
-                          }
-                        }}
-                      >
-                        Accept Quote
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No quotes yet</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Photos */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Verification Photos</h3>
-            
-            {/* Pre-handover Photos */}
-            <div className="mb-6">
-              <h4 className="font-medium mb-2">Pre-Handover Photos</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upload photos before handover to document item condition
-              </p>
-              {order.preHandoverPhotos && order.preHandoverPhotos.length > 0 ? (
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  {order.preHandoverPhotos.map((url, index) => (
-                    <img
-                      key={index}
-                      src={url}
-                      alt={`Pre-handover photo ${index + 1}`}
-                      className="h-24 w-24 rounded-md object-cover"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mb-4">No pre-handover photos uploaded</p>
-              )}
-              {isSeller && (
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => {/* TODO: Implement photo upload */}}
-                >
-                  Upload Pre-Handover Photos
-                </Button>
-              )}
-            </div>
-
-            {/* Post-return Photos */}
-            <div>
-              <h4 className="font-medium mb-2">Post-Return Photos</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upload photos after return to document item condition
-              </p>
-              {order.postReturnPhotos && order.postReturnPhotos.length > 0 ? (
-                <div className="grid grid-cols-4 gap-4 mb-4">
-                  {order.postReturnPhotos.map((url, index) => (
-                    <img
-                      key={index}
-                      src={url}
-                      alt={`Post-return photo ${index + 1}`}
-                      className="h-24 w-24 rounded-md object-cover"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mb-4">No post-return photos uploaded</p>
-              )}
-              {isSeller && order.type === 'RENTAL' && (
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => {/* TODO: Implement photo upload */}}
-                >
-                  Upload Post-Return Photos
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Chat */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold mb-4">Order Chat</h3>
-            <p className="text-muted-foreground mb-4">
-              Discuss this order with {isSeller ? 'the buyer' : 'the seller'}
-            </p>
-            <Button onClick={() => router.push(`/dashboard/messages?conversation=${order.conversation?.id}`)}>
-              Open Chat
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

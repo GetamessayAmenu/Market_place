@@ -1,16 +1,11 @@
+'use client'
+
 import React from 'react'
 
 import ListingsTable from '../../components/admin/ListingsTable'
-import { fetchAdminListings } from '../../lib/adminApi'
 
-export default async function ListingsPage() {
-
-  let initialData
-  try {
-    initialData = await fetchAdminListings({ page: 1, limit: 10, status: 'pending_review' })
-  } catch {
-    initialData = { success: true, data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
-  }
+export default function ListingsPage() {
+  const initialData = { success: true, data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
 
   return (
     <div className="space-y-6">

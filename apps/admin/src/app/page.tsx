@@ -9,6 +9,9 @@ import {
   fetchTopCategories,
   fetchUsersByStatus,
   fetchVerifications,
+  fetchAdminListings,
+  PaginatedResponse,
+  AdminListing,
 } from '../lib/adminApi'
 
 export default async function DashboardPage() {
@@ -26,9 +29,10 @@ export default async function DashboardPage() {
   let recentActivities: Array<{ id: string; actorId: string; action: string; resource: string; resourceId?: string | null; createdAt: string }> = []
   let sellersCount = 0
   let pendingVerifications = 0
+  let pendingListingsData: PaginatedResponse<AdminListing> = { success: true, data: [], meta: { total: 0, page: 1, limit: 5, totalPages: 0 } }
 
   try {
-    const [dashboard, listingsStatus, usersStatus, categories, latestUsers, activityLogs, verifications] = await Promise.all([
+    const [dashboard, listingsStatus, usersStatus, categories, latestUsers, activityLogs, verifications, pendingListings] = await Promise.all([
       fetchDashboardStats(),
       fetchListingsByStatus(),
       fetchUsersByStatus(),
@@ -36,6 +40,7 @@ export default async function DashboardPage() {
       fetchAdminUsers({ page: 1, limit: 5 }),
       fetchAuditLogs({ page: 1, limit: 5 }),
       fetchVerifications({ page: 1, limit: 1, status: 'pending' }),
+      fetchAdminListings({ page: 1, limit: 5, status: 'pending_review' }),
     ])
 
     stats = dashboard
@@ -46,6 +51,7 @@ export default async function DashboardPage() {
     recentActivities = activityLogs.data
     sellersCount = (await fetchAdminUsers({ page: 1, limit: 1, role: 'seller' })).meta.total
     pendingVerifications = verifications.meta.total
+    pendingListingsData = pendingListings
   } catch {
     // best effort only: render available data
   }
@@ -61,6 +67,7 @@ export default async function DashboardPage() {
         recentActivities={recentActivities}
         sellersCount={sellersCount}
         pendingVerifications={pendingVerifications}
+        pendingListingsData={pendingListingsData}
       />
     </div>
   )

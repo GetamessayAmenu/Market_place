@@ -10,6 +10,7 @@ export const QUEUE_NAMES = {
   TAXONOMY_CACHE: 'taxonomy-cache',
   AUDIT_LOG: 'audit-log',
   MEILISEARCH_SYNC: 'meilisearch-sync',
+  CHAT_SAFETY: 'chat-safety',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

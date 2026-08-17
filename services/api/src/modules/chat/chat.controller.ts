@@ -57,10 +57,10 @@ export class ChatController {
   @Post('conversations/:id/messages')
   async sendMessage(
     @Param('id') conversationId: string,
-    @Body() body: { body: string },
+    @Body() body: { content: string },
     @CurrentUser() user: AuthenticatedUser
   ) {
-    return this.chatService.sendMessage(conversationId, user, body.body);
+    return this.chatService.sendMessage(conversationId, user, body.content);
   }
 
   @Post('conversations/:id/read')

@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 
 import VerificationTable from '../../components/admin/VerificationTable'

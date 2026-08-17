@@ -32,17 +32,22 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email: data.email, password: data.password })
       })
 
+      console.log('Login response status:', response.status)
+      console.log('Login response headers:', Object.fromEntries(response.headers.entries()))
+
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Login error response:', errorText)
         throw new Error(`Login failed: ${response.status}`)
       }
 
       const result = await response.json()
       console.log('Login response:', result)
+      console.log('Cookies after login:', document.cookie)
       
       // Backend returns {success: true, data: {user, tokens}}
       if (result.success && result.data) {
         console.log('Login successful, user:', result.data.user)
-        console.log('Current cookies:', document.cookie)
         // Login successful, redirect to admin dashboard
         // Wait a moment for cookies to be set, then redirect
         setTimeout(() => {

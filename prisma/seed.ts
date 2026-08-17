@@ -845,7 +845,7 @@ async function main(): Promise<void> {
           userId: buyer.id,
           type: 'listing_approved',
           title: 'Listing approved',
-          body: 'Your listing has been approved and is now live',
+          content: 'Your listing has been approved and is now live',
           data: { listingId: listingForOrder?.id },
         },
       });
@@ -856,7 +856,7 @@ async function main(): Promise<void> {
             userId: buyer.id,
             type: 'new_message',
             title: 'New message',
-            body: 'You have a new message from Kidane Seller',
+            content: 'You have a new message from Kidane Seller',
             data: { senderId: sellerForNotification.id },
             readAt: new Date(),
           },
@@ -868,7 +868,7 @@ async function main(): Promise<void> {
           userId: buyer.id,
           type: 'new_order',
           title: 'Order shipped',
-          body: 'Your order ORD-001 has been shipped',
+          content: 'Your order ORD-001 has been shipped',
           data: { orderId: 'test-order-id', orderNumber: 'ORD-001' },
         },
       });
@@ -995,7 +995,7 @@ async function main(): Promise<void> {
         data: {
           conversationId: conversation.id,
           senderId: buyer.id,
-          body: 'Hello, is this item still available?',
+          content: 'Hello, is this item still available?',
         },
       });
 
@@ -1003,7 +1003,7 @@ async function main(): Promise<void> {
         data: {
           conversationId: conversation.id,
           senderId: listingForOrder.sellerId,
-          body: 'Yes, it is available! Would you like to make an offer?',
+          content: 'Yes, it is available! Would you like to purchase it?',
         },
       });
 
@@ -1016,7 +1016,7 @@ async function main(): Promise<void> {
             data: {
               conversationId: conversation.id,
               senderId: buyer.id,
-              body: 'Hello, is this item still available?',
+              content: 'Hello, is this item still available?',
             },
           });
 
@@ -1024,7 +1024,7 @@ async function main(): Promise<void> {
             data: {
               conversationId: conversation.id,
               senderId: listingForOrder.sellerId,
-              body: 'Yes, it is available! Would you like to make an offer?',
+              content: 'Yes, it is available! Would you like to make an offer?',
             },
           });
         }
@@ -1082,7 +1082,7 @@ async function main(): Promise<void> {
           sellerId: listingForOrder.sellerId,
           rating: 5,
           title: 'Excellent quality!',
-          body: 'The item was exactly as described. Very satisfied with the purchase.',
+          content: 'The item was exactly as described. Very satisfied with the purchase.',
         },
       });
 
@@ -1094,7 +1094,7 @@ async function main(): Promise<void> {
             sellerId: otherListing.sellerId,
             rating: 4,
             title: 'Good value',
-            body: 'Nice product, reasonable price. Would recommend.',
+            content: 'Nice product, reasonable price. Would recommend.',
           },
         });
       }

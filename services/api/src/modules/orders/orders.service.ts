@@ -296,6 +296,39 @@ export class OrdersService {
       ...(dto.disputeNotes && { disputeNotes: dto.disputeNotes }),
     });
 
+    // Log system message to conversation if exists
+    if (order.conversationId) {
+      try {
+        const statusMessage = this.formatStatusChangeMessage(dto.status, user.displayName);
+        await (this.ordersRepository as any).prisma.message.create({
+          data: {
+            conversationId: order.conversationId,
+            senderId: user.id,
+            body: JSON.stringify({
+              type: 'system',
+              content: statusMessage,
+              metadata: {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                previousStatus: order.status,
+                newStatus: dto.status,
+                updatedBy: user.displayName,
+              }
+            }),
+            metadata: {
+              type: 'system_status_update',
+              orderId: order.id,
+              previousStatus: order.status,
+              newStatus: dto.status,
+            }
+          }
+        });
+      } catch (error) {
+        // Log error but don't fail the status update
+        console.error('Failed to log status change to conversation:', error);
+      }
+    }
+
     // Notify the other party
     const recipientId = order.buyerId === user.id ? order.sellerId : order.buyerId;
     await this.notificationsService.createCustomNotification(
@@ -306,7 +339,40 @@ export class OrdersService {
       { orderId: order.id, orderNumber: order.orderNumber }
     );
 
+    // Emit Socket.IO event for real-time updates
+    this.eventEmitter.emit('order.status_updated', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      buyerId: order.buyerId,
+      sellerId: order.sellerId,
+      previousStatus: order.status,
+      newStatus: dto.status,
+      updatedBy: user.id,
+    });
+
     return this.serializeOrder(updatedOrder);
+  }
+
+  private formatStatusChangeMessage(status: OrderStatus, actorName: string): string {
+    const statusLabels: Record<OrderStatus, string> = {
+      INQUIRY_PENDING: 'Pending Inquiry',
+      QUOTE_PROPOSED: 'Quote Proposed',
+      APPROVED_RESERVED: 'Approved / Reserved',
+      READY_FOR_HANDOVER: 'Ready for Handover',
+      COMPLETED: 'Completed',
+      CANCELLED: 'Cancelled',
+      DISPUTED: 'Disputed',
+      MEASUREMENTS_SUBMITTED: 'Measurements Submitted',
+      FABRIC_CUTTING: 'Fabric Cutting',
+      TAILORING_IN_PROGRESS: 'Tailoring in Progress',
+      FITTING_READY: 'Ready for Fitting',
+      HANDOVER_PENDING_DEPOSIT: 'Handover Pending',
+      RENTAL_ACTIVE: 'Rental Active',
+      RETURN_INITIATED: 'Return Initiated',
+      RETURNED_INSPECTED: 'Returned & Inspected',
+    };
+    
+    return `📋 Order status updated to "${statusLabels[status]}" by ${actorName}`;
   }
 
   async createQuote(

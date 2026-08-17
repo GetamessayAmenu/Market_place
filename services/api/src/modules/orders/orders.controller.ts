@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -81,6 +82,16 @@ export class OrdersController {
 
   @Put(':id/status')
   updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.ordersService.updateOrderStatus(id, user, dto);
+  }
+
+  @Patch(':id/status')
+  @Roles('seller')
+  patchStatus(
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
     @CurrentUser() user: AuthenticatedUser

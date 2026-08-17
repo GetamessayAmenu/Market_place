@@ -17,16 +17,11 @@ interface Order {
   status: OrderStatus;
   agreedPrice: number;
   agreedDeposit: number | null;
-  offlineDepositRefunded: boolean;
   customMeasurements: any;
   fittingDate: string | null;
   rentalStartDate: string | null;
   rentalEndDate: string | null;
-  extensionDaysRequested: number;
-  extensionApproved: boolean | null;
-  preHandoverPhotos: string[];
-  postReturnPhotos: string[];
-  disputeNotes: string | null;
+  conversationId: string | null;
   createdAt: string;
   updatedAt: string;
   buyer: {
@@ -52,9 +47,7 @@ interface Order {
     price: number;
     currency: string;
     images: any[];
-  };
-  conversation?: any;
-  customQuotes?: any[];
+  } | null;
 }
 
 export default function OrdersPage() {
@@ -65,7 +58,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [filter, setFilter] = useState<OrderType | 'ALL'>('ALL');
+  const [filter, setFilter] = useState<OrderStatus | 'ALL'>('ALL');
 
   useEffect(() => {
     const success = searchParams.get('success');
@@ -97,25 +90,25 @@ export default function OrdersPage() {
 
   const filteredOrders = filter === 'ALL' 
     ? orders 
-    : orders.filter(order => order.type === filter);
+    : orders.filter(order => order.status === filter);
 
   const getStatusColor = (status: OrderStatus) => {
     const statusColors: Record<OrderStatus, string> = {
       INQUIRY_PENDING: 'bg-yellow-100 text-yellow-800',
       QUOTE_PROPOSED: 'bg-blue-100 text-blue-800',
       APPROVED_RESERVED: 'bg-green-100 text-green-800',
-      READY_FOR_HANDOVER: 'bg-purple-100 text-purple-800',
+      READY_FOR_HANDOVER: 'bg-indigo-100 text-indigo-800',
       COMPLETED: 'bg-gray-100 text-gray-800',
       CANCELLED: 'bg-red-100 text-red-800',
       DISPUTED: 'bg-orange-100 text-orange-800',
-      MEASUREMENTS_SUBMITTED: 'bg-teal-100 text-teal-800',
-      FABRIC_CUTTING: 'bg-indigo-100 text-indigo-800',
-      TAILORING_IN_PROGRESS: 'bg-pink-100 text-pink-800',
-      FITTING_READY: 'bg-cyan-100 text-cyan-800',
+      MEASUREMENTS_SUBMITTED: 'bg-purple-100 text-purple-800',
+      FABRIC_CUTTING: 'bg-pink-100 text-pink-800',
+      TAILORING_IN_PROGRESS: 'bg-violet-100 text-violet-800',
+      FITTING_READY: 'bg-teal-100 text-teal-800',
       HANDOVER_PENDING_DEPOSIT: 'bg-amber-100 text-amber-800',
-      RENTAL_ACTIVE: 'bg-emerald-100 text-emerald-800',
-      RETURN_INITIATED: 'bg-violet-100 text-violet-800',
-      RETURNED_INSPECTED: 'bg-slate-100 text-slate-800',
+      RENTAL_ACTIVE: 'bg-cyan-100 text-cyan-800',
+      RETURN_INITIATED: 'bg-lime-100 text-lime-800',
+      RETURNED_INSPECTED: 'bg-emerald-100 text-emerald-800',
     };
     return statusColors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -123,8 +116,8 @@ export default function OrdersPage() {
   const getOrderTypeLabel = (type: OrderType) => {
     const labels: Record<OrderType, string> = {
       SALE: 'Sale',
-      RENTAL: 'Rental',
       CUSTOM_TAILORING: 'Custom Tailoring',
+      RENTAL: 'Rental',
     };
     return labels[type];
   };
@@ -165,16 +158,17 @@ export default function OrdersPage() {
         </Alert>
       )}
 
-      {/* Filter Buttons */}
-      <div className="flex gap-2 mb-6">
-        {(['ALL', 'SALE', 'RENTAL', 'CUSTOM_TAILORING'] as const).map((type) => (
+      {/* Status Pipeline Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        {(['ALL', 'INQUIRY_PENDING', 'QUOTE_PROPOSED', 'APPROVED_RESERVED', 'READY_FOR_HANDOVER', 'COMPLETED', 'CANCELLED', 'DISPUTED'] as const).map((status) => (
           <Button
-            key={type}
-            variant={filter === type ? 'primary' : 'outline'}
+            key={status}
+            variant={filter === status ? 'primary' : 'outline'}
             size="sm"
-            onClick={() => setFilter(type)}
+            onClick={() => setFilter(status)}
+            className="whitespace-nowrap"
           >
-            {type === 'ALL' ? 'All' : getOrderTypeLabel(type)}
+            {status === 'ALL' ? 'All' : status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
           </Button>
         ))}
       </div>
@@ -210,7 +204,7 @@ export default function OrdersPage() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{order.product.title}</h3>
+                          <h3 className="font-semibold">{order.product?.title || 'Custom Order'}</h3>
                           <Badge variant="outline" className="text-xs">
                             {getOrderTypeLabel(order.type)}
                           </Badge>
@@ -219,12 +213,19 @@ export default function OrdersPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-lg">
-                          {order.product.currency} {order.agreedPrice.toLocaleString()}
+                          ETB {order.agreedPrice.toLocaleString()}
                         </p>
                         <Badge className={getStatusColor(order.status)}>
                           {order.status.replace(/_/g, ' ')}
                         </Badge>
                       </div>
+                    </div>
+                    
+                    {/* Counterparty */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-sm text-muted-foreground">
+                        {user?.role === 'seller' ? `Buyer: ${order.buyer.displayName}` : `Seller: ${order.seller.displayName}`}
+                      </span>
                     </div>
                     
                     {/* Type-specific information */}
@@ -241,14 +242,11 @@ export default function OrdersPage() {
                     
                     {order.type === 'CUSTOM_TAILORING' && order.fittingDate && (
                       <div className="mt-2 text-sm text-muted-foreground">
-                        Fitting: {new Date(order.fittingDate).toLocaleDateString()}
+                        Fitting Date: {new Date(order.fittingDate).toLocaleDateString()}
                       </div>
                     )}
 
                     <div className="flex justify-between items-center mt-4">
-                      <p className="text-sm text-muted-foreground">
-                        {user?.role === 'seller' ? `Buyer: ${order.buyer.displayName}` : `Seller: ${order.seller.displayName}`}
-                      </p>
                       <div className="flex gap-2">
                         <Button 
                           variant="outline" 
@@ -257,12 +255,12 @@ export default function OrdersPage() {
                         >
                           View Details
                         </Button>
-                        {order.status === 'INQUIRY_PENDING' && user?.role === 'seller' && (
+                        {order.status === 'INTENT_PLACED' && user?.role === 'seller' && (
                           <Button 
                             size="sm"
-                            onClick={() => router.push(`/dashboard/orders/${order.id}/quote`)}
+                            onClick={() => router.push(`/dashboard/orders/${order.id}`)}
                           >
-                            Send Quote
+                            Respond
                           </Button>
                         )}
                       </div>

@@ -80,12 +80,13 @@ export default function VerificationTable({ initialData }: VerificationTableProp
           type: type || undefined
         })
       )
-      setVerifications(res.data)
+      setVerifications(Array.isArray(res.data) ? res.data : [])
       setTotalPages(res.meta.totalPages)
       setTotal(res.meta.total)
     } catch (err) {
       console.error('Failed to load verifications:', err)
       setError('Authentication required. Please log in to view verification requests.')
+      setVerifications([])
     } finally {
       setLoading(false)
     }

@@ -10,11 +10,14 @@ import {
 } from '@marketplace/ui'
 
 import { formatDate, formatDateTime } from './StatusBadge'
+import PendingListingsWidget from './PendingListingsWidget'
 import type {
   AdminUser,
   AuditLog,
   DashboardStats,
   TopCategory,
+  PaginatedResponse,
+  AdminListing,
 } from '../../lib/adminApi'
 
 interface DashboardOverviewProps {
@@ -26,6 +29,7 @@ interface DashboardOverviewProps {
   recentActivities: AuditLog[]
   sellersCount: number
   pendingVerifications: number
+  pendingListingsData?: PaginatedResponse<AdminListing>
 }
 
 const metricCards = [
@@ -105,6 +109,7 @@ export default function DashboardOverview({
   recentActivities,
   sellersCount,
   pendingVerifications,
+  pendingListingsData,
 }: DashboardOverviewProps) {
   const topCategoryMax = Math.max(...topCategories.map((category) => category.listingCount), 1)
 
@@ -291,6 +296,12 @@ export default function DashboardOverview({
           </div>
         </div>
       </div>
+
+      {pendingListingsData ? (
+        <PendingListingsWidget initialData={pendingListingsData} />
+      ) : (
+        <PendingListingsWidget />
+      )}
     </div>
   )
 }

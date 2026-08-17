@@ -74,10 +74,12 @@ model User {
   verifiedDesignerById      String?               @map("verified_designer_by_id") @db.Uuid
   adminLogs                 AdminLog[]
   callbackRequests          CallbackRequest[]
+  chatFlagLogsResolved      ChatFlagLog[]         @relation("ChatFlagResolvedBy")
   buyerConversations        Conversation[]        @relation("BuyerConversations")
   sellerConversations       Conversation[]        @relation("SellerConversations")
   customOrdersAsBuyer       CustomOrder[]         @relation("CustomOrderBuyer")
   customOrdersAsSeller      CustomOrder[]         @relation("CustomOrderSeller")
+  custom_quotes             CustomQuote[]
   disputeComments           DisputeComment[]
   disputesEscalated         Dispute[]             @relation("DisputeEscalator")
   disputesAgainst           Dispute[]             @relation("DisputeReportedUser")
@@ -115,9 +117,9 @@ model User {
   verifiedDesigners         User[]                @relation("VerifiedDesigner")
   kycProfilesReviewed       VendorKycProfile[]    @relation("KycReviewer")
   vendorKycProfile          VendorKycProfile?
+  verificationHistoryActor  VerificationHistory[] @relation("VerificationHistoryActor")
   verificationReviews       VerificationRequest[] @relation("VerificationReviewer")
   verificationRequests      VerificationRequest[]
-  verificationHistoryActor  VerificationHistory[] @relation("VerificationHistoryActor")
 
   @@index([roleId])
   @@index([status])
@@ -159,16 +161,16 @@ model Category {
 model Attribute {
   id                 String              @id @default(uuid()) @db.Uuid
   name               String              @db.VarChar(100)
-  nameAm             String?             @map("name_am") @db.VarChar(100)
   type               AttributeType
   values             Json
-  description        String?             @db.Text
-  descriptionAm      String?             @map("description_am") @db.Text
   sortOrder          Int                 @default(0) @map("sort_order")
   isActive           Boolean             @default(true) @map("is_active")
   deletedAt          DateTime?           @map("deleted_at")
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
+  description        String?
+  descriptionAm      String?             @map("description_am")
+  nameAm             String?             @map("name_am") @db.VarChar(100)
   categoryAttributes CategoryAttribute[]
 
   @@index([type])
@@ -322,18 +324,22 @@ model Conversation {
   deletedAt     DateTime?     @map("deleted_at")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
+  isFlagged     Boolean       @default(false) @map("is_flagged")
+  riskScore     Int           @default(0) @map("risk_score")
+  chatFlagLogs  ChatFlagLog[]
   buyer         User          @relation("BuyerConversations", fields: [buyerId], references: [id])
   listing       Listing       @relation(fields: [listingId], references: [id])
   seller        User          @relation("SellerConversations", fields: [sellerId], references: [id])
   customOrders  CustomOrder[]
   disputes      Dispute[]
   messages      Message[]
+  orders        Order?
   reports       Report[]
-  orders        Order[]
 
   @@unique([listingId, buyerId, sellerId])
   @@index([buyerId, lastMessageAt(sort: Desc)])
   @@index([sellerId, lastMessageAt(sort: Desc)])
+  @@index([isFlagged, riskScore(sort: Desc)])
   @@index([deletedAt])
   @@map("conversations")
 }
@@ -342,20 +348,45 @@ model Message {
   id             String       @id @default(uuid()) @db.Uuid
   conversationId String       @map("conversation_id") @db.Uuid
   senderId       String       @map("sender_id") @db.Uuid
-  body           String
+  content        String       @map("body")
   readAt         DateTime?    @map("read_at")
   deletedAt      DateTime?    @map("deleted_at")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
+  isFlagged      Boolean      @default(false) @map("is_flagged")
+  metadata       Json?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User         @relation(fields: [senderId], references: [id])
   reports        Report[]
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
+  @@index([isFlagged])
   @@index([readAt])
   @@index([deletedAt])
   @@map("messages")
+}
+
+model ChatFlagLog {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String         @map("conversation_id") @db.Uuid
+  flaggedByUserId  String?        @map("flagged_by_user_id") @db.Uuid
+  reason           ChatFlagReason @map("reason")
+  keywordTriggered String?        @map("keyword_triggered")
+  status           ChatFlagStatus @default(PENDING_REVIEW)
+  action           String?        @map("action")
+  actionReason     String?        @map("action_reason")
+  resolvedById     String?        @map("resolved_by_id") @db.Uuid
+  resolvedAt       DateTime?      @map("resolved_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  conversation     Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  resolvedBy       User?          @relation("ChatFlagResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([flaggedByUserId])
+  @@index([resolvedById])
+  @@map("chat_flag_logs")
 }
 
 model Report {
@@ -429,55 +460,54 @@ model AdminLog {
 }
 
 model Order {
-  id                      String        @id @default(uuid()) @db.Uuid
-  orderNumber             String        @unique @map("order_number") @db.VarChar(20)
-  type                    OrderType
-  status                  OrderStatus   @default(INQUIRY_PENDING)
-  buyerId                 String        @map("buyer_id") @db.Uuid
-  sellerId                String        @map("seller_id") @db.Uuid
-  productId               String        @map("product_id") @db.Uuid
-  conversationId          String?       @map("conversation_id") @db.Uuid
-  agreedPrice             Decimal       @map("agreed_price") @db.Decimal(12, 2)
-  agreedDeposit           Decimal?     @map("agreed_deposit") @db.Decimal(12, 2)
-  offlineDepositRefunded  Boolean       @default(false) @map("offline_deposit_refunded")
-  customMeasurements      Json?         @map("custom_measurements")
-  fittingDate             DateTime?     @map("fitting_date")
-  rentalStartDate         DateTime?     @map("rental_start_date")
-  rentalEndDate           DateTime?     @map("rental_end_date")
-  extensionDaysRequested  Int           @default(0) @map("extension_days_requested")
-  extensionApproved       Boolean?      @map("extension_approved")
-  preHandoverPhotos       String[]      @map("pre_handover_photos")
-  postReturnPhotos        String[]      @map("post_return_photos")
-  disputeNotes            String?       @map("dispute_notes")
-  shipping_address        Json?         @map("shipping_address")
-  createdAt               DateTime      @default(now()) @map("created_at")
-  updatedAt               DateTime      @updatedAt @map("updated_at")
-  buyer                   User          @relation("BuyerOrders", fields: [buyerId], references: [id])
-  seller                  User          @relation("SellerOrders", fields: [sellerId], references: [id])
-  product                 Listing       @relation(fields: [productId], references: [id])
-  conversation            Conversation? @relation(fields: [conversationId], references: [id])
-  customQuotes            CustomQuote[]
+  id                       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber              String        @unique @map("order_number") @db.VarChar(20)
+  type                     OrderType
+  status                   OrderStatus   @default(INQUIRY_PENDING)
+  buyerId                  String        @map("buyer_id") @db.Uuid
+  sellerId                 String        @map("seller_id") @db.Uuid
+  productId                String        @map("product_id") @db.Uuid
+  conversationId           String?       @unique @map("conversation_id") @db.Uuid
+  agreedPrice              Decimal       @map("agreed_price") @db.Decimal(10, 2)
+  agreed_deposit           Decimal?      @db.Decimal(10, 2)
+  offline_deposit_refunded Boolean?      @default(false)
+  customMeasurements       Json?         @map("custom_measurements")
+  fitting_date             DateTime?     @db.Timestamp(6)
+  rentalStartDate          DateTime?     @map("rental_start_date") @db.Timestamp(6)
+  rentalEndDate            DateTime?     @map("rental_end_date") @db.Timestamp(6)
+  extension_days_requested Int?          @default(0)
+  extension_approved       Boolean?
+  pre_handover_photos      String[]      @default([])
+  post_return_photos       String[]      @default([])
+  dispute_notes            String?
+  createdAt                DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt                DateTime?     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  customQuotes             CustomQuote[]
+  buyer                    User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  conversations            Conversation? @relation(fields: [conversationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  product                  Listing       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  seller                   User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  @@index([sellerId, status])
-  @@index([buyerId, status])
   @@index([orderNumber])
-  @@index([status, createdAt(sort: Desc)])
-  @@index([type, status])
-  @@index([conversationId])
+  @@index([buyerId, status], map: "orders_buyer_status_idx")
+  @@index([sellerId, status], map: "orders_seller_status_idx")
   @@map("orders")
 }
 
 model CustomQuote {
-  id              String   @id @default(uuid()) @db.Uuid
-  orderId         String   @map("order_id") @db.Uuid
-  proposedPrice   Decimal  @map("proposed_price") @db.Decimal(12, 2)
-  proposedDeposit  Decimal? @map("proposed_deposit") @db.Decimal(12, 2)
-  notes           String?  @db.Text
-  isAccepted      Boolean  @default(false) @map("is_accepted")
-  createdAt       DateTime @default(now()) @map("created_at")
-  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String    @map("order_id") @db.Uuid
+  offered_by_user_id String    @db.Uuid
+  proposedPrice      Decimal   @map("proposed_price") @db.Decimal(10, 2)
+  proposedDeposit    Decimal?  @map("proposed_deposit") @db.Decimal(10, 2)
+  notes              String?
+  isAccepted         Boolean?  @default(false) @map("is_accepted")
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  users              User      @relation(fields: [offered_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([orderId])
+  @@index([offered_by_user_id], map: "custom_quotes_offered_by_idx")
+  @@index([orderId], map: "custom_quotes_order_idx")
   @@map("custom_quotes")
 }
 
@@ -549,23 +579,23 @@ model Review {
 }
 
 model VerificationRequest {
-  id              String             @id @default(uuid()) @db.Uuid
-  userId          String             @map("user_id") @db.Uuid
+  id              String                @id @default(uuid()) @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
   type            VerificationType
-  status          VerificationStatus @default(pending)
-  documentUrl     String?            @map("document_url") @db.VarChar(500)
+  status          VerificationStatus    @default(pending)
+  documentUrl     String?               @map("document_url") @db.VarChar(500)
   metadata        Json?
-  reviewedById    String?            @map("reviewed_by_id") @db.Uuid
-  reviewedAt      DateTime?          @map("reviewed_at")
-  rejectionReason String?            @map("rejection_reason") @db.VarChar(500)
-  reviewerNotes   String?            @map("reviewer_notes") @db.Text
-  notes           String?            @db.Text
-  deletedAt       DateTime?          @map("deleted_at")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  reviewedBy      User?              @relation("VerificationReviewer", fields: [reviewedById], references: [id])
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedById    String?               @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?             @map("reviewed_at")
+  rejectionReason String?               @map("rejection_reason") @db.VarChar(500)
+  deletedAt       DateTime?             @map("deleted_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  notes           String?
+  reviewerNotes   String?               @map("reviewer_notes")
   history         VerificationHistory[]
+  reviewedBy      User?                 @relation("VerificationReviewer", fields: [reviewedById], references: [id])
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, status])
   @@index([status, createdAt(sort: Desc)])
@@ -575,15 +605,15 @@ model VerificationRequest {
 }
 
 model VerificationHistory {
-  id                   String   @id @default(uuid()) @db.Uuid
-  verificationRequestId String   @map("verification_request_id") @db.Uuid
-  action               String   @db.VarChar(100)
-  status               String   @db.VarChar(50)
-  notes                String?  @db.Text
-  actorId              String   @map("actor_id") @db.Uuid
-  createdAt            DateTime @default(now()) @map("created_at")
-  verificationRequest  VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
-  actor                User     @relation("VerificationHistoryActor", fields: [actorId], references: [id])
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  verificationRequestId String              @map("verification_request_id") @db.Uuid
+  action                String              @db.VarChar(100)
+  status                String              @db.VarChar(50)
+  notes                 String?
+  actorId               String              @map("actor_id") @db.Uuid
+  createdAt             DateTime            @default(now()) @map("created_at")
+  actor                 User                @relation("VerificationHistoryActor", fields: [actorId], references: [id], onDelete: Cascade)
+  verificationRequest   VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
 
   @@index([verificationRequestId, createdAt(sort: Desc)])
   @@index([actorId])
@@ -891,23 +921,20 @@ model RegionHub {
   id            String   @id @default(uuid()) @db.Uuid
   name          String   @db.VarChar(100)
   nameAm        String?  @map("name_am") @db.VarChar(100)
-  description   String?  @db.Text
-  descriptionAm String?  @map("description_am") @db.Text
+  description   String?
+  descriptionAm String?  @map("description_am")
   type          String   @db.VarChar(50)
-  city          String?  @db.VarChar(100)
+  city          String   @db.VarChar(100)
   cityAm        String?  @map("city_am") @db.VarChar(100)
-  coordinates   String?  @db.VarChar(200)
+  coordinates   String?  @db.VarChar(100)
   sortOrder     Int      @default(0) @map("sort_order")
   isActive      Boolean  @default(true) @map("is_active")
   isPopular     Boolean  @default(false) @map("is_popular")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  @@index([type])
   @@index([city])
-  @@index([isActive])
-  @@index([sortOrder])
-  @@index([isPopular])
+  @@index([type, isActive])
   @@map("region_hubs")
 }
 
@@ -940,6 +967,24 @@ model HeroBanner {
   @@index([status, publishAt])
   @@index([deletedAt])
   @@map("hero_banners")
+}
+
+enum ChatFlagReason {
+  SUSPICIOUS_EXTERNAL_PAYMENT
+  ABUSIVE_LANGUAGE
+  OFF_PLATFORM_SCAM
+  PHISHING_ATTEMPT
+  HARASSMENT
+  SPAM
+  OTHER
+}
+
+enum ChatFlagStatus {
+  PENDING_REVIEW
+  RESOLVED
+  DISMISSED
+  USER_BANNED
+  USER_WARNED
 }
 
 enum UserStatus {
@@ -1105,17 +1150,12 @@ enum VerificationType {
   phone
   identity
   business
-  seller_verification
-  identity_verification
-  business_verification
 }
 
 enum VerificationStatus {
   pending
-  under_review
   approved
   rejected
-  changes_requested
   cancelled
 }
 
@@ -1133,24 +1173,6 @@ enum OrderType {
   SALE
   RENTAL
   CUSTOM_TAILORING
-}
-
-enum OrderStatus {
-  INQUIRY_PENDING
-  QUOTE_PROPOSED
-  APPROVED_RESERVED
-  READY_FOR_HANDOVER
-  COMPLETED
-  CANCELLED
-  DISPUTED
-  MEASUREMENTS_SUBMITTED
-  FABRIC_CUTTING
-  TAILORING_IN_PROGRESS
-  FITTING_READY
-  HANDOVER_PENDING_DEPOSIT
-  RENTAL_ACTIVE
-  RETURN_INITIATED
-  RETURNED_INSPECTED
 }
 
 enum PaymentStatus {
@@ -1200,4 +1222,22 @@ enum ContentType {
   featured_custom_service
   promotional_section
   homepage_category
+}
+
+enum OrderStatus {
+  INQUIRY_PENDING
+  QUOTE_PROPOSED
+  APPROVED_RESERVED
+  READY_FOR_HANDOVER
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  MEASUREMENTS_SUBMITTED
+  FABRIC_CUTTING
+  TAILORING_IN_PROGRESS
+  FITTING_READY
+  HANDOVER_PENDING_DEPOSIT
+  RENTAL_ACTIVE
+  RETURN_INITIATED
+  RETURNED_INSPECTED
 }

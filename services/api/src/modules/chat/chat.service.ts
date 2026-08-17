@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { ConversationsRepository } from './conversations.repository';
 import { MessagesRepository } from './messages.repository';
@@ -9,7 +8,7 @@ export interface SerializedMessage {
   id: string;
   conversationId: string;
   senderId: string;
-  body: string;
+  content: string;
   readAt: string | null;
   createdAt: string;
   sender: {
@@ -22,9 +21,9 @@ export interface SerializedMessage {
 
 export interface SerializedConversation {
   id: string;
+  listingId: string | null;
   buyerId: string;
   sellerId: string;
-  listingId: string | null;
   lastMessageAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -57,7 +56,6 @@ export class ChatService {
     private readonly conversationsRepository: ConversationsRepository,
     private readonly messagesRepository: MessagesRepository,
     private readonly notificationsService: NotificationsService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async getConversations(
@@ -160,7 +158,7 @@ export class ChatService {
   async sendMessage(
     conversationId: string,
     user: AuthenticatedUser,
-    body: string
+    content: string
   ): Promise<SerializedMessage> {
     const conversation = await this.conversationsRepository.findById(conversationId);
     if (!conversation) {
@@ -175,7 +173,7 @@ export class ChatService {
     const message = await this.messagesRepository.create({
       conversationId,
       senderId: user.id,
-      body,
+      content,
     });
 
     // Update conversation timestamp
@@ -189,18 +187,9 @@ export class ChatService {
       recipientId,
       'new_message',
       'New message received',
-      body.substring(0, 100),
+      content.substring(0, 100),
       { conversationId, messageId: message.id }
     );
-
-    // Emit Socket.IO event
-    this.eventEmitter.emit('chat.message_sent', {
-      conversationId,
-      messageId: message.id,
-      senderId: user.id,
-      recipientId,
-      body,
-    });
 
     return this.serializeMessage(message);
   }
@@ -226,9 +215,9 @@ export class ChatService {
   private serializeConversation(conv: any, unreadCount: number = 0): SerializedConversation {
     return {
       id: conv.id,
+      listingId: conv.listingId,
       buyerId: conv.buyerId,
       sellerId: conv.sellerId,
-      listingId: conv.listingId,
       lastMessageAt: conv.lastMessageAt?.toISOString() ?? null,
       createdAt: conv.createdAt.toISOString(),
       updatedAt: conv.updatedAt.toISOString(),
@@ -246,7 +235,7 @@ export class ChatService {
       id: msg.id,
       conversationId: msg.conversationId,
       senderId: msg.senderId,
-      body: msg.body,
+      content: msg.content || msg.body,
       readAt: msg.readAt?.toISOString() ?? null,
       createdAt: msg.createdAt.toISOString(),
       sender: msg.sender,

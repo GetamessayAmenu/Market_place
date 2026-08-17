@@ -34,6 +34,7 @@ import { QUEUE_NAMES } from './queue.constants';
       { name: QUEUE_NAMES.TAXONOMY_CACHE },
       { name: QUEUE_NAMES.AUDIT_LOG },
       { name: QUEUE_NAMES.MEILISEARCH_SYNC },
+      { name: QUEUE_NAMES.CHAT_SAFETY },
     ),
   ],
   exports: [BullModule],
