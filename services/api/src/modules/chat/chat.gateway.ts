@@ -12,6 +12,7 @@ import { ChatService } from './chat.service';
 import { ChatSafetyService } from './chat.safety.service';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { eventEmitter } from '../users/users.service';
 
 @WebSocketGateway({
   cors: {
@@ -30,7 +31,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly chatService: ChatService,
     private readonly chatSafetyService: ChatSafetyService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    // Listen for store follower updates and emit via Socket.IO
+    eventEmitter.on('store_follower_updated', (data) => {
+      this.server.to(`user:${data.storeId}`).emit('store_follower_updated', {
+        followerCount: data.followerCount,
+        isFollowing: data.isFollowing,
+      });
+    });
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -136,6 +145,114 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('message_sent', message);
     } catch (error) {
       client.emit('error', { message: 'Failed to send message' });
+    }
+  }
+
+  @SubscribeMessage('send_custom_quote')
+  async handleSendCustomQuote(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; quote: { proposedPrice: number; proposedDeposit?: number; notes?: string } }
+  ) {
+    const user = client.data.user as AuthenticatedUser;
+    if (!user) return;
+
+    try {
+      // Send quote as a structured message
+      const quoteMessage = JSON.stringify({
+        type: 'custom_quote',
+        ...data.quote,
+        senderId: user.id,
+        senderName: user.email.split('@')[0],
+      });
+
+      const message = await this.chatService.sendMessage(
+        data.conversationId,
+        user,
+        quoteMessage
+      );
+
+      // Broadcast to conversation
+      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
+      this.server.to(`conversation:${data.conversationId}`).emit('custom_quote_sent', {
+        conversationId: data.conversationId,
+        quote: data.quote,
+        messageId: message.id,
+      });
+
+      client.emit('quote_sent', message);
+    } catch (error) {
+      client.emit('error', { message: 'Failed to send quote' });
+    }
+  }
+
+  @SubscribeMessage('accept_quote')
+  async handleAcceptQuote(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; quoteId: string }
+  ) {
+    const user = client.data.user as AuthenticatedUser;
+    if (!user) return;
+
+    try {
+      // Send acceptance message
+      const acceptMessage = JSON.stringify({
+        type: 'quote_accepted',
+        quoteId: data.quoteId,
+        senderId: user.id,
+      });
+
+      const message = await this.chatService.sendMessage(
+        data.conversationId,
+        user,
+        acceptMessage
+      );
+
+      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
+      this.server.to(`conversation:${data.conversationId}`).emit('quote_accepted', {
+        conversationId: data.conversationId,
+        quoteId: data.quoteId,
+      });
+
+      client.emit('quote_accepted', message);
+    } catch (error) {
+      client.emit('error', { message: 'Failed to accept quote' });
+    }
+  }
+
+  @SubscribeMessage('update_order_status')
+  async handleUpdateOrderStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; orderId: string; status: string }
+  ) {
+    const user = client.data.user as AuthenticatedUser;
+    if (!user) return;
+
+    try {
+      // This would typically call the orders service
+      // For now, send a system message about the status update
+      const statusMessage = JSON.stringify({
+        type: 'system_status_update',
+        orderId: data.orderId,
+        status: data.status,
+        senderId: user.id,
+      });
+
+      const message = await this.chatService.sendMessage(
+        data.conversationId,
+        user,
+        statusMessage
+      );
+
+      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
+      this.server.to(`conversation:${data.conversationId}`).emit('order_status_updated', {
+        conversationId: data.conversationId,
+        orderId: data.orderId,
+        status: data.status,
+      });
+
+      client.emit('order_status_updated', message);
+    } catch (error) {
+      client.emit('error', { message: 'Failed to update order status' });
     }
   }
 

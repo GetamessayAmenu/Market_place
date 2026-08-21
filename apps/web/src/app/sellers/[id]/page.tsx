@@ -35,7 +35,7 @@ interface SellerData {
   createdAt: string
   _count?: {
     listings: number
-    followers?: number
+    storeFollowers?: number
   }
 }
 
@@ -109,12 +109,16 @@ export default async function SellerPage({ params, searchParams: _searchParams }
 
     if (sellerRes.status === 'fulfilled') {
       seller = sellerRes.value
+    } else {
+      console.error('Seller fetch error:', sellerRes.reason)
     }
     if (listingsRes.status === 'fulfilled') {
       listings = listingsRes.value.data
+    } else {
+      console.error('Listings fetch error:', listingsRes.reason)
     }
-  } catch {
-    // Graceful fallback
+  } catch (error) {
+    console.error('Unexpected error:', error)
   }
 
   if (seller == null) {
@@ -183,6 +187,8 @@ export default async function SellerPage({ params, searchParams: _searchParams }
         seller={{
           ...seller,
           sellerType,
+          ...(seller._count?.listings !== undefined && { _count: { listings: seller._count.listings } }),
+          ...(seller._count?.storeFollowers !== undefined && { _count: { storeFollowers: seller._count.storeFollowers } }),
         }}
       />
 

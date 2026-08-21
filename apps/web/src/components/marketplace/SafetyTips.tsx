@@ -1,22 +1,34 @@
 'use client'
 
-import { Alert } from '@marketplace/ui'
 import React, { useState } from 'react'
 
 export interface SafetyTipsProps {
   className?: string
+  context?: 'buyer' | 'seller' | 'both'
 }
 
-export default function SafetyTips({ className }: SafetyTipsProps) {
+export default function SafetyTips({ className, context = 'both' }: SafetyTipsProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const tips = [
-    'Avoid paying in advance, even for delivery',
-    'Meet with the seller at a safe public place',
-    "Inspect the item and ensure it's exactly what you want",
-    "Make sure that the packed item is the one you've inspected",
-    "Only pay if you're satisfied",
+  const buyerTips = [
+    'Contact the seller through the platform first to establish trust',
+    'Meet in a safe, public place with other people around',
+    'Inspect the item thoroughly before paying',
+    'Only pay when you are satisfied with the item',
+    'Use cash or secure payment methods you can reverse if needed',
+    'Trust your instincts - if something feels wrong, walk away',
   ]
+
+  const sellerTips = [
+    'Verify the buyer before meeting - check their profile and reviews',
+    'Meet in a safe, public location during daylight hours',
+    'Bring a friend or family member for large transactions',
+    'Accept cash or secure payment methods only',
+    'Do not release the item until payment is confirmed',
+    'Keep records of all communication through the platform',
+  ]
+
+  const tips = context === 'buyer' ? buyerTips : context === 'seller' ? sellerTips : [...buyerTips, ...sellerTips]
 
   return (
     <div className={className}>
@@ -44,7 +56,9 @@ export default function SafetyTips({ className }: SafetyTipsProps) {
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Safety Tips</h3>
-            <p className="text-sm text-muted-foreground">Keep yourself safe when buying</p>
+            <p className="text-sm text-muted-foreground">
+              {context === 'buyer' ? 'Keep yourself safe when buying' : context === 'seller' ? 'Keep yourself safe when selling' : 'Safe buying and selling practices'}
+            </p>
           </div>
         </div>
         <svg
@@ -60,8 +74,30 @@ export default function SafetyTips({ className }: SafetyTipsProps) {
 
       {isExpanded && (
         <div className="mt-2 rounded-lg border bg-card p-4">
+          {context === 'both' && (
+            <>
+              <h4 className="font-medium text-sm text-foreground mb-3">For Buyers</h4>
+              <ul className="space-y-2 mb-4" role="list">
+                {buyerTips.map((tip, index) => (
+                  <li key={`buyer-${index}`} className="flex gap-3 text-sm text-muted-foreground">
+                    <svg
+                      className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+              <h4 className="font-medium text-sm text-foreground mb-3">For Sellers</h4>
+            </>
+          )}
           <ul className="space-y-2" role="list">
-            {tips.map((tip, index) => (
+            {(context === 'both' ? sellerTips : tips).map((tip, index) => (
               <li key={index} className="flex gap-3 text-sm text-muted-foreground">
                 <svg
                   className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-500"
@@ -76,6 +112,9 @@ export default function SafetyTips({ className }: SafetyTipsProps) {
               </li>
             ))}
           </ul>
+          <div className="mt-4 pt-3 border-t text-xs text-muted-foreground">
+            <p>If you encounter suspicious activity, report it to our support team immediately.</p>
+          </div>
         </div>
       )}
     </div>

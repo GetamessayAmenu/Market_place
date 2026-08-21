@@ -88,6 +88,8 @@ model User {
   favorites                 Favorite[]
   followers                 Follow[]              @relation("Following")
   following                 Follow[]              @relation("Followed")
+  storeFollows              StoreFollow[]         @relation("UserStoreFollows")
+  storeFollowers            StoreFollow[]         @relation("StoreFollowers")
   heroBannersCreated        HeroBanner[]          @relation("HeroBannerCreated")
   heroBannersUpdated        HeroBanner[]          @relation("HeroBannerUpdated")
   homepageContentCreated    HomepageContent[]     @relation("HomepageContentCreated")
@@ -313,6 +315,21 @@ model Follow {
   @@index([followerId])
   @@index([followingId])
   @@map("follows")
+}
+
+model StoreFollow {
+  id        String   @id @default(uuid()) @db.Uuid
+  followerId String   @map("follower_id") @db.Uuid
+  storeId   String   @map("store_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  follower  User     @relation("UserStoreFollows", fields: [followerId], references: [id], onDelete: Cascade)
+  store     User     @relation("StoreFollowers", fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, storeId])
+  @@index([storeId])
+  @@index([followerId])
+  @@map("store_follows")
 }
 
 model Conversation {

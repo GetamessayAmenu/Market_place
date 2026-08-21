@@ -3,21 +3,20 @@ import Link from 'next/link'
 import React from 'react'
 
 import Container from '../../../components/Container'
-import ChatButton from '../../../components/marketplace/ChatButton'
 import FavoriteButton from '../../../components/marketplace/FavoriteButton'
 import ImageGallery from '../../../components/marketplace/ImageGallery'
-import ListingActions from '../../../components/marketplace/ListingActions'
+import ListingAttributes from '../../../components/marketplace/ListingAttributes'
 import ListingCard from '../../../components/marketplace/ListingCard'
 import MarkUnavailableButton from '../../../components/marketplace/MarkUnavailableButton'
+import MoreFromSeller from '../../../components/marketplace/MoreFromSeller'
 import PostSimilarAdButton from '../../../components/marketplace/PostSimilarAdButton'
 import PriceHistoryButton from '../../../components/marketplace/PriceHistoryButton'
 import ReportAbuseButton from '../../../components/marketplace/ReportAbuseButton'
-import RequestCallbackButton from '../../../components/marketplace/RequestCallbackButton'
 import ReviewSection from '../../../components/marketplace/ReviewSection'
 import SafetyTips from '../../../components/marketplace/SafetyTips'
-import SellerInfoCard from '../../../components/marketplace/SellerInfoCard'
 import ShareButton from '../../../components/marketplace/ShareButton'
-import ShopLocationMap from '../../../components/marketplace/ShopLocationMap'
+import RevealContact from '../../../components/marketplace/RevealContact'
+import YouMayAlsoLike from '../../../components/marketplace/YouMayAlsoLike'
 import { optionalUser } from '../../../lib/authServer'
 import { serverGet } from '../../../lib/serverApi'
 
@@ -118,7 +117,15 @@ export default async function ListingPage({ params }: Props) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   let listing: ListingData | null = null
-  let relatedListings: { id: string; title: string; price: number; condition: string; city: string; primaryImageUrl?: string | null }[] = []
+  let relatedData: {
+    moreFromSeller: any[]
+    youMayAlsoLike: any[]
+    seller: {
+      id: string
+      displayName: string
+      avatarUrl?: string | null
+    }
+  } | null = null
 
   try {
     const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
@@ -129,15 +136,13 @@ export default async function ListingPage({ params }: Props) {
     listing = null
   }
 
-  if (listing?.category?.id) {
+  if (listing) {
     try {
-      const relatedRes = await serverGet<typeof relatedListings>('/listings', {
+      relatedData = await serverGet<typeof relatedData>(`/listings/${id}/related`, {
         revalidate: 60,
-        params: { categoryId: listing.category.id, limit: 4 },
       })
-      relatedListings = relatedRes.filter((l) => l.id !== listing.id)
     } catch {
-      // Graceful fallback
+      // Graceful fallback - related sections won't show
     }
   }
 
@@ -217,23 +222,37 @@ export default async function ListingPage({ params }: Props) {
 
         <div className="grid gap-8 lg:grid-cols-5">
           {/* Image gallery - 3 cols */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 space-y-6">
             <ImageGallery images={galleryImages} />
+            
+            {/* Description - immediately below image */}
+            <div className="rounded-xl border bg-card p-6">
+              <h3 className="text-lg font-semibold text-foreground mb-3">Description</h3>
+              <div className="prose prose-base max-w-none text-muted-foreground whitespace-pre-wrap leading-relaxed">{listing.description}</div>
+              
+              {/* Listing Attributes */}
+              <ListingAttributes 
+                customizationOptions={listing.customizationOptions}
+                attributes={listing.attributes}
+                condition={listing.condition}
+                category={listing.category}
+              />
+            </div>
           </div>
 
           {/* Listing info - 2 cols */}
           <div className="lg:col-span-2 space-y-6">
             {/* Title and price */}
-            <div>
+            <div className="space-y-4">
               <div className="flex items-start justify-between gap-4">
-                <h1 className="text-2xl font-bold text-foreground">{listing.title}</h1>
-                <div className="flex items-center gap-2">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground leading-tight">{listing.title}</h1>
+                <div className="flex items-center gap-3 shrink-0">
                   <ShareButton title={listing.title} />
                   <FavoriteButton listingId={listing.id} />
                 </div>
               </div>
-              <div className="mt-3 flex items-baseline gap-3 flex-wrap">
-                <p className="text-3xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
+              <div className="flex items-baseline gap-4 flex-wrap">
+                <p className="text-3xl md:text-4xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
                 <PriceHistoryButton 
                   listingId={listing.id} 
                   currentPrice={listing.price}
@@ -241,14 +260,14 @@ export default async function ListingPage({ params }: Props) {
                 />
               </div>
               {listing.availableForRent && listing.rentalPricePerDay != null && (
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="text-base text-muted-foreground">
                   or rent for {listing.currency}{listing.rentalPricePerDay.toLocaleString()}/day
                 </p>
               )}
             </div>
 
             {/* Badges */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {listing.condition ? (
                 <Badge variant={conditionVariant[listing.condition] ?? 'default'}>
                   {listing.condition.replace('_', ' ')}
@@ -258,214 +277,114 @@ export default async function ListingPage({ params }: Props) {
               {listing.status ? <Badge variant="info">{listing.status}</Badge> : null}
             </div>
 
-            {/* Buy / Rent / Custom Order actions */}
-            {hasActions && listing.seller && (
-              <ListingActions
-                listingId={listing.id}
-                price={listing.price}
-                currency={listing.currency}
-                availableForPurchase={listing.availableForPurchase ?? false}
-                availableForRent={listing.availableForRent ?? false}
-                customOrderAvailable={listing.customOrderAvailable ?? false}
-                {...(listing.rentalPricePerDay !== undefined ? { rentalPricePerDay: listing.rentalPricePerDay ?? null } : { rentalPricePerDay: null })}
-                {...(listing.rentalDeposit !== undefined ? { rentalDeposit: listing.rentalDeposit ?? null } : { rentalDeposit: null })}
-                sellerId={listing.seller.id}
-                supportsReadyMade={listing.supportsReadyMade ?? true}
-                supportsCustomDesign={listing.supportsCustomDesign ?? false}
-                {...(listing.startingCustomPrice !== undefined ? { startingCustomPrice: listing.startingCustomPrice } : {})}
-                {...(listing.estimatedProductionDays !== undefined ? { estimatedProductionDays: listing.estimatedProductionDays } : {})}
-                {...(listing.customizationOptions !== undefined ? { customizationOptions: listing.customizationOptions } : {})}
-              />
-            )}
-
-            {/* Request Callback */}
+            {/* Combined Card - Contact, Location, Seller Info (Jiji-style compact) */}
             {listing.seller && (
-              <RequestCallbackButton 
-                listingId={listing.id}
-                sellerId={listing.seller.id}
-                listingTitle={listing.title}
-              />
+              <div className="rounded-xl border bg-card p-4 space-y-4 sticky top-4 shadow-sm">
+                {/* Seller Info */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    {listing.seller.avatarUrl ? (
+                      <img 
+                        src={listing.seller.avatarUrl} 
+                        alt={listing.seller.displayName}
+                        className="h-10 w-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                        <svg className="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div>
+                      <Link 
+                        href={`/sellers/${listing.seller.id}`}
+                        className="font-semibold text-foreground hover:underline"
+                      >
+                        {listing.seller.displayName}
+                      </Link>
+                      <p className="text-sm text-muted-foreground">
+                        {listing.seller.createdAt 
+                          ? `${Math.floor((Date.now() - new Date(listing.seller.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)) + 1}+ years on marketplace`
+                          : 'Member on marketplace'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Typically replies within minutes
+                  </p>
+                </div>
+
+                {/* Phone - Reveal Contact */}
+                <RevealContact phoneNumber={listing.contactOptions?.whatsapp} />
+
+                {/* Chat Button */}
+                <Link
+                  href={`/dashboard/messages?listing=${listing.id}&seller=${listing.seller.id}`}
+                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Start chat
+                </Link>
+              </div>
             )}
 
-            {/* Location and date */}
-            <div className="space-y-2 text-sm text-muted-foreground">
-              {listing.city ? (
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  <span>{listing.location ?? listing.city}</span>
-                </div>
-              ) : null}
-              <div className="flex items-center gap-2">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span>Posted {new Date(listing.createdAt).toLocaleDateString()}</span>
+            {/* Feedback Section */}
+            {listing.seller && (
+              <div className="rounded-xl border bg-card p-4">
+                <Link 
+                  href={`/sellers/${listing.seller.id}/reviews`}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💬</span>
+                    <span className="text-sm font-medium text-foreground">24 Reviews</span>
+                  </div>
+                  <span className="text-sm text-primary hover:text-primary/80 font-medium">View all</span>
+                </Link>
               </div>
-              {listing._count?.favorites !== undefined ? (
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                    />
-                  </svg>
-                  <span>{String(listing._count.favorites)} saved</span>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Contact actions */}
-            {listing.contactOptions ? (
-              <div className="space-y-3">
-                <h3 className="font-semibold text-foreground">Contact Seller</h3>
-                <div className="flex flex-wrap gap-2">
-                  {listing.contactOptions.showPhone ? (
-                    <a
-                      href="tel:"
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                        />
-                      </svg>
-                      Show Contact
-                    </a>
-                  ) : null}
-                  {listing.contactOptions.whatsapp ? (
-                    <a
-                      href={`https://wa.me/${listing.contactOptions.whatsapp}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-                    >
-                      WhatsApp
-                    </a>
-                  ) : null}
-                  {listing.contactOptions.telegram ? (
-                    <a
-                      href={`https://t.me/${listing.contactOptions.telegram}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600"
-                    >
-                      Telegram
-                    </a>
-                  ) : null}
-                  {listing.contactOptions.inAppMessaging && listing.seller ? (
-                    <>
-                      <ChatButton
-                        listingId={listing.id}
-                        sellerId={listing.seller.id}
-                        sellerName={listing.seller.displayName}
-                      />
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Enhanced Seller info card */}
-            {listing.seller ? (
-              <SellerInfoCard 
-                seller={{
-                  id: listing.seller.id,
-                  name: listing.seller.displayName,
-                  avatarUrl: listing.seller.avatarUrl ?? null,
-                  emailVerifiedAt: listing.seller.emailVerifiedAt ?? null,
-                  phoneVerifiedAt: listing.seller.phoneVerifiedAt ?? null,
-                  ...(listing.seller.createdAt ? { createdAt: listing.seller.createdAt } : {}),
-                }}
-                responseTime="Typically replies within minutes"
-              />
-            ) : null}
-
-            {/* Shop Location Map */}
-            {listing.seller?.location ? (
-              <ShopLocationMap 
-                sellerName={listing.seller.displayName}
-                location={listing.seller.location}
-              />
-            ) : null}
-
-            {/* Safety Tips */}
-            <SafetyTips />
+            )}
 
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2">
+              <ReportAbuseButton 
+                listingId={listing.id}
+                listingTitle={listing.title}
+              />
               <MarkUnavailableButton 
                 listingId={listing.id}
                 listingTitle={listing.title}
                 isOwner={isOwner}
               />
-              <ReportAbuseButton 
-                listingId={listing.id}
-                listingTitle={listing.title}
-              />
             </div>
+
+            {/* Safety Tips */}
+            <SafetyTips />
           </div>
         </div>
 
-        {/* Description */}
-        <section className="mt-10" aria-labelledby="description-heading">
-          <h2 id="description-heading" className="text-xl font-bold text-foreground mb-4">
-            Description
-          </h2>
-          <div className="prose prose-sm max-w-none text-muted-foreground whitespace-pre-wrap">{listing.description}</div>
-        </section>
+        {/* Related Products */}
+        {relatedData && (
+          <div className="mt-12 space-y-8">
+            {/* More from this seller */}
+            {relatedData.moreFromSeller.length > 0 && (
+              <MoreFromSeller
+                listings={relatedData.moreFromSeller}
+                seller={relatedData.seller}
+              />
+            )}
 
-        {/* Reviews */}
-        {listing.seller && (
-          <section className="mt-10" aria-labelledby="reviews-heading">
-            <h2 id="reviews-heading" className="text-xl font-bold text-foreground mb-4">
-              Reviews
-            </h2>
-            <ReviewSection listingId={listing.id} sellerId={listing.seller.id} />
-          </section>
+            {/* You may also like */}
+            {relatedData.youMayAlsoLike.length > 0 && (
+              <YouMayAlsoLike listings={relatedData.youMayAlsoLike} />
+            )}
+          </div>
         )}
-
-        {/* Related listings */}
-        {relatedListings.length > 0 ? (
-          <section className="mt-12" aria-labelledby="related-heading">
-            <h2 id="related-heading" className="text-xl font-bold text-foreground mb-6">
-              Similar Listings
-            </h2>
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-              {relatedListings.map((rel) => (
-                <ListingCard
-                  key={rel.id}
-                  id={rel.id}
-                  title={rel.title}
-                  price={rel.price}
-                  {...(rel.primaryImageUrl !== undefined ? { imageUrl: rel.primaryImageUrl } : {})}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         {/* Post Similar Ad CTA */}
         <section className="mt-12" aria-labelledby="post-ad-heading">

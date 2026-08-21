@@ -6,6 +6,7 @@ import {
   Body,
   Query,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -73,5 +74,43 @@ export class ChatController {
   async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
     const count = await this.chatService.getUnreadCount(user);
     return { count };
+  }
+
+  // Seller-specific endpoints
+  @Get('seller/conversations')
+  @Roles('seller')
+  async getSellerConversations(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('filter') filter?: 'all' | 'unread' | 'sales_custom' | 'rentals' | 'quotes' | 'archived'
+  ) {
+    return this.chatService.getSellerConversations(user, filter);
+  }
+
+  @Patch('seller/conversations/:id/archive')
+  @Roles('seller')
+  async archiveConversation(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.chatService.archiveConversation(id, user);
+  }
+
+  @Post('conversations/:id/quote')
+  @Roles('seller')
+  async sendQuote(
+    @Param('id') conversationId: string,
+    @Body() body: { proposedPrice: number; proposedDeposit?: number; notes?: string },
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.chatService.sendQuote(conversationId, user, body);
+  }
+
+  @Post('conversations/:id/quote/:quoteId/accept')
+  async acceptQuote(
+    @Param('id') conversationId: string,
+    @Param('quoteId') quoteId: string,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.chatService.acceptQuote(conversationId, quoteId, user);
   }
 }

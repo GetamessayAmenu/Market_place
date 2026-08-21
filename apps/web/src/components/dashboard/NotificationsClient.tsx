@@ -4,7 +4,7 @@ import { useSocket } from '../../hooks/useSocket'
 
 export default function NotificationsClient({ initialNotifications }: { initialNotifications: any[] }) {
   const socketRef = useSocket()
-  const [notifications, setNotifications] = useState(initialNotifications || [])
+  const [notifications, setNotifications] = useState(Array.isArray(initialNotifications) ? initialNotifications : [])
 
   useEffect(() => {
     const socket = socketRef.current

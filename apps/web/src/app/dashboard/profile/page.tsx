@@ -3,6 +3,7 @@ import Link from 'next/link';
 import React from 'react';
 
 import { requireUser } from '../../../lib/authServer';
+import StoreManagement from '../../../components/dashboard/StoreManagement';
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -13,7 +14,7 @@ export default async function ProfilePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
-          <p className="text-muted-foreground">View and manage your public profile.</p>
+          <p className="text-muted-foreground">View and manage your public profile and store settings.</p>
         </div>
         <Link href="/dashboard/profile/edit">
           <Button variant="outline">Edit Profile</Button>
@@ -94,6 +95,12 @@ export default async function ProfilePage() {
             </Link>
           </div>
         </div>
+      </div>
+
+      {/* Store Management Section */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Store Management</h2>
+        <StoreManagement />
       </div>
     </div>
   );

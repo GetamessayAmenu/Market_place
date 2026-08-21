@@ -5,7 +5,6 @@ export interface TrustBadgesProps {
   emailVerified?: boolean
   phoneVerified?: boolean
   identityVerified?: boolean
-  paymentVerified?: boolean
   topRated?: boolean
   fastResponder?: boolean
   memberSince?: string
@@ -72,21 +71,28 @@ export default function TrustBadges({
   emailVerified,
   phoneVerified,
   identityVerified,
-  paymentVerified,
   topRated,
   fastResponder,
   memberSince,
   className,
 }: TrustBadgesProps) {
+  // Prioritize phone verification as primary trust signal
   const badges: BadgeItemProps[] = [
-    { label: 'Email Verified', icon: <CheckIcon />, active: emailVerified ?? false },
+    // Primary: Phone verification (most important for OLX/Jiji model)
     { label: 'Phone Verified', icon: <CheckIcon />, active: phoneVerified ?? false },
+    // Secondary: Email verification (for account recovery)
+    { label: 'Email Verified', icon: <CheckIcon />, active: emailVerified ?? false },
+    // Optional: Identity verification (not required, just a badge)
     { label: 'Identity Verified', icon: <ShieldIcon />, active: identityVerified ?? false },
-    { label: 'Payment Verified', icon: <CheckIcon />, active: paymentVerified ?? false },
+    // Reputation signals
     { label: 'Top Rated', icon: <StarIcon />, active: topRated ?? false },
     { label: 'Fast Responder', icon: <BoltIcon />, active: fastResponder ?? false },
+    // Account age
     { label: `Member since ${memberSince ?? ''}`, icon: <CalendarIcon />, active: memberSince != null },
   ]
+
+  // Remove payment verification - not needed for classified marketplace model
+  // Payment verification is more relevant for e-commerce platforms
 
   const activeBadges = badges.filter((b) => b.active)
   if (activeBadges.length === 0) return null

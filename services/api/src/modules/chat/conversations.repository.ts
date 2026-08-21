@@ -181,7 +181,7 @@ export class ConversationsRepository {
     });
   }
 
-  async update(id: string, data: { lastMessageAt?: Date }) {
+  async update(id: string, data: { lastMessageAt?: Date; deletedAt?: Date }) {
     return this.prisma.conversation.update({
       where: { id },
       data,

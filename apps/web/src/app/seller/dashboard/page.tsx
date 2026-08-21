@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Alert, Button, Card, CardContent } from '@marketplace/ui';
 import Link from 'next/link';
 import useAuth from '../../../hooks/useAuth';
+import { apiGet } from '../../../lib/api';
 import { usePendingActions } from '../../../hooks/seller/usePendingActions';
 import { useEngagementMetrics } from '../../../hooks/seller/useEngagementMetrics';
 
@@ -49,6 +50,12 @@ const IconCalendar = () => (
 const IconShare = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+  </svg>
+);
+
+const IconUsers = () => (
+  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
   </svg>
 );
 
@@ -147,10 +154,24 @@ function HolidayAlertBanner() {
 export default function SellerDashboardPage() {
   const user = useAuth((s) => s.user);
   const sellerId = user?.id || '';
+  const [followerCount, setFollowerCount] = useState(0);
 
   // API calls
   const { data: pendingActions = [] } = usePendingActions(sellerId);
   const { data: engagementMetrics = [] } = useEngagementMetrics(sellerId);
+
+  // Fetch followers count
+  React.useEffect(() => {
+    if (sellerId) {
+      apiGet<{ _count: { storeFollowers: number } }>(`/users/${sellerId}`)
+        .then((data) => {
+          setFollowerCount(data._count?.storeFollowers || 0);
+        })
+        .catch(() => {
+          setFollowerCount(0);
+        });
+    }
+  }, [sellerId]);
 
   if (!user) {
     return (
@@ -184,7 +205,7 @@ export default function SellerDashboardPage() {
       {/* Quick Action Shortcuts */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <QuickActionCard
             icon={<IconPlus />}
             label="Add New Listing"
@@ -200,16 +221,29 @@ export default function SellerDashboardPage() {
             label="Share Storefront Link"
             href="/seller/store#share"
           />
+          <QuickActionCard
+            icon={<IconUsers />}
+            label="View Followers"
+            href="/seller/followers"
+          />
         </div>
       </div>
 
       {/* Engagement Health Metrics */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Engagement Health</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           {engagementMetrics.map((metric, index) => (
             <EngagementMetricCard key={index} metric={metric} />
           ))}
+          <EngagementMetricCard
+            metric={{
+              label: 'Followers',
+              value: followerCount,
+              change: 0,
+              icon: <IconUsers />,
+            }}
+          />
         </div>
       </div>
     </div>

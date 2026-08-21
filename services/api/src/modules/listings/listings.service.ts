@@ -946,4 +946,98 @@ export class ListingsService {
       results,
     };
   }
+
+  async getRelatedListings(listingId: string, viewer?: AuthenticatedUser) {
+    const listing = await this.listingsRepository.findByIdWithRelations(listingId);
+    if (!listing || listing.deletedAt) {
+      throw new ListingNotFoundException();
+    }
+
+    const isOwner = viewer?.id === listing.sellerId;
+    const canModerate = viewer ? canModerateListings(viewer) : false;
+    if (!isPublicListingStatus(listing.status) && !isOwner && !canModerate) {
+      throw new ListingNotFoundException();
+    }
+
+    // Get "More from this seller" - same seller, active listings, exclude current
+    const sellerListings = await this.listingsRepository.findManyWithRelations({
+      where: {
+        sellerId: listing.sellerId,
+        id: { not: listingId },
+        status: { in: ['active', 'sold'] },
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+      page: 1,
+      limit: 8,
+    });
+
+    // Prioritize same category for seller listings
+    const sellerListingsSameCategory = sellerListings.items
+      .filter((l) => l.categoryId === listing.categoryId)
+      .slice(0, 4);
+    const sellerListingsOtherCategory = sellerListings.items
+      .filter((l) => l.categoryId !== listing.categoryId)
+      .slice(0, 4);
+    const moreFromSeller = [...sellerListingsSameCategory, ...sellerListingsOtherCategory].slice(0, 4);
+
+    // Get "You may also like" - other sellers, same category first, then related
+    const priceRange = listing.price.toNumber();
+    const priceMin = priceRange * 0.5;
+    const priceMax = priceRange * 1.5;
+
+    const relatedListings = await this.listingsRepository.findManyWithRelations({
+      where: {
+        id: { not: listingId },
+        sellerId: { not: listing.sellerId },
+        status: { in: ['active', 'sold'] },
+        deletedAt: null,
+        OR: [
+          { categoryId: listing.categoryId },
+          { 
+            AND: [
+              { price: { gte: new Prisma.Decimal(priceMin) } },
+              { price: { lte: new Prisma.Decimal(priceMax) } },
+            ],
+          },
+          ...(listing.city ? [{ city: listing.city }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      page: 1,
+      limit: 8,
+    });
+
+    // Remove duplicates with seller listings and limit to 4
+    const sellerListingIds = new Set(moreFromSeller.map((l) => l.id));
+    const youMayAlsoLike = relatedListings.items
+      .filter((l) => !sellerListingIds.has(l.id))
+      .slice(0, 4);
+
+    // Get favorite status if viewer is logged in
+    const allListingIds = [...moreFromSeller, ...youMayAlsoLike].map((l) => l.id);
+    const favoritedIds = viewer
+      ? new Set(
+          await this.favoritesService.getFavoritedIds(viewer.id, allListingIds),
+        )
+      : null;
+
+    const serializeWithFavorite = (l: ListingWithRelations) => {
+      const summary = serializeListingSummary(l);
+      if (favoritedIds) {
+        return { ...summary, isFavorited: favoritedIds.has(l.id) };
+      }
+      return summary;
+    };
+
+    return {
+      moreFromSeller: moreFromSeller.map(serializeWithFavorite),
+      youMayAlsoLike: youMayAlsoLike.map(serializeWithFavorite),
+      seller: {
+        id: listing.seller.id,
+        displayName: listing.seller.displayName,
+        avatarUrl: listing.seller.avatarUrl,
+      },
+    };
+  }
 }

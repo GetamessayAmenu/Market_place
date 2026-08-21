@@ -18,7 +18,11 @@ export interface SellerProfileData {
   phoneVerifiedAt?: string | null
   createdAt: string
   followerCount?: number
-  _count?: { followers?: number }
+  _count?: { 
+    listings?: number
+    followers?: number
+    storeFollowers?: number 
+  }
 }
 
 export interface SellerProfileCardProps {
@@ -124,7 +128,7 @@ export default function SellerProfileCard({ seller, isFollowing, className }: Se
             {/* Actions row */}
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <FollowButton
-                sellerId={seller.id}
+                storeId={seller.id}
                 initialIsFollowing={isFollowing ?? false}
                 initialFollowerCount={followerCount}
               />

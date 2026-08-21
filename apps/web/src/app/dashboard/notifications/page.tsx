@@ -1,4 +1,5 @@
 import React from 'react'
+import { cookies } from 'next/headers'
 
 import Container from '../../../components/Container'
 import NotificationsClient from '../../../components/dashboard/NotificationsClient'
@@ -7,7 +8,9 @@ import { serverGet } from '../../../lib/serverApi'
 
 export default async function NotificationsPage() {
   await requireUser()
-  const notifications = await serverGet<{ id: string; type: string; title: string; body: string }[]>('/notifications')
+  const cookieStore = await cookies()
+  const cookieHeader = cookieStore.toString()
+  const notifications = await serverGet<{ id: string; type: string; title: string; body: string }[]>('/notifications', { cookieHeader })
 
   return (
     <Container>

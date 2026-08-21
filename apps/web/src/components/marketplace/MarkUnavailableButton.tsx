@@ -15,26 +15,30 @@ export default function MarkUnavailableButton({ listingId, listingTitle, isOwner
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
-  // Only show to listing owner
-  if (!isOwner) return null
-
   const handleMarkUnavailable = async () => {
     setLoading(true)
 
     try {
-      await apiPatch(`/listings/${listingId}/mark-unavailable`)
-
-      toast({
-        title: 'Listing marked as unavailable',
-        description: 'Your listing has been hidden from search results.',
-        variant: 'success',
-      })
+      if (isOwner) {
+        await apiPatch(`/listings/${listingId}/mark-unavailable`)
+        toast({
+          title: 'Listing marked as unavailable',
+          description: 'Your listing has been hidden from search results.',
+          variant: 'success',
+        })
+      } else {
+        await apiPatch(`/listings/${listingId}/report-unavailable`)
+        toast({
+          title: 'Report submitted',
+          description: 'Thank you for helping us keep the marketplace up to date.',
+          variant: 'success',
+        })
+      }
       setIsOpen(false)
-      // Optionally redirect or refresh
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to update listing. Please try again.',
+        description: 'Failed to submit. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -69,13 +73,12 @@ export default function MarkUnavailableButton({ listingId, listingTitle, isOwner
       <Modal
         open={isOpen}
         onClose={() => setIsOpen(false)}
-        title="Mark as Unavailable?"
+        title="Is it not available anymore? 😢"
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            This will hide <span className="font-medium text-foreground">{listingTitle}</span> from search results and
-            mark it as unavailable. You can make it available again later from your dashboard.
+            We'll do our best to ensure this advert is closed
           </p>
 
           <div className="flex gap-3 pt-2">
@@ -94,7 +97,7 @@ export default function MarkUnavailableButton({ listingId, listingTitle, isOwner
               className="flex-1"
               loading={loading}
             >
-              Mark Unavailable
+              Confirm
             </Button>
           </div>
         </div>

@@ -102,7 +102,7 @@ export class UsersRepository {
     });
   }
 
-  async findProfileById(id: string): Promise<UserWithRole | null> {
+  async findProfileById(id: string): Promise<UserWithRole & { _count: { listings: number; favorites: number; reportsFiled: number; notifications: number; storeFollowers: number } } | null> {
     return this.prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -113,9 +113,112 @@ export class UsersRepository {
             favorites: true,
             reportsFiled: true,
             notifications: true,
+            storeFollowers: true,
           },
         },
       },
+    });
+  }
+
+  // ─── Store Follow Feature ───────────────────────────────────────────────────
+
+  async findStoreFollow(followerId: string, storeId: string) {
+    return this.prisma.storeFollow.findUnique({
+      where: {
+        followerId_storeId: {
+          followerId,
+          storeId,
+        },
+      },
+    });
+  }
+
+  async createStoreFollow(followerId: string, storeId: string) {
+    return this.prisma.storeFollow.create({
+      data: {
+        followerId,
+        storeId,
+      },
+    });
+  }
+
+  async deleteStoreFollow(id: string) {
+    return this.prisma.storeFollow.delete({
+      where: { id },
+    });
+  }
+
+  async countStoreFollowers(storeId: string) {
+    return this.prisma.storeFollow.count({
+      where: { storeId },
+    });
+  }
+
+  async findStoreFollowsByFollower(followerId: string) {
+    return this.prisma.storeFollow.findMany({
+      where: { followerId },
+      include: {
+        store: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            location: true,
+            bio: true,
+            sellerType: true,
+            _count: {
+              select: {
+                listings: true,
+                storeFollowers: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findStoreFollowsByStore(storeId: string) {
+    return this.prisma.storeFollow.findMany({
+      where: { storeId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findUserListings(userId: string) {
+    return this.prisma.listing.findMany({
+      where: {
+        sellerId: userId,
+        status: 'active',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        price: true,
+        condition: true,
+        city: true,
+        availableForPurchase: true,
+        availableForRent: true,
+        customOrderAvailable: true,
+        rentalPricePerDay: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 }

@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ListingsService } from '../listings/listings.service';
+import { UsersRepository } from '../users/users.repository';
 
 @Injectable()
 export class SellerService {
   constructor(
     private readonly listingsService: ListingsService,
+    private readonly usersRepository: UsersRepository,
   ) {}
 
   // ─── Hub 1: Overview ───────────────────────────────────────────────────────
@@ -190,5 +192,17 @@ export class SellerService {
   async updateCustomerMeasurements(_sellerId: string, _customerId: string, _measurements: Record<string, number>) {
     // TODO: Implement customer measurements update
     return { success: true };
+  }
+
+  // ─── Store Follow Feature ───────────────────────────────────────────────────
+
+  async getFollowers(sellerId: string) {
+    const followers = await this.usersRepository.findStoreFollowsByStore(sellerId);
+
+    return followers.map((follow: any) => ({
+      id: follow.id,
+      follower: follow.follower,
+      followedAt: follow.createdAt,
+    }));
   }
 }

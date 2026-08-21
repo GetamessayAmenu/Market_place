@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Button, Card, CardContent, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Badge } from '@marketplace/ui';
 import useAuth from '../../../hooks/useAuth';
+import { apiGet } from '../../../lib/api';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { reviewResponseSchema, type ReviewResponseInput } from '../../../lib/validations/seller';
@@ -198,6 +199,20 @@ function CustomerRow({ customer }: { customer: Customer }) {
 export default function InsightsPage() {
   const user = useAuth((s) => s.user);
   const [activeTab, setActiveTab] = useState<'analytics' | 'deposits' | 'reviews' | 'customers'>('analytics');
+  const [followerCount, setFollowerCount] = useState(0);
+
+  // Fetch followers count
+  React.useEffect(() => {
+    if (user?.id) {
+      apiGet<{ _count: { storeFollowers: number } }>(`/users/${user.id}`)
+        .then((data) => {
+          setFollowerCount(data._count?.storeFollowers || 0);
+        })
+        .catch(() => {
+          setFollowerCount(0);
+        });
+    }
+  }, [user?.id]);
 
   // Mock data - replace with actual API calls
   const analyticsMetrics: AnalyticsMetric[] = [
@@ -228,8 +243,14 @@ export default function InsightsPage() {
       value: 67,
       change: 12,
       icon: <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
       </svg>,
+    },
+    {
+      label: 'Followers',
+      value: followerCount,
+      change: 0,
+      icon: <IconUsers />,
     },
   ];
 
@@ -353,7 +374,7 @@ export default function InsightsPage() {
       {/* Tab Content */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {analyticsMetrics.map((metric, index) => (
               <AnalyticsMetricCard key={index} metric={metric} />
             ))}

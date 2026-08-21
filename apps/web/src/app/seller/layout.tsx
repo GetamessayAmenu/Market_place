@@ -2,6 +2,7 @@ import React from 'react'
 
 import SellerSidebar from '../../components/seller/SellerSidebar'
 import SellerHeader from '../../components/seller/SellerHeader'
+import SellerBottomNav from '../../components/seller/SellerBottomNav'
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
 
       {/* Sidebar + Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar (Desktop) */}
         <SellerSidebar />
 
         {/* Main scrollable area */}
@@ -24,6 +25,9 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
           </div>
         </main>
       </div>
+
+      {/* Bottom Navigation (Mobile) */}
+      <SellerBottomNav />
     </div>
   )
 }

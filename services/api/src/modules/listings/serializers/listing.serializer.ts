@@ -47,6 +47,10 @@ export interface SerializedListing {
   readonly availableForPurchase: boolean;
   readonly availableForRent: boolean;
   readonly customOrderAvailable: boolean;
+  readonly supportsReadyMade: boolean;
+  readonly supportsCustomDesign: boolean;
+  readonly startingCustomPrice: number | null;
+  readonly estimatedProductionDays: number | null;
   readonly rentalPricePerDay: number | null;
   readonly rentalDeposit: number | null;
   readonly attributes: Record<string, unknown> | null;
@@ -105,6 +109,10 @@ export function serializeListing(
     availableForPurchase: listing.availableForPurchase,
     availableForRent: listing.availableForRent,
     customOrderAvailable: listing.customOrderAvailable,
+    supportsReadyMade: listing.supportsReadyMade ?? true,
+    supportsCustomDesign: listing.supportsCustomDesign ?? false,
+    startingCustomPrice: decimalToNumber(listing.startingCustomPrice),
+    estimatedProductionDays: listing.estimatedProductionDays,
     rentalPricePerDay: decimalToNumber(listing.rentalPricePerDay),
     rentalDeposit: decimalToNumber(listing.rentalDeposit),
     attributes: parseAttributes(listing.attributes),
@@ -162,6 +170,8 @@ export function serializeListingSummary(
   | 'availableForPurchase'
   | 'availableForRent'
   | 'customOrderAvailable'
+  | 'supportsReadyMade'
+  | 'supportsCustomDesign'
   | 'rentalPricePerDay'
   | 'rentalDeposit'
   | 'rejectedReason'
@@ -186,6 +196,8 @@ export function serializeListingSummary(
     availableForPurchase: full.availableForPurchase,
     availableForRent: full.availableForRent,
     customOrderAvailable: full.customOrderAvailable,
+    supportsReadyMade: full.supportsReadyMade,
+    supportsCustomDesign: full.supportsCustomDesign,
     rentalPricePerDay: full.rentalPricePerDay,
     rentalDeposit: full.rentalDeposit,
     rejectedReason: full.rejectedReason,

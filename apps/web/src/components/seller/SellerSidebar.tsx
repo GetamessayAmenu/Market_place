@@ -9,6 +9,7 @@ interface SidebarItem {
   href: string;
   icon?: React.ReactNode;
   badge?: number | string;
+  section?: string;
 }
 
 /* ── SVG Icons (16×16) ────────────────────────────────────────────────────── */
@@ -23,18 +24,6 @@ const IconCatalog = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6z" />
-  </svg>
-);
-
-const IconOrders = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
-  </svg>
-);
-
-const IconRentalQueue = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25z" />
   </svg>
 );
 
@@ -59,13 +48,20 @@ const IconInsights = () => (
 /* ── Default Items ────────────────────────────────────────────────────────── */
 
 const sellerHubItems: SidebarItem[] = [
-  { label: 'Overview', href: '/seller/dashboard', icon: <IconDashboard /> },
-  { label: 'Catalog & Stock', href: '/seller/catalog', icon: <IconCatalog /> },
-  { label: 'Orders & Requests Pipeline', href: '/seller/orders', icon: <IconOrders /> },
-  { label: 'Rental Queue', href: '/seller/orders/rental-queue', icon: <IconRentalQueue /> },
-  { label: 'Messages', href: '/seller/messages', icon: <IconMessages />, badge: 0 },
-  { label: 'Store & Profile', href: '/seller/store', icon: <IconStore /> },
-  { label: 'Insights & Feedback', href: '/seller/insights', icon: <IconInsights /> },
+  { label: 'Overview', href: '/seller', icon: <IconDashboard />, section: 'Seller Hub' },
+  { label: 'Listings', href: '/seller/listings', icon: <IconCatalog />, section: 'Seller Hub' },
+  { label: 'Messages', href: '/seller/messages', icon: <IconMessages />, badge: 0, section: 'Seller Hub' },
+  { label: 'Insights & Analytics', href: '/seller/insights', icon: <IconInsights />, section: 'Seller Hub' },
+];
+
+const accountItems: SidebarItem[] = [
+  { label: 'My Rentals', href: '/dashboard/rentals', icon: <IconInsights />, section: 'Account' },
+  { label: 'Saved Items', href: '/dashboard/saved', icon: <IconStore />, section: 'Account' },
+  { label: 'Following', href: '/account/following', icon: <IconStore />, section: 'Account' },
+  { label: 'Notifications', href: '/dashboard/notifications', icon: <IconMessages />, section: 'Account' },
+  { label: 'Profile', href: '/dashboard/profile', icon: <IconStore />, section: 'Account' },
+  { label: 'Settings', href: '/dashboard/settings/account', icon: <IconDashboard />, section: 'Account' },
+  { label: 'Security', href: '/dashboard/settings/security', icon: <IconDashboard />, section: 'Account' },
 ];
 
 /* ── Badge ─────────────────────────────────────────────────────────────────── */
@@ -90,10 +86,19 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
-  const items = sellerHubItems.map(item => ({
-    ...item,
-    badge: item.href === '/seller/messages' ? unreadMessageCount : item.badge
-  }));
+  const allItems = [...sellerHubItems, ...accountItems].map(item => {
+    const newItem = { ...item };
+    if (item.href === '/seller/messages') {
+      newItem.badge = unreadMessageCount;
+    }
+    return newItem;
+  });
+
+  const sections = allItems.reduce<Record<string, SidebarItem[]>>((acc, item) => {
+    const section = item.section ?? 'Other';
+    (acc[section] ??= []).push(item);
+    return acc;
+  }, {});
 
   return (
     <aside
@@ -126,50 +131,59 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Seller hub navigation">
-        <div className="space-y-0.5">
-          {items.map((item) => {
-            const isActive = item.href === '/seller/orders'
-              ? pathname === '/seller/orders'
-              : pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-foreground/70 hover:bg-muted hover:text-foreground'
-                )}
-                aria-current={isActive ? 'page' : undefined}
-                title={collapsed ? item.label : undefined}
-              >
-                {/* Active indicator bar */}
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
-                )}
-                {item.icon && (
-                  <span className={cn('flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')}>
-                    {item.icon}
-                  </span>
-                )}
-                {!collapsed && (
-                  <>
-                    <span className="truncate">{item.label}</span>
-                    {item.badge !== undefined && item.badge !== 0 && (
-                      <SidebarBadge value={item.badge} />
+        {Object.entries(sections).map(([sectionName, sectionItems]) => (
+          <div key={sectionName} className="mb-4">
+            {!collapsed && (
+              <p className="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {sectionName}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {sectionItems.map((item) => {
+                const isActive = item.href === '/seller/orders'
+                  ? pathname === '/seller/orders'
+                  : pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-foreground/70 hover:bg-muted hover:text-foreground'
                     )}
-                  </>
-                )}
-                {collapsed && item.badge !== undefined && item.badge !== 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
-                    {typeof item.badge === 'number' && item.badge > 9 ? '9+' : String(item.badge)}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+                    aria-current={isActive ? 'page' : undefined}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    {/* Active indicator bar */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                    )}
+                    {item.icon && (
+                      <span className={cn('flex-shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')}>
+                        {item.icon}
+                      </span>
+                    )}
+                    {!collapsed && (
+                      <>
+                        <span className="truncate">{item.label}</span>
+                        {item.badge !== undefined && item.badge !== 0 && (
+                          <SidebarBadge value={item.badge} />
+                        )}
+                      </>
+                    )}
+                    {collapsed && item.badge !== undefined && item.badge !== 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                        {typeof item.badge === 'number' && item.badge > 9 ? '9+' : String(item.badge)}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
     </aside>
   );

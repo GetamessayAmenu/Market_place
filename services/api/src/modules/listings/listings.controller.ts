@@ -136,6 +136,16 @@ export class ListingsController {
     return this.listingsService.getPriceHistory(id);
   }
 
+  @Public()
+  @OptionalAuth()
+  @Get(':id/related')
+  getRelatedListings(
+    @Param('id') id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.listingsService.getRelatedListings(id, user);
+  }
+
   @UseGuards(PermissionsGuard, ListingOwnerGuard)
   @Permissions({ resource: 'listing', action: 'update' })
   @Patch(':id/mark-unavailable')

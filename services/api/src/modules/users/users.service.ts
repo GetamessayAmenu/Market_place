@@ -14,14 +14,26 @@ import type { UserQueryDto } from './dto/user-query.dto';
 import type { UserWithRole } from './users.repository';
 import { UsersRepository } from './users.repository';
 
-type UserWithProfileCount = UserWithRole & {
-  readonly _count: {
-    readonly listings: number;
-    readonly favorites: number;
-    readonly reportsFiled: number;
-    readonly notifications: number;
-  };
-};
+// Simple event emitter for Socket.IO integration
+class EventEmitter {
+  private listeners: Map<string, Set<(data: any) => void>> = new Map();
+
+  on(event: string, callback: (data: any) => void) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(callback);
+  }
+
+  emit(event: string, data: any) {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      callbacks.forEach(callback => callback(data));
+    }
+  }
+}
+
+export const eventEmitter = new EventEmitter();
 
 @Injectable()
 export class UsersService {
@@ -172,26 +184,38 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.usersRepository.findProfileById(id);
-    if (!user) throw new NotFoundException('User not found');
-    return {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      phone: user.phone,
-      status: user.status,
-      role: user.role.slug,
-      emailVerifiedAt: user.emailVerifiedAt,
-      phoneVerifiedAt: user.phoneVerifiedAt,
-      lastLoginAt: user.lastLoginAt,
-      createdAt: user.createdAt,
-      counts: {
-        listings: (user as UserWithProfileCount)._count.listings,
-        favorites: (user as UserWithProfileCount)._count.favorites,
-        reportsFiled: (user as UserWithProfileCount)._count.reportsFiled,
-      },
-    };
+    try {
+      const user = await this.usersRepository.findProfileById(id);
+      if (!user) throw new NotFoundException('User not found');
+      
+      // Return a simplified version to avoid circular references
+      return {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        bio: user.bio,
+        location: user.location,
+        sellerType: user.sellerType,
+        coverImageUrl: user.coverImageUrl,
+        specialties: user.specialties,
+        socialLinks: user.socialLinks,
+        responseRate: user.responseRate,
+        responseTimeHours: user.responseTimeHours,
+        totalSales: user.totalSales,
+        status: user.status,
+        role: user.role.slug,
+        emailVerifiedAt: user.emailVerifiedAt,
+        phoneVerifiedAt: user.phoneVerifiedAt,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        _count: user._count || { listings: 0, storeFollowers: 0 },
+      };
+    } catch (error) {
+      console.error('Error in findOne:', error);
+      throw error;
+    }
   }
 
   async adminUpdate(admin: { id: string }, targetUserId: string, dto: AdminUpdateUserDto) {
@@ -246,5 +270,70 @@ export class UsersService {
       // non-fatal
     }
     return { deleted: true };
+  }
+
+  // ─── Store Follow Feature ───────────────────────────────────────────────────
+
+  async toggleStoreFollow(userId: string, storeId: string) {
+    const store = await this.usersRepository.findActiveById(storeId);
+    if (!store) throw new NotFoundException('Store not found');
+
+    const existingFollow = await this.usersRepository.findStoreFollow(userId, storeId);
+
+    if (existingFollow) {
+      // Unfollow
+      await this.usersRepository.deleteStoreFollow(existingFollow.id);
+      const followerCount = await this.usersRepository.countStoreFollowers(storeId);
+      
+      // Emit real-time event
+      eventEmitter.emit('store_follower_updated', {
+        storeId,
+        followerCount,
+        isFollowing: false,
+        userId,
+      });
+      
+      return { isFollowing: false, followerCount };
+    } else {
+      // Follow
+      await this.usersRepository.createStoreFollow(userId, storeId);
+      const followerCount = await this.usersRepository.countStoreFollowers(storeId);
+      
+      // Emit real-time event
+      eventEmitter.emit('store_follower_updated', {
+        storeId,
+        followerCount,
+        isFollowing: true,
+        userId,
+      });
+      
+      return { isFollowing: true, followerCount };
+    }
+  }
+
+  async getFollowing(userId: string) {
+    const follows = await this.usersRepository.findStoreFollowsByFollower(userId);
+
+    return follows.map((follow: any) => ({
+      id: follow.id,
+      storeId: follow.storeId,
+      store: follow.store,
+      followedAt: follow.createdAt,
+    }));
+  }
+
+  async findUserListings(userId: string) {
+    const listings = await this.usersRepository.findUserListings(userId);
+
+    return {
+      success: true,
+      data: listings,
+      meta: {
+        total: listings.length,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      },
+    };
   }
 }

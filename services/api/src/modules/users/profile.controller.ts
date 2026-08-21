@@ -1,6 +1,8 @@
-import { Body, Controller, Delete, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -10,7 +12,15 @@ import { UsersService } from './users.service';
 export class ProfileController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Specific routes must come before parameterized routes
+  @Get('following')
+  @UseGuards(JwtAuthGuard)
+  getFollowing(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getFollowing(user.id);
+  }
+
   @Patch('me')
+  @UseGuards(JwtAuthGuard)
   updateProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateProfileDto,
@@ -19,7 +29,32 @@ export class ProfileController {
   }
 
   @Delete('me')
+  @UseGuards(JwtAuthGuard)
   deleteSelf(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.deleteSelf(user.id);
+  }
+
+  // Parameterized routes
+  @Public()
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  @Public()
+  @Get(':id/listings')
+  findUserListings(@Param('id') id: string) {
+    return this.usersService.findUserListings(id);
+  }
+
+  // ─── Store Follow Feature ───────────────────────────────────────────────────
+
+  @Post('stores/:storeId/follow')
+  @UseGuards(JwtAuthGuard)
+  toggleStoreFollow(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('storeId') storeId: string,
+  ) {
+    return this.usersService.toggleStoreFollow(user.id, storeId);
   }
 }

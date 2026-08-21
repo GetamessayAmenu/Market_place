@@ -222,6 +222,13 @@ export class SellerController {
     return this.sellerService.updatePromotions(user.id, data);
   }
 
+  // ─── Store Follow Feature ───────────────────────────────────────────────────
+
+  @Post('followers')
+  getFollowers(@CurrentUser() user: AuthenticatedUser) {
+    return this.sellerService.getFollowers(user.id);
+  }
+
   // ─── Hub 6: Insights & Customer Feedback ───────────────────────────────────
 
   @Get('analytics')

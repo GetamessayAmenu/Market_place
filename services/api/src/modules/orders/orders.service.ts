@@ -299,7 +299,13 @@ export class OrdersService {
     // Log system message to conversation if exists
     if (order.conversationId) {
       try {
-        const statusMessage = this.formatStatusChangeMessage(dto.status, user.displayName);
+        // Fetch user details to get displayName
+        const userDetails = await (this.ordersRepository as any).prisma.user.findUnique({
+          where: { id: user.id },
+          select: { displayName: true }
+        });
+        
+        const statusMessage = this.formatStatusChangeMessage(dto.status, userDetails?.displayName || user.email);
         await (this.ordersRepository as any).prisma.message.create({
           data: {
             conversationId: order.conversationId,
@@ -312,7 +318,7 @@ export class OrdersService {
                 orderNumber: order.orderNumber,
                 previousStatus: order.status,
                 newStatus: dto.status,
-                updatedBy: user.displayName,
+                updatedBy: userDetails?.displayName || user.email,
               }
             }),
             metadata: {

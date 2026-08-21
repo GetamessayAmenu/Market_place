@@ -110,6 +110,72 @@ export default function SecuritySettingsPage() {
         </form>
       </div>
 
+      {/* Progressive Verification */}
+      <div className="max-w-lg rounded-lg border bg-card p-6 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">Verification Status</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Verify your account to build trust with buyers and sellers. Phone verification is recommended but not required.
+        </p>
+
+        <div className="space-y-3">
+          {/* Email Verification */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex items-center gap-3">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${user.emailVerified ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+                {user.emailVerified ? (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-sm">Email Verified</p>
+                <p className="text-xs text-muted-foreground">Required for account recovery</p>
+              </div>
+            </div>
+            <span className={`text-xs font-medium ${user.emailVerified ? 'text-green-600' : 'text-muted-foreground'}`}>
+              {user.emailVerified ? 'Verified' : 'Not Verified'}
+            </span>
+          </div>
+
+          {/* Phone Verification */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="flex items-center gap-3">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${user.phoneVerified ? 'bg-green-100 text-green-600' : 'bg-brand-gold/10 text-brand-gold'}`}>
+                {user.phoneVerified ? (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-sm">Phone Verified</p>
+                <p className="text-xs text-muted-foreground">Recommended for trust signals</p>
+              </div>
+            </div>
+            <span className={`text-xs font-medium ${user.phoneVerified ? 'text-green-600' : 'text-brand-gold'}`}>
+              {user.phoneVerified ? 'Verified' : 'Recommended'}
+            </span>
+          </div>
+        </div>
+
+        {!user.phoneVerified && (
+          <div className="mt-4 p-3 bg-brand-gold/5 border border-brand-gold/20 rounded-lg">
+            <p className="text-xs text-brand-gold">
+              <strong>Tip:</strong> Phone verified sellers get more inquiries and appear more trustworthy to buyers.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Account info */}
       <div className="max-w-lg rounded-lg border bg-card p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Account Information</h2>
@@ -125,6 +191,10 @@ export default function SecuritySettingsPage() {
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Email Verified</dt>
             <dd className="font-medium">{user.emailVerified ? 'Yes' : 'No'}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Phone Verified</dt>
+            <dd className="font-medium">{user.phoneVerified ? 'Yes' : 'No'}</dd>
           </div>
         </dl>
       </div>
