@@ -56,8 +56,8 @@ export default function NewListingPage() {
         } : {}),
       };
 
-      const result = await apiPost<{ id: string }>('/listings', apiData);
-      
+      await apiPost<{ id: string }>('/listings', apiData);
+
       // Show success message
       setSuccess(true);
     } catch (err: any) {

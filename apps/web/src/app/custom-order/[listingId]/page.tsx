@@ -5,9 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 
 import Container from '../../../components/Container'
 import BreadcrumbNav from '../../../components/marketplace/BreadcrumbNav'
-import CustomOrderForm, { type CustomOrderFormData } from '../../../components/marketplace/CustomOrderForm'
-import { useAuth } from '../../../hooks/useAuth'
-import { createCustomOrder } from '../../../lib/marketplaceApi'
+import CustomOrderForm from '../../../components/marketplace/CustomOrderForm'
 import { serverGet } from '../../../lib/serverApi'
 
 interface ListingData {
@@ -27,10 +25,8 @@ interface Props {
 export default function CustomOrderPage({ params }: Props) {
   const { listingId } = params
   const router = useRouter()
-  const { user } = useAuth()
   const [listing, setListing] = useState<ListingData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -48,31 +44,9 @@ export default function CustomOrderPage({ params }: Props) {
     void fetchListing()
   }, [listingId])
 
-  const handleSubmit = useCallback(async (data: CustomOrderFormData) => {
-    if (!user) {
-      router.push(`/login?redirect=/custom-order/${listingId}`)
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      await createCustomOrder({
-        listingId,
-        measurements: data.measurements as unknown as Record<string, unknown>,
-        ...(data.fabricChoice ? { fabricChoice: data.fabricChoice } : {}),
-        ...(data.colorChoice ? { colorChoice: data.colorChoice } : {}),
-        ...(data.designNotes ? { designNotes: data.designNotes } : {}),
-        ...(data.referenceImages.length > 0 ? { referenceImages: data.referenceImages } : {}),
-      })
-      setSuccess('Your custom order has been submitted! The designer will review your specifications and get back to you.')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit custom order')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [user, listingId, router])
+  const handleSuccess = useCallback(() => {
+    setSuccess('Your custom order has been submitted! The designer will review your specifications and get back to you.')
+  }, [])
 
   if (loading) {
     return (
@@ -155,11 +129,18 @@ export default function CustomOrderPage({ params }: Props) {
 
         <CustomOrderForm
           listingId={listingId}
-          basePrice={listing.price}
+          sellerId={listing.seller.id}
+          startingPrice={listing.price}
           estimatedDays={14}
-          currency={listing.currency}
-          onSubmit={(data) => { void handleSubmit(data) }}
-          isSubmitting={isSubmitting}
+          customizationOptions={{
+            requiresMeasurements: true,
+            fabricTypes: ['Cotton', 'Silk', 'Linen', 'Polyester'],
+            colors: ['Red', 'Blue', 'Green', 'Black', 'White', 'Gold'],
+            embroideryTypes: ['Traditional', 'Modern', 'Minimal'],
+            customNotesAllowed: true,
+          }}
+          onClose={() => { router.push(`/listings/${listingId}`) }}
+          onSuccess={handleSuccess}
         />
       </section>
     </Container>

@@ -63,9 +63,13 @@ export default function BuyCheckoutPage({ params }: Props) {
       setError('Please fill in all required fields')
       return
     }
+    if (!listing) {
+      setError('Listing not found')
+      return
+    }
     setIsSubmitting(true)
     setError(null)
-    
+
     try {
       const orderData = {
         type: 'SALE' as const,

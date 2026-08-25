@@ -16,7 +16,8 @@ export interface PricingData {
   rentalDeposit: string;
   minimumRentalDays: string;
   // Custom-specific
-  estimatedDays: string;
+  startingCustomPrice: string;
+  estimatedProductionDays: string;
   customizationNotes: string;
 }
 
@@ -27,7 +28,8 @@ export const DEFAULT_PRICING: PricingData = {
   rentalPricePerDay: '',
   rentalDeposit: '',
   minimumRentalDays: '1',
-  estimatedDays: '14',
+  startingCustomPrice: '',
+  estimatedProductionDays: '14',
   customizationNotes: '',
 };
 
@@ -117,14 +119,25 @@ export default function PricingSection({ listingType, data, onChange, errors }: 
           />
         )}
 
+        {/* Custom: starting price */}
+        {listingType === 'custom' && (
+          <FormInput
+            label="Starting Price ($)"
+            type="number"
+            placeholder="0.00"
+            value={data.startingCustomPrice}
+            onChange={(e) => { update('startingCustomPrice', e.target.value); }}
+          />
+        )}
+
         {/* Custom: estimated days */}
         {listingType === 'custom' && (
           <FormInput
             label="Estimated Completion (days)"
             type="number"
             placeholder="14"
-            value={data.estimatedDays}
-            onChange={(e) => { update('estimatedDays', e.target.value); }}
+            value={data.estimatedProductionDays}
+            onChange={(e) => { update('estimatedProductionDays', e.target.value); }}
           />
         )}
       </div>
@@ -180,10 +193,10 @@ export default function PricingSection({ listingType, data, onChange, errors }: 
               <span className="font-medium">${Number(data.rentalDeposit).toLocaleString()}</span>
             </div>
           )}
-          {listingType === 'custom' && data.estimatedDays && (
+          {listingType === 'custom' && data.estimatedProductionDays && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Est. completion</span>
-              <span className="font-medium">{data.estimatedDays} days</span>
+              <span className="font-medium">{data.estimatedProductionDays} days</span>
             </div>
           )}
         </div>

@@ -4,6 +4,14 @@ import React, { useState } from 'react'
 
 import { useAuth } from '../../hooks/useAuth'
 
+export interface CustomOrderFormData {
+  measurements: Record<string, string>
+  fabricChoice?: string
+  colorChoice?: string
+  designNotes?: string
+  referenceImages?: string[]
+}
+
 interface CustomOrderFormProps {
   listingId: string
   sellerId: string

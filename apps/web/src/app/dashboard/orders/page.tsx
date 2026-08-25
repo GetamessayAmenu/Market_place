@@ -193,7 +193,7 @@ export default function OrdersPage() {
             <Card key={order.id}>
               <CardContent className="p-6">
                 <div className="flex gap-4">
-                  {order.product.images[0] && (
+                  {order.product?.images[0] && (
                     <img
                       src={order.product.images[0].url}
                       alt={order.product.title}
@@ -255,7 +255,7 @@ export default function OrdersPage() {
                         >
                           View Details
                         </Button>
-                        {order.status === 'INTENT_PLACED' && user?.role === 'seller' && (
+                        {order.status === 'INQUIRY_PENDING' && user?.role === 'seller' && (
                           <Button 
                             size="sm"
                             onClick={() => router.push(`/dashboard/orders/${order.id}`)}

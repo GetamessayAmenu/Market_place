@@ -6,13 +6,11 @@ import Container from '../../../components/Container'
 import FavoriteButton from '../../../components/marketplace/FavoriteButton'
 import ImageGallery from '../../../components/marketplace/ImageGallery'
 import ListingAttributes from '../../../components/marketplace/ListingAttributes'
-import ListingCard from '../../../components/marketplace/ListingCard'
 import MarkUnavailableButton from '../../../components/marketplace/MarkUnavailableButton'
 import MoreFromSeller from '../../../components/marketplace/MoreFromSeller'
 import PostSimilarAdButton from '../../../components/marketplace/PostSimilarAdButton'
 import PriceHistoryButton from '../../../components/marketplace/PriceHistoryButton'
 import ReportAbuseButton from '../../../components/marketplace/ReportAbuseButton'
-import ReviewSection from '../../../components/marketplace/ReviewSection'
 import SafetyTips from '../../../components/marketplace/SafetyTips'
 import ShareButton from '../../../components/marketplace/ShareButton'
 import RevealContact from '../../../components/marketplace/RevealContact'
@@ -79,6 +77,7 @@ interface ListingData {
     embroideryTypes: string[]
     customNotesAllowed: boolean
   }
+  attributes?: Record<string, unknown> | null
   createdAt: string
 }
 
@@ -138,9 +137,18 @@ export default async function ListingPage({ params }: Props) {
 
   if (listing) {
     try {
-      relatedData = await serverGet<typeof relatedData>(`/listings/${id}/related`, {
+      const relatedRes = await serverGet<{
+        moreFromSeller: any[]
+        youMayAlsoLike: any[]
+        seller: {
+          id: string
+          displayName: string
+          avatarUrl?: string | null
+        }
+      }>(`/listings/${id}/related`, {
         revalidate: 60,
       })
+      relatedData = relatedRes
     } catch {
       // Graceful fallback - related sections won't show
     }
@@ -195,8 +203,6 @@ export default async function ListingPage({ params }: Props) {
     } : {}),
   }
 
-  const hasActions = (listing.availableForPurchase ?? false) || (listing.availableForRent ?? false) || (listing.customOrderAvailable ?? false)
-
   const currentUser = await optionalUser()
   const isOwner = currentUser ? currentUser.id === listing.seller?.id : false
 
@@ -231,11 +237,11 @@ export default async function ListingPage({ params }: Props) {
               <div className="prose prose-base max-w-none text-muted-foreground whitespace-pre-wrap leading-relaxed">{listing.description}</div>
               
               {/* Listing Attributes */}
-              <ListingAttributes 
-                customizationOptions={listing.customizationOptions}
-                attributes={listing.attributes}
+              <ListingAttributes
+                {...(listing.customizationOptions ? { customizationOptions: listing.customizationOptions } : {})}
+                {...(listing.attributes ? { attributes: listing.attributes as Record<string, unknown> } : {})}
                 condition={listing.condition}
-                category={listing.category}
+                {...(listing.category ? { category: { name: listing.category.name } } : {})}
               />
             </div>
           </div>
@@ -369,18 +375,16 @@ export default async function ListingPage({ params }: Props) {
         </div>
 
         {/* Related Products */}
-        {relatedData && (
+        {relatedData && relatedData.moreFromSeller && relatedData.moreFromSeller.length > 0 && (
           <div className="mt-12 space-y-8">
             {/* More from this seller */}
-            {relatedData.moreFromSeller.length > 0 && (
-              <MoreFromSeller
-                listings={relatedData.moreFromSeller}
-                seller={relatedData.seller}
-              />
-            )}
+            <MoreFromSeller
+              listings={relatedData.moreFromSeller}
+              seller={relatedData.seller}
+            />
 
             {/* You may also like */}
-            {relatedData.youMayAlsoLike.length > 0 && (
+            {relatedData.youMayAlsoLike && relatedData.youMayAlsoLike.length > 0 && (
               <YouMayAlsoLike listings={relatedData.youMayAlsoLike} />
             )}
           </div>

@@ -8,10 +8,7 @@ import ImageGallery from '../../../components/marketplace/ImageGallery'
 import ListingAttributes from '../../../components/marketplace/ListingAttributes'
 import ListingCard from '../../../components/marketplace/ListingCard'
 import MarkUnavailableButton from '../../../components/marketplace/MarkUnavailableButton'
-import PostSimilarAdButton from '../../../components/marketplace/PostSimilarAdButton'
-import PriceHistoryButton from '../../../components/marketplace/PriceHistoryButton'
 import ReportAbuseButton from '../../../components/marketplace/ReportAbuseButton'
-import ReviewSection from '../../../components/marketplace/ReviewSection'
 import SafetyTips from '../../../components/marketplace/SafetyTips'
 import ShareButton from '../../../components/marketplace/ShareButton'
 import RevealContact from '../../../components/marketplace/RevealContact'
@@ -250,11 +247,11 @@ export default async function ProductPage({ params }: Props) {
               <div className="prose prose-base max-w-none text-muted-foreground whitespace-pre-wrap leading-relaxed">{listing.description}</div>
               
               {/* Listing Attributes */}
-              <ListingAttributes 
-                customizationOptions={listing.customizationOptions}
-                attributes={listing.attributes}
+              <ListingAttributes
+                {...(listing.customizationOptions ? { customizationOptions: listing.customizationOptions } : {})}
+                {...(listing.attributes ? { attributes: listing.attributes as Record<string, unknown> } : {})}
                 condition={listing.condition}
-                category={listing.category}
+                {...(listing.category ? { category: { name: listing.category.name } } : {})}
               />
             </div>
           </div>

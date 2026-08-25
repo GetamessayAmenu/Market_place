@@ -959,12 +959,12 @@ export class ListingsService {
       throw new ListingNotFoundException();
     }
 
-    // Get "More from this seller" - same seller, active listings, exclude current
+    // Get "More from this seller" - same seller, active listings only, exclude current
     const sellerListings = await this.listingsRepository.findManyWithRelations({
       where: {
         sellerId: listing.sellerId,
         id: { not: listingId },
-        status: { in: ['active', 'sold'] },
+        status: 'active',
         deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
@@ -990,7 +990,7 @@ export class ListingsService {
       where: {
         id: { not: listingId },
         sellerId: { not: listing.sellerId },
-        status: { in: ['active', 'sold'] },
+        status: 'active',
         deletedAt: null,
         OR: [
           { categoryId: listing.categoryId },

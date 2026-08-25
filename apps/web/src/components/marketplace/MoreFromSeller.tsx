@@ -40,9 +40,11 @@ export default function MoreFromSeller({ listings, seller }: MoreFromSellerProps
       </div>
 
       {/* Horizontal scroll container for mobile, grid for desktop */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 snap-x snap-mandatory">
         {listings.map((listing) => (
-          <RelatedProductCard key={listing.id} {...listing} />
+          <div key={listing.id} className="flex-shrink-0 w-[160px] snap-start lg:w-auto lg:flex-shrink-0">
+            <RelatedProductCard {...listing} />
+          </div>
         ))}
       </div>
     </section>
