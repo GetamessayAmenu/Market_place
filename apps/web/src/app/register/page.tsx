@@ -459,11 +459,11 @@ function RegisterForm() {
 
         {userType === 'seller' && (
           <div className="bg-brand-gold/5 border border-brand-gold/20 rounded-lg p-3 text-sm">
-            <p className="font-medium text-foreground mb-1">📋 Seller Requirements</p>
+            <p className="font-medium text-foreground mb-1">📋 Seller Account</p>
             <ul className="text-xs text-muted-foreground space-y-0.5">
-              <li>• Your name must match your government-issued ID</li>
-              <li>• Phone number will be used for verification</li>
-              <li>• You'll need to complete ID verification before selling</li>
+              <li>• Your name will be displayed on your shop profile</li>
+              <li>• Phone number is used for order notifications</li>
+              <li>• Listings are reviewed by moderators before going public</li>
             </ul>
           </div>
         )}

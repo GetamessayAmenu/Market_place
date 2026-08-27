@@ -9,7 +9,6 @@ import useAuth from '../../../hooks/useAuth'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type ListingStatus = 'active' | 'paused' | 'pending' | 'sold' | 'rented'
 type BusinessModel = 'ready-made' | 'rental' | 'custom'
 
 interface Listing {
@@ -18,7 +17,8 @@ interface Listing {
   price: number
   currency: string
   imageUrl: string | undefined
-  status: ListingStatus
+  status: string
+  rejectedReason?: string | null
   businessModels: BusinessModel[]
   views: number
   inquiries: number
@@ -67,20 +67,23 @@ const IconToggle = () => (
 
 // ─── Status Badge ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: ListingStatus }) {
-  const config = {
-    active: { label: 'Live', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    active: { label: 'Published / Approved', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    pending_review: { label: 'Pending Review', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    pending: { label: 'Pending Review', className: 'bg-amber-100 text-amber-700 border-amber-200' },
+    rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 border-red-200' },
     paused: { label: 'Paused', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-    pending: { label: 'Pending', className: 'bg-amber-100 text-amber-700 border-amber-200' },
     sold: { label: 'Sold', className: 'bg-blue-100 text-blue-700 border-blue-200' },
     rented: { label: 'Rented', className: 'bg-purple-100 text-purple-700 border-purple-200' },
+    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-200' },
   }
 
-  const { label, className } = config[status]
+  const item = config[status] || { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' }
 
   return (
-    <Badge className={className} variant="outline">
-      {label}
+    <Badge className={item.className} variant="outline">
+      {item.label}
     </Badge>
   )
 }
@@ -144,6 +147,16 @@ function ListingCard({ listing }: { listing: Listing }) {
             </p>
 
             <BusinessModelBadges models={listing.businessModels} />
+
+            {listing.status === 'rejected' && listing.rejectedReason && (
+              <div className="mt-2.5 p-2.5 rounded-md border border-red-200 bg-red-50 text-red-800 dark:bg-red-950/20 dark:border-red-900/30 text-xs">
+                <p className="font-semibold text-red-900 dark:text-red-300">Rejection Reason:</p>
+                <p className="mt-0.5 text-muted-foreground">{listing.rejectedReason}</p>
+                <Link href={`/seller/catalog/${listing.id}/edit`} className="inline-block mt-1.5 font-medium text-red-700 dark:text-red-300 underline hover:no-underline">
+                  Edit & Resubmit Listing →
+                </Link>
+              </div>
+            )}
 
             <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
               <span>{listing.views.toLocaleString()} views</span>
@@ -377,7 +390,7 @@ export default function ListingsManagementPage() {
             Manage your product listings, inventory, and availability.
           </p>
         </div>
-        <Link href="/seller/listings/new">
+        <Link href="/seller/catalog/new">
           <Button>
             <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -400,7 +413,7 @@ export default function ListingsManagementPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground">No listings found in this category.</p>
-              <Link href="/seller/listings/new" className="inline-block mt-4 text-primary hover:underline">
+              <Link href="/seller/catalog/new" className="inline-block mt-4 text-primary hover:underline">
                 Create your first listing
               </Link>
             </CardContent>

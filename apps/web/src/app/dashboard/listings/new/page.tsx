@@ -188,9 +188,9 @@ export default function NewListingPage() {
             </svg>
           </div>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Listing Published!</h2>
+            <h2 className="text-2xl font-bold mb-2">Listing Submitted for Review!</h2>
             <p className="text-muted-foreground">
-              Your listing "{watch('description')?.title || ''}" is now live and visible to buyers.
+              Your listing "{watch('description')?.title || ''}" has been submitted for review. It will become live and visible to buyers once approved by an admin.
             </p>
           </div>
           <div className="space-y-3">
@@ -743,7 +743,7 @@ export default function NewListingPage() {
                 <Spinner size="sm" /> Publishing...
               </span>
             ) : currentStep === 'preview' ? (
-              'Publish Listing'
+              'Submit Listing for Review'
             ) : (
               'Continue'
             )}

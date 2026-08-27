@@ -4,7 +4,6 @@ import type { AuthenticatedUser } from '../../../common/interfaces/authenticated
 const SELLER_OWNED_STATUSES: readonly ListingStatus[] = [
   'draft',
   'pending_review',
-  'active',
   'sold',
   'archived',
 ];
@@ -53,4 +52,18 @@ export function canSetListingStatus(
 
 export function isPublicListingStatus(status: ListingStatus): boolean {
   return status === 'active';
+}
+
+/**
+ * Evaluates the initial status for a newly submitted listing.
+ *
+ * Future scalability hooks:
+ * - Trusted sellers / verified status: can auto-approve directly to 'active'.
+ * - Suspicious / high-risk sellers: require prior seller approval or strict escalation.
+ * - Automated moderation scoring: low risk -> 'active', medium risk -> 'pending_review', high risk -> 'rejected'.
+ *
+ * Current active rule: All normal seller listings go to 'pending_review'.
+ */
+export function determineInitialListingStatus(_seller: AuthenticatedUser): ListingStatus {
+  return 'pending_review';
 }

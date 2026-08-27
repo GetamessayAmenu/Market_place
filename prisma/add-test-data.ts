@@ -108,6 +108,44 @@ async function addListing() {
   console.log(`✓ Listing created: ${listing.title} (ID: ${listing.id})`);
 }
 
+async function addImagesToListing() {
+  console.log('\n--- Add Images to Listing ---');
+  const listingSlug = await question('Listing Slug: ');
+  const imageCount = parseInt(await question('Number of images to add: '));
+
+  const listing = await prisma.listing.findUnique({ where: { slug: listingSlug } });
+  if (!listing) {
+    console.error(`Listing "${listingSlug}" not found`);
+    return;
+  }
+
+  const existingImages = await prisma.listingImage.findMany({
+    where: { listingId: listing.id },
+    orderBy: { sortOrder: 'desc' },
+  });
+
+  const startSortOrder = existingImages.length > 0 ? existingImages[0].sortOrder + 1 : 0;
+
+  for (let i = 0; i < imageCount; i++) {
+    const imageUrl = await question(`Image ${i + 1} URL: `);
+    const isPrimary = existingImages.length === 0 && i === 0 ? true : await question(`Is this the primary image? (y/n): `) === 'y';
+
+    await prisma.listingImage.create({
+      data: {
+        listingId: listing.id,
+        url: imageUrl,
+        cloudinaryPublicId: `test-${Date.now()}-${i}`,
+        sortOrder: startSortOrder + i,
+        isPrimary,
+      },
+    });
+
+    console.log(`✓ Image ${i + 1} added`);
+  }
+
+  console.log(`✓ ${imageCount} images added to listing "${listing.title}"`);
+}
+
 async function addOrder() {
   console.log('\n--- Add New Order ---');
   const buyerEmail = await question('Buyer Email: ');
@@ -242,13 +280,14 @@ async function main() {
     console.log('\nSelect an option:');
     console.log('1. Add User');
     console.log('2. Add Listing');
-    console.log('3. Add Order');
-    console.log('4. Add Review');
-    console.log('5. Add Conversation');
-    console.log('6. Show Statistics');
-    console.log('7. Exit');
+    console.log('3. Add Images to Listing');
+    console.log('4. Add Order');
+    console.log('5. Add Review');
+    console.log('6. Add Conversation');
+    console.log('7. Show Statistics');
+    console.log('8. Exit');
     
-    const choice = await question('\nEnter choice (1-7): ');
+    const choice = await question('\nEnter choice (1-8): ');
     
     switch (choice) {
       case '1':
@@ -258,18 +297,21 @@ async function main() {
         await addListing();
         break;
       case '3':
-        await addOrder();
+        await addImagesToListing();
         break;
       case '4':
-        await addReview();
+        await addOrder();
         break;
       case '5':
-        await addConversation();
+        await addReview();
         break;
       case '6':
-        await showStats();
+        await addConversation();
         break;
       case '7':
+        await showStats();
+        break;
+      case '8':
         console.log('Goodbye!');
         rl.close();
         await prisma.$disconnect();

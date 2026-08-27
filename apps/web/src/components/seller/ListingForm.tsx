@@ -1,21 +1,16 @@
 "use client"
 import { Alert, Button, Card, CardContent, Checkbox, FormInput, FormSelect, FormTextarea, Select, Spinner } from '@marketplace/ui';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useCategories, type Category } from '../../hooks/useCategories';
 import { useImageUpload, type UploadedImage } from '../../hooks/useSeller';
 
-import DeliveryOptions, { DEFAULT_DELIVERY, type DeliveryData } from './DeliveryOptions';
-import ListingReviewSummary from './ListingReviewSummary';
 import ListingStepper, { type StepDef } from './ListingStepper';
-import ListingTypeSelector, { type ListingType } from './ListingTypeSelector';
-import PricingSection, { DEFAULT_PRICING, type PricingData } from './PricingSection';
-import TagInput from './TagInput';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ListingFormData {
-  listingType: ListingType;
+  listingType: 'sale' | 'rent';
   title: string;
   description: string;
   price: string;
@@ -23,7 +18,6 @@ export interface ListingFormData {
   categoryName: string;
   city: string;
   condition: string;
-  tags: string[];
   contactOptions: {
     showPhone: boolean;
     whatsapp: string;
@@ -31,25 +25,35 @@ export interface ListingFormData {
     inAppMessaging: boolean;
   };
   images: UploadedImage[];
-  pricing: PricingData;
-  delivery: DeliveryData;
-  // Unified custom design fields
-  supportsReadyMade?: boolean;
-  supportsCustomDesign?: boolean;
-  startingCustomPrice?: string;
-  estimatedProductionDays?: string;
-  customizationOptions?: {
-    requiresMeasurements: boolean;
-    fabricTypes: string[];
-    colors: string[];
-    embroideryTypes: string[];
-    customNotesAllowed: boolean;
-  };
+  // Product details (dynamic based on category)
+  productDetails?: {
+    size?: string;
+    color?: string;
+    material?: string;
+    gender?: string;
+    style?: string;
+  } | null;
+  // Rental information (conditional)
+  rentalInfo?: {
+    rentalPricePerDay: string;
+    rentalDeposit: string;
+    minRentalDays: string;
+    maxRentalDays: string;
+  } | null;
+  // Custom-made option
+  customOrderAvailable: boolean;
+  customDetails?: {
+    sizeAdjustments: boolean;
+    colorFabricChanges: boolean;
+    embroidery: boolean;
+    otherCustomization: string;
+    additionalCustomPrice: string;
+  } | null;
 }
 
 interface ListingFormProps {
   initialData?: Partial<ListingFormData>;
-  initialListingType?: ListingType;
+  initialListingType?: 'sale' | 'rent';
   onSubmit: (data: ListingFormData) => void;
   isSubmitting?: boolean;
   submitLabel?: string;
@@ -95,14 +99,17 @@ const STEP_ICONS = {
   ),
 };
 
-function getSteps(type: ListingType | null): StepDef[] {
-  return [
-    { id: 'info', label: 'Basic Information', description: 'Title, description, category', icon: STEP_ICONS.info },
-    { id: 'images', label: 'Photos', description: 'Upload up to 10 photos', icon: STEP_ICONS.image },
-    { id: 'pricing', label: 'Pricing', description: type === 'rent' ? 'Rental rates & deposit' : type === 'custom' ? 'Service pricing' : 'Set your price', icon: STEP_ICONS.pricing },
-    { id: 'delivery', label: 'Delivery & Availability', description: 'How buyers receive the item', icon: STEP_ICONS.delivery },
-    { id: 'review', label: 'Review & Publish', description: 'Confirm all details', icon: STEP_ICONS.review },
+function getSteps(type: 'sale' | 'rent' | null): StepDef[] {
+  const steps: StepDef[] = [
+    { id: 'photos', label: 'Photos', description: 'Upload 1-8 product photos', icon: STEP_ICONS.image },
+    { id: 'info', label: 'Basic Information', description: 'Title, category, description', icon: STEP_ICONS.info },
+    { id: 'details', label: 'Product Details', description: 'Size, color, material', icon: STEP_ICONS.info },
+    { id: 'type', label: 'Listing Type', description: 'For sale or for rent', icon: STEP_ICONS.pricing },
+    { id: 'custom', label: 'Custom Option', description: 'Custom-made available?', icon: STEP_ICONS.delivery },
+    { id: 'contact', label: 'Contact', description: 'How buyers reach you', icon: STEP_ICONS.delivery },
+    { id: 'review', label: 'Preview', description: 'Review before publishing', icon: STEP_ICONS.review },
   ];
+  return steps;
 }
 
 // ─── Image Upload Section ────────────────────────────────────────────────────
@@ -116,12 +123,14 @@ interface ImageUploadSectionProps {
 function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectionProps) {
   const { uploadImage, isUploading, uploadError, clearError } = useImageUpload();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const dragCounterRef = React.useRef(0);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
     for (const file of Array.from(files)) {
-      if (images.length >= 10) break;
+      if (images.length >= 8) break;
       const result = await uploadImage(file);
       if (result) {
         const updated = [...images, { ...result, sortOrder: images.length }];
@@ -129,6 +138,44 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    for (const file of files) {
+      if (images.length >= 8) break;
+      const result = await uploadImage(file);
+      if (result) {
+        const updated = [...images, { ...result, sortOrder: images.length }];
+        onImagesChange(updated);
+      }
+    }
   }
 
   function handleRemove(index: number) {
@@ -157,30 +204,53 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-medium">Listing Photos</h3>
-        <p className="text-sm text-muted-foreground">Upload up to 10 photos. The first photo will be the primary image.</p>
+        <h3 className="text-sm font-medium">Product Photos</h3>
+        <p className="text-sm text-muted-foreground">Upload 1-8 photos. The first photo will be the main product image. Show clear photos of the complete clothing item.</p>
       </div>
 
       {uploadError && <Alert variant="error" onDismiss={clearError}>{uploadError}</Alert>}
       {error !== undefined && <p className="text-sm text-destructive">{error}</p>}
 
-      <div className="flex items-center gap-3">
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+        }`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { void handleFileSelect(e); }} className="hidden" id="listing-images-input" />
-        <Button type="button" variant="outline" onClick={() => { fileInputRef.current?.click(); }} disabled={isUploading || images.length >= 10}>
-          {isUploading ? <span className="flex items-center gap-2"><Spinner size="sm" /> Uploading...</span> : 'Add Photos'}
-        </Button>
-        <span className="text-xs text-muted-foreground">{images.length}/10 photos</span>
+        <div className="space-y-3">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <svg className="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Drag and drop photos here</p>
+            <p className="text-xs text-muted-foreground">or click to browse</p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => { fileInputRef.current?.click(); }} disabled={isUploading || images.length >= 8}>
+            {isUploading ? <span className="flex items-center gap-2"><Spinner size="sm" /> Uploading...</span> : 'Select Photos'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{images.length}/8 photos</span>
+        <span>JPEG, PNG, WebP • Max 5MB each</span>
       </div>
 
       {images.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {images.map((img, index) => (
             <div key={img.cloudinaryPublicId} className="group relative overflow-hidden rounded-lg border bg-muted">
               <div className="aspect-square">
                 <img src={img.url} alt={'Photo ' + String(index + 1)} className="h-full w-full object-cover" />
               </div>
               {index === 0 && (
-                <div className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">Primary</div>
+                <div className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">Main</div>
               )}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="flex gap-0.5">
@@ -215,80 +285,155 @@ interface CategoryPickerProps {
   error?: string;
 }
 
+function categoryLabel(cat: Category) {
+  return cat.nameAm ? `${cat.name} (${cat.nameAm})` : cat.name;
+}
+
 function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
   const { data: catData, isLoading } = useCategories();
-  const categories = catData?.data ?? [];
+  const roots = useMemo(
+    () => (Array.isArray(catData) ? catData.filter((c) => !c.parentId) : []),
+    [catData],
+  );
 
-  const options: { value: string; label: string }[] = [{ value: '', label: 'Select a category' }];
-  const nameMap = useMemo(() => new Map<string, string>(), []);
-
-  function addCats(cats: Category[], prefix = '') {
-    for (const cat of cats) {
-      options.push({ value: cat.id, label: prefix + cat.name });
-      nameMap.set(cat.id, prefix + cat.name);
-      if (cat.children && cat.children.length > 0) {
-        addCats(cat.children, prefix + cat.name + ' > ');
-      }
+  const selectedParent = useMemo(() => {
+    for (const root of roots) {
+      if (root.id === value) return root;
+      if (root.children?.some((child) => child.id === value)) return root;
     }
+    return undefined;
+  }, [roots, value]);
+
+  const [parentId, setParentId] = useState(selectedParent?.id ?? '');
+
+  useEffect(() => {
+    if (selectedParent?.id) {
+      setParentId(selectedParent.id);
+    }
+  }, [selectedParent?.id]);
+
+  const parent = roots.find((c) => c.id === parentId);
+  const children = parent?.children ?? [];
+
+  const parentOptions = useMemo(
+    () => [
+      { value: '', label: 'Select a fashion category' },
+      ...roots.map((cat) => ({ value: cat.id, label: categoryLabel(cat) })),
+    ],
+    [roots],
+  );
+
+  const childOptions = useMemo(
+    () => [
+      { value: '', label: 'Select a subcategory' },
+      ...children.map((cat) => ({ value: cat.id, label: categoryLabel(cat) })),
+    ],
+    [children],
+  );
+
+  function handleParentChange(id: string) {
+    setParentId(id);
+    const nextParent = roots.find((c) => c.id === id);
+    if (!nextParent) {
+      onChange('', '');
+      return;
+    }
+    if (nextParent.children && nextParent.children.length > 0) {
+      onChange('', '');
+      return;
+    }
+    onChange(nextParent.id, categoryLabel(nextParent));
   }
-  addCats(categories);
+
+  function handleChildChange(id: string) {
+    const child = children.find((c) => c.id === id);
+    if (!child || !parent) {
+      onChange('', '');
+      return;
+    }
+    onChange(child.id, `${categoryLabel(parent)} > ${categoryLabel(child)}`);
+  }
 
   if (isLoading) {
     return (
-      <div>
+      <div className="sm:col-span-2">
         <label className="block text-sm font-medium text-foreground mb-1.5">Category</label>
         <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
-          <Spinner size="sm" /> Loading categories...
+          <Spinner size="sm" /> Loading fashion categories...
         </div>
       </div>
     );
   }
 
   return (
-    <Select
-      label="Category"
-      options={options}
-      value={value}
-      onChange={(e) => {
-        const id = e.target.value;
-        onChange(id, nameMap.get(id) ?? '');
-      }}
-      {...(error !== undefined && { error })}
-    />
+    <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+      <Select
+        label="Fashion category"
+        options={parentOptions}
+        value={parentId}
+        required
+        onChange={(e) => handleParentChange(e.target.value)}
+        {...(error !== undefined && !parentId ? { error } : {})}
+      />
+      {children.length > 0 && (
+        <Select
+          label="Subcategory"
+          options={childOptions}
+          value={children.some((c) => c.id === value) ? value : ''}
+          required
+          onChange={(e) => handleChildChange(e.target.value)}
+          {...(error !== undefined ? { error } : {})}
+        />
+      )}
+    </div>
   );
 }
 
 // ─── Main Form ───────────────────────────────────────────────────────────────
 
 export default function ListingForm({ initialData, initialListingType, onSubmit, isSubmitting, submitLabel = 'Publish Listing', error }: ListingFormProps) {
-  const [listingType, setListingType] = useState<ListingType | null>(initialListingType ?? initialData?.listingType ?? null);
+  const [listingType, setListingType] = useState<'sale' | 'rent' | null>(initialListingType ?? initialData?.listingType ?? null);
   const [step, setStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   // Form state
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [description, setDescription] = useState(initialData?.description ?? '');
+  const [price, setPrice] = useState(initialData?.price ?? '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId ?? '');
   const [categoryName, setCategoryName] = useState(initialData?.categoryName ?? '');
   const [city, setCity] = useState(initialData?.city ?? '');
   const [condition, setCondition] = useState(initialData?.condition ?? '');
-  const [tags, setTags] = useState<string[]>(initialData?.tags ?? []);
   const [images, setImages] = useState<UploadedImage[]>(initialData?.images ?? []);
-  const [pricing, setPricing] = useState<PricingData>(initialData?.pricing ?? { ...DEFAULT_PRICING, price: initialData?.price ?? '' });
-  const [delivery, setDelivery] = useState<DeliveryData>(initialData?.delivery ?? {
-    ...DEFAULT_DELIVERY,
-    supportsReadyMade: initialData?.supportsReadyMade ?? true,
-    supportsCustomDesign: initialData?.supportsCustomDesign ?? false,
-    startingCustomPrice: initialData?.startingCustomPrice ?? '',
-    estimatedProductionDays: initialData?.estimatedProductionDays ?? '',
-    customizationOptions: initialData?.customizationOptions ?? {
-      requiresMeasurements: false,
-      fabricTypes: [],
-      colors: [],
-      embroideryTypes: [],
-      customNotesAllowed: true,
-    },
+  
+  // Product details
+  const [productDetails, setProductDetails] = useState(initialData?.productDetails ?? {
+    size: '',
+    color: '',
+    material: '',
+    gender: '',
+    style: '',
   });
+  
+  // Rental info
+  const [rentalInfo, setRentalInfo] = useState(initialData?.rentalInfo ?? {
+    rentalPricePerDay: '',
+    rentalDeposit: '',
+    minRentalDays: '',
+    maxRentalDays: '',
+  });
+  
+  // Custom order
+  const [customOrderAvailable, setCustomOrderAvailable] = useState(initialData?.customOrderAvailable ?? false);
+  const [customDetails, setCustomDetails] = useState(initialData?.customDetails ?? {
+    sizeAdjustments: false,
+    colorFabricChanges: false,
+    embroidery: false,
+    otherCustomization: '',
+    additionalCustomPrice: '',
+  });
+  
+  // Contact options
   const [contactOptions, setContactOptions] = useState(initialData?.contactOptions ?? {
     showPhone: false,
     whatsapp: '',
@@ -316,39 +461,43 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
     const errs: Record<string, string> = {};
 
     if (stepIndex === 0) {
+      // Photos
+      if (images.length === 0) errs.images = 'At least one photo is required';
+      if (images.length > 8) errs.images = 'Maximum 8 photos allowed';
+    }
+
+    if (stepIndex === 1) {
       // Basic Info
       if (!title || title.length < 3) errs.title = 'Title must be at least 3 characters';
       if (title.length > 200) errs.title = 'Title must be 200 characters or less';
       if (!description || description.length < 10) errs.description = 'Description must be at least 10 characters';
-      if (!categoryId) errs.categoryId = 'Please select a category';
+      if (!categoryId) errs.categoryId = 'Please select a fashion category';
       if (!condition) errs.condition = 'Please select a condition';
       if (!city || city.length < 2) errs.city = 'City is required';
-    }
-
-    if (stepIndex === 1) {
-      // Images
-      if (images.length === 0) errs.images = 'At least one image is required';
+      if (!price || Number(price) <= 0) errs.price = 'Price must be greater than 0';
     }
 
     if (stepIndex === 2) {
-      // Pricing
-      if (!pricing.price || Number(pricing.price) < 0) errs.price = 'Price must be 0 or more';
-      if (listingType === 'rent') {
-        if (!pricing.rentalPricePerDay || Number(pricing.rentalPricePerDay) <= 0) errs.rentalPricePerDay = 'Rental price per day is required';
-        if (!pricing.rentalDeposit || Number(pricing.rentalDeposit) < 0) errs.rentalDeposit = 'Security deposit is required';
-      }
+      // Product Details - optional, no validation
     }
 
     if (stepIndex === 3) {
-      // Delivery
-      if (!delivery.supportsReadyMade && !delivery.supportsCustomDesign && !delivery.availableForRent) {
-        errs.availability = 'Select at least one availability option';
+      // Listing Type
+      if (!listingType) errs.listingType = 'Please select a listing type';
+      if (listingType === 'rent') {
+        if (!rentalInfo.rentalPricePerDay || Number(rentalInfo.rentalPricePerDay) <= 0) errs.rentalPricePerDay = 'Rental price per day is required';
+        if (!rentalInfo.rentalDeposit || Number(rentalInfo.rentalDeposit) < 0) errs.rentalDeposit = 'Security deposit is required';
       }
-      if (delivery.supportsCustomDesign && (!delivery.estimatedProductionDays || Number(delivery.estimatedProductionDays) <= 0)) {
-        errs.estimatedProductionDays = 'Estimated production days is required for custom design';
-      }
-      if ((delivery.deliveryMethod === 'delivery' || delivery.deliveryMethod === 'both') && !delivery.deliveryFee) {
-        errs.deliveryFee = 'Delivery fee is required when delivery is selected';
+    }
+
+    if (stepIndex === 4) {
+      // Custom Option - optional, no validation
+    }
+
+    if (stepIndex === 5) {
+      // Contact - at least one method required
+      if (!contactOptions.inAppMessaging && !contactOptions.showPhone && !contactOptions.whatsapp && !contactOptions.telegram) {
+        errs.contact = 'Please select at least one contact method';
       }
     }
 
@@ -390,21 +539,17 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
       listingType: effectiveType,
       title,
       description,
-      price: pricing.price,
+      price,
       categoryId,
       categoryName,
       city,
       condition,
-      tags,
       contactOptions,
       images,
-      pricing,
-      delivery,
-      supportsReadyMade: delivery.supportsReadyMade,
-      supportsCustomDesign: delivery.supportsCustomDesign,
-      startingCustomPrice: delivery.startingCustomPrice,
-      estimatedProductionDays: delivery.estimatedProductionDays,
-      customizationOptions: delivery.customizationOptions,
+      productDetails: productDetails || null,
+      rentalInfo: listingType === 'rent' ? rentalInfo : null,
+      customOrderAvailable,
+      customDetails: customOrderAvailable ? customDetails : null,
     });
   }
 
@@ -414,20 +559,42 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
     return (
       <Card>
         <CardContent className="p-6">
-          <ListingTypeSelector
-            value={listingType}
-            onChange={(type) => {
-              setListingType(type);
-              // Set type-appropriate defaults
-              if (type === 'rent') {
-                setDelivery((prev) => ({ ...prev, availableForRent: true, supportsReadyMade: false, supportsCustomDesign: false }));
-              } else if (type === 'custom') {
-                setDelivery((prev) => ({ ...prev, supportsCustomDesign: true, supportsReadyMade: false, availableForRent: false }));
-              } else {
-                setDelivery((prev) => ({ ...prev, supportsReadyMade: true, supportsCustomDesign: false, availableForRent: false }));
-              }
-            }}
-          />
+          <div className="space-y-4">
+            <h3 className="text-lg font-display font-semibold">Select Listing Type</h3>
+            <p className="text-sm text-muted-foreground">Choose how you want to sell this item</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setListingType('sale')}
+                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 text-center transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-medium">For Sale</h4>
+                  <p className="text-xs text-muted-foreground">Sell your item directly</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setListingType('rent')}
+                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 text-center transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-medium">For Rent</h4>
+                  <p className="text-xs text-muted-foreground">Rent out your item</p>
+                </div>
+              </button>
+            </div>
+          </div>
           {error && <Alert variant="error" className="mt-4">{error}</Alert>}
         </CardContent>
       </Card>
@@ -475,13 +642,22 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
         <div className="flex-1 min-w-0">
           <Card>
             <CardContent className="p-6">
-              {/* Step 0: Basic Information */}
+              {/* Step 0: Photos */}
               {step === 0 && (
+                <ImageUploadSection
+                  images={images}
+                  onImagesChange={setImages}
+                  {...(errors.images !== undefined && { error: errors.images })}
+                />
+              )}
+
+              {/* Step 1: Basic Information */}
+              {step === 1 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-display font-semibold">Basic Information</h3>
 
                   <FormInput
-                    label="Title"
+                    label="Product Title"
                     placeholder="e.g. Handwoven Ethiopian Cotton Dress"
                     value={title}
                     onChange={(e) => { setTitle(e.target.value); clearField('title'); }}
@@ -512,104 +688,292 @@ export default function ListingForm({ initialData, initialListingType, onSubmit,
                     />
                   </div>
 
-                  <FormInput
-                    label="City"
-                    placeholder="e.g. Addis Ababa"
-                    value={city}
-                    onChange={(e) => { setCity(e.target.value); clearField('city'); }}
-                    {...(errors.city !== undefined && { error: errors.city })}
-                  />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput
+                      label="Price (ETB)"
+                      placeholder="e.g. 3500"
+                      type="number"
+                      value={price}
+                      onChange={(e) => { setPrice(e.target.value); clearField('price'); }}
+                      {...(errors.price !== undefined && { error: errors.price })}
+                    />
+                    <FormInput
+                      label="Location"
+                      placeholder="e.g. Addis Ababa"
+                      value={city}
+                      onChange={(e) => { setCity(e.target.value); clearField('city'); }}
+                      {...(errors.city !== undefined && { error: errors.city })}
+                    />
+                  </div>
+                </div>
+              )}
 
-                  <TagInput
-                    label="Tags"
-                    description="Add keywords to help buyers find your listing"
-                    value={tags}
-                    onChange={setTags}
-                    maxTags={10}
-                    placeholder="Type and press Enter"
+              {/* Step 2: Product Details */}
+              {step === 2 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Product Details</h3>
+                  <p className="text-sm text-muted-foreground">Add relevant details based on your category (optional)</p>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput
+                      label="Size"
+                      placeholder="e.g. M, L, XL"
+                      value={productDetails.size || ''}
+                      onChange={(e) => setProductDetails({ ...productDetails, size: e.target.value })}
+                    />
+                    <FormInput
+                      label="Color"
+                      placeholder="e.g. Red, Blue, Black"
+                      value={productDetails.color || ''}
+                      onChange={(e) => setProductDetails({ ...productDetails, color: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormInput
+                      label="Material/Fabric"
+                      placeholder="e.g. Cotton, Silk, Linen"
+                      value={productDetails.material || ''}
+                      onChange={(e) => setProductDetails({ ...productDetails, material: e.target.value })}
+                    />
+                    <FormInput
+                      label="Gender"
+                      placeholder="e.g. Women, Men, Unisex"
+                      value={productDetails.gender || ''}
+                      onChange={(e) => setProductDetails({ ...productDetails, gender: e.target.value })}
+                    />
+                  </div>
+
+                  <FormInput
+                    label="Style"
+                    placeholder="e.g. Traditional, Modern, Casual"
+                    value={productDetails.style || ''}
+                    onChange={(e) => setProductDetails({ ...productDetails, style: e.target.value })}
                   />
                 </div>
               )}
 
-              {/* Step 1: Images */}
-              {step === 1 && (
-                <ImageUploadSection
-                  images={images}
-                  onImagesChange={setImages}
-                  {...(errors.images !== undefined && { error: errors.images })}
-                />
-              )}
-
-              {/* Step 2: Pricing */}
-              {step === 2 && (
-                <PricingSection
-                  listingType={listingType}
-                  data={pricing}
-                  onChange={setPricing}
-                  errors={errors}
-                />
-              )}
-
-              {/* Step 3: Delivery & Availability */}
+              {/* Step 3: Listing Type */}
               {step === 3 && (
-                <DeliveryOptions
-                  listingType={listingType}
-                  data={delivery}
-                  onChange={setDelivery}
-                  errors={errors}
-                />
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Listing Type</h3>
+                  <p className="text-sm text-muted-foreground">Current selection: {listingType === 'sale' ? 'For Sale' : 'For Rent'}</p>
+
+                  <div className="rounded-lg border p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                          {listingType === 'sale' ? (
+                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                            </svg>
+                          ) : (
+                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{listingType === 'sale' ? 'For Sale' : 'For Rent'}</h4>
+                          <p className="text-xs text-muted-foreground">{listingType === 'sale' ? 'Sell your item directly' : 'Rent out your item'}</p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setListingType(null)}>
+                        Change
+                      </Button>
+                    </div>
+
+                    {listingType === 'rent' && (
+                      <div className="space-y-4 border-t pt-4">
+                        <h4 className="font-medium">Rental Information</h4>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormInput
+                            label="Rental Price (ETB/day)"
+                            placeholder="e.g. 200"
+                            type="number"
+                            value={rentalInfo.rentalPricePerDay}
+                            onChange={(e) => setRentalInfo({ ...rentalInfo, rentalPricePerDay: e.target.value })}
+                            {...(errors.rentalPricePerDay !== undefined && { error: errors.rentalPricePerDay })}
+                          />
+                          <FormInput
+                            label="Security Deposit (ETB)"
+                            placeholder="e.g. 500"
+                            type="number"
+                            value={rentalInfo.rentalDeposit}
+                            onChange={(e) => setRentalInfo({ ...rentalInfo, rentalDeposit: e.target.value })}
+                            {...(errors.rentalDeposit !== undefined && { error: errors.rentalDeposit })}
+                          />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <FormInput
+                            label="Minimum Rental Days"
+                            placeholder="e.g. 1"
+                            type="number"
+                            value={rentalInfo.minRentalDays}
+                            onChange={(e) => setRentalInfo({ ...rentalInfo, minRentalDays: e.target.value })}
+                          />
+                          <FormInput
+                            label="Maximum Rental Days"
+                            placeholder="e.g. 30"
+                            type="number"
+                            value={rentalInfo.maxRentalDays}
+                            onChange={(e) => setRentalInfo({ ...rentalInfo, maxRentalDays: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
-              {/* Step 4: Review & Publish */}
+              {/* Step 4: Custom Option */}
               {step === 4 && (
-                <ListingReviewSummary
-                  data={{
-                    listingType,
-                    title,
-                    description,
-                    categoryId,
-                    categoryName,
-                    condition,
-                    city,
-                    tags,
-                    images,
-                    pricing,
-                    delivery,
-                    contactOptions,
-                  }}
-                />
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Custom-Made Option</h3>
+                  <p className="text-sm text-muted-foreground">Can this item be customized for buyers?</p>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={customOrderAvailable}
+                        onChange={(e) => setCustomOrderAvailable(e.target.checked)}
+                      />
+                      <div>
+                        <span className="font-medium">Available for custom order?</span>
+                        <p className="text-xs text-muted-foreground">Buyers can request customizations</p>
+                      </div>
+                    </div>
+
+                    {customOrderAvailable && (
+                      <div className="space-y-4 border-t pt-4">
+                        <h4 className="font-medium">Customization Details</h4>
+                        
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-3">
+                            <Checkbox
+                              checked={customDetails.sizeAdjustments}
+                              onChange={(e) => setCustomDetails({ ...customDetails, sizeAdjustments: e.target.checked })}
+                            />
+                            <span className="text-sm">Size adjustments available</span>
+                          </label>
+                          <label className="flex items-center gap-3">
+                            <Checkbox
+                              checked={customDetails.colorFabricChanges}
+                              onChange={(e) => setCustomDetails({ ...customDetails, colorFabricChanges: e.target.checked })}
+                            />
+                            <span className="text-sm">Color/fabric changes available</span>
+                          </label>
+                          <label className="flex items-center gap-3">
+                            <Checkbox
+                              checked={customDetails.embroidery}
+                              onChange={(e) => setCustomDetails({ ...customDetails, embroidery: e.target.checked })}
+                            />
+                            <span className="text-sm">Embroidery customization available</span>
+                          </label>
+                        </div>
+
+                        <FormTextarea
+                          label="Other Customization Options"
+                          placeholder="Describe any other customization options you offer..."
+                          rows={3}
+                          value={customDetails.otherCustomization}
+                          onChange={(e) => setCustomDetails({ ...customDetails, otherCustomization: e.target.value })}
+                        />
+
+                        <FormInput
+                          label="Additional Custom Price (ETB) - Optional"
+                          placeholder="e.g. 500"
+                          type="number"
+                          value={customDetails.additionalCustomPrice}
+                          onChange={(e) => setCustomDetails({ ...customDetails, additionalCustomPrice: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
 
-              {/* Contact options (shown in basic info step for compactness) */}
-              {step === 0 && (
-                <div className="mt-6 border-t pt-5">
-                  <h4 className="text-sm font-medium text-foreground mb-3">Contact Options</h4>
-                  <div className="space-y-2.5">
+              {/* Step 5: Contact */}
+              {step === 5 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Contact Options</h3>
+                  <p className="text-sm text-muted-foreground">How can buyers reach you?</p>
+
+                  <div className="space-y-3">
                     <label className="flex items-center gap-3">
-                      <Checkbox checked={contactOptions.showPhone} onChange={(e) => { updateContact('showPhone', e.target.checked); }} />
-                      <span className="text-sm">Show my phone number</span>
+                      <Checkbox
+                        checked={contactOptions.inAppMessaging}
+                        onChange={(e) => updateContact('inAppMessaging', e.target.checked)}
+                      />
+                      <div>
+                        <span className="font-medium">Platform chat</span>
+                        <p className="text-xs text-muted-foreground">Buyers can message you through the platform</p>
+                      </div>
                     </label>
                     <label className="flex items-center gap-3">
-                      <Checkbox checked={contactOptions.inAppMessaging} onChange={(e) => { updateContact('inAppMessaging', e.target.checked); }} />
-                      <span className="text-sm">Enable in-app messaging</span>
+                      <Checkbox
+                        checked={contactOptions.showPhone}
+                        onChange={(e) => updateContact('showPhone', e.target.checked)}
+                      />
+                      <div>
+                        <span className="font-medium">Phone</span>
+                        <p className="text-xs text-muted-foreground">Show your phone number to buyers</p>
+                      </div>
                     </label>
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <FormInput
                       label="WhatsApp Number"
-                      placeholder="+251..."
+                      placeholder="e.g. +251911123456"
                       value={contactOptions.whatsapp}
-                      onChange={(e) => { updateContact('whatsapp', e.target.value); }}
+                      onChange={(e) => updateContact('whatsapp', e.target.value)}
                     />
                     <FormInput
                       label="Telegram Username"
-                      placeholder="@username"
+                      placeholder="e.g. @username"
                       value={contactOptions.telegram}
-                      onChange={(e) => { updateContact('telegram', e.target.value); }}
+                      onChange={(e) => updateContact('telegram', e.target.value)}
                     />
+                  </div>
+
+                  {errors.contact && (
+                    <p className="text-sm text-destructive">{errors.contact}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Step 6: Preview */}
+              {step === 6 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-display font-semibold">Preview Your Listing</h3>
+                  <p className="text-sm text-muted-foreground">This is how your listing will appear to buyers</p>
+
+                  <div className="rounded-lg border bg-card p-6">
+                    <div className="flex gap-6">
+                      {images.length > 0 && images[0] && (
+                        <div className="h-48 w-48 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                          <img src={images[0].url} alt={title} className="h-full w-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex-1 space-y-2">
+                        <h4 className="text-xl font-semibold">{title || 'Product Title'}</h4>
+                        <p className="text-2xl font-bold text-primary">{price ? `${price} ETB` : 'Price'}</p>
+                        <p className="text-sm text-muted-foreground">📍 {city || 'Location'}</p>
+                        <p className="text-sm line-clamp-2">{description || 'Product description...'}</p>
+                        <div className="flex gap-2">
+                          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{condition || 'Condition'}</span>
+                          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{listingType === 'sale' ? 'For Sale' : 'For Rent'}</span>
+                          {customOrderAvailable && (
+                            <span className="rounded-full bg-brand-gold/10 px-2 py-1 text-xs font-medium text-brand-gold">Custom Available</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
+
             </CardContent>
           </Card>
 

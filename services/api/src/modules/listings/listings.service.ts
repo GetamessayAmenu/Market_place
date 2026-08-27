@@ -39,6 +39,7 @@ import { AdminListingAction, AdminListingActionDto, BulkAdminListingActionDto } 
 import {
   canModerateListings,
   canSetListingStatus,
+  determineInitialListingStatus,
   isPublicListingStatus,
 } from './policies/listing.policies';
 import { serializeListing, serializeListingSummary } from './serializers/listing.serializer';
@@ -64,7 +65,7 @@ export class ListingsService {
     const slug = await this.generateUniqueSlug(dto.title);
     const now = new Date();
     const expiresAt = this.addDays(now, LISTING_DEFAULT_TTL_DAYS);
-    const status: ListingStatus = 'pending_review';
+    const status: ListingStatus = determineInitialListingStatus(user);
 
     const listing = await this.listingsRepository.createWithImages({
       sellerId: user.id,
@@ -307,6 +308,10 @@ export class ListingsService {
       if (dto.status === 'rejected' && dto.rejectedReason) {
         updateData.rejectedReason = dto.rejectedReason;
       }
+    } else if (existing.sellerId === user.id && !canModerateListings(user) && existing.status === 'rejected') {
+      // Automatic resubmission: REJECTED -> edit -> PENDING_REVIEW
+      updateData.status = 'pending_review';
+      updateData.rejectedReason = null;
     }
 
     if (dto.title && dto.title !== existing.title) {
@@ -461,7 +466,8 @@ export class ListingsService {
   }
 
   async publish(user: AuthenticatedUser, id: string) {
-    return this.updateStatus(user, id, 'active');
+    const targetStatus: ListingStatus = canModerateListings(user) ? 'active' : 'pending_review';
+    return this.updateStatus(user, id, targetStatus);
   }
 
   async findBySeller(sellerId: string, query: ListingQueryDto, viewer?: AuthenticatedUser) {
@@ -858,6 +864,7 @@ export class ListingsService {
           const now = new Date();
           updateData.publishedAt = listing.publishedAt ?? now;
           updateData.expiresAt = this.addDays(now, LISTING_DEFAULT_TTL_DAYS);
+          updateData.rejectedReason = null;
         }
         if (newStatus === 'rejected' && dto.reason) {
           updateData.rejectedReason = dto.reason;

@@ -229,7 +229,7 @@ export default async function ListingPage({ params }: Props) {
         <div className="grid gap-8 lg:grid-cols-5">
           {/* Image gallery - 3 cols */}
           <div className="lg:col-span-3 space-y-6">
-            <ImageGallery images={galleryImages} />
+            <ImageGallery images={galleryImages} listingTitle={listing.title} />
             
             {/* Description - immediately below image */}
             <div className="rounded-xl border bg-card p-6">

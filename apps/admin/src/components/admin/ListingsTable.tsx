@@ -155,7 +155,8 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
 
   useEffect(() => {
     void fetchStatusCounts()
-  }, [fetchStatusCounts])
+    void fetchData(page, statusFilter, typeFilter, search)
+  }, [fetchData, fetchStatusCounts, page, statusFilter, typeFilter, search])
 
   // Real-time Socket.IO updates
   const socket = useSocket()

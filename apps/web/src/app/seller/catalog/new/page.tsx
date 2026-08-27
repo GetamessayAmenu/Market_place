@@ -26,7 +26,7 @@ export default function NewListingPage() {
 
     try {
       // Transform form data to match API DTO
-      const apiData = {
+      const apiData: Record<string, unknown> = {
         title: data.title,
         description: data.description,
         price: parseFloat(data.price) || 0,
@@ -34,27 +34,45 @@ export default function NewListingPage() {
         condition: data.condition,
         city: data.city,
         contactOptions: data.contactOptions,
-        availableForPurchase: data.delivery.availableForPurchase,
-        availableForRent: data.delivery.availableForRent,
-        customOrderAvailable: data.delivery.customOrderAvailable,
+        availableForPurchase: data.listingType === 'sale',
+        availableForRent: data.listingType === 'rent',
+        customOrderAvailable: data.customOrderAvailable,
         images: data.images.map(img => ({
           url: img.url,
           cloudinaryPublicId: img.cloudinaryPublicId,
           sortOrder: img.sortOrder,
           isPrimary: img.sortOrder === 0
         })),
-        // Add rental pricing if available
-        ...(data.listingType === 'rent' ? {
-          rentalPricePerDay: parseFloat(data.pricing.rentalPricePerDay || '0') || 0,
-          rentalDeposit: parseFloat(data.pricing.rentalDeposit || '0') || 0,
-        } : {}),
-        // Add custom order pricing if available
-        ...(data.listingType === 'custom' ? {
-          startingCustomPrice: parseFloat(data.pricing.startingCustomPrice || '0') || 0,
-          estimatedProductionDays: parseInt(data.pricing.estimatedProductionDays || '0') || 0,
-          supportsCustomDesign: true,
-        } : {}),
       };
+
+      // Add rental pricing if available
+      if (data.listingType === 'rent' && data.rentalInfo) {
+        apiData.rentalPricePerDay = parseFloat(data.rentalInfo.rentalPricePerDay) || 0;
+        apiData.rentalDeposit = parseFloat(data.rentalInfo.rentalDeposit) || 0;
+      }
+
+      // Add custom order details if available
+      if (data.customOrderAvailable && data.customDetails) {
+        if (data.customDetails.additionalCustomPrice) {
+          apiData.startingCustomPrice = parseFloat(data.customDetails.additionalCustomPrice) || 0;
+        }
+        // Store custom details as attributes
+        apiData.attributes = {
+          sizeAdjustments: data.customDetails.sizeAdjustments,
+          colorFabricChanges: data.customDetails.colorFabricChanges,
+          embroidery: data.customDetails.embroidery,
+          otherCustomization: data.customDetails.otherCustomization,
+        };
+      }
+
+      // Add product details as attributes
+      if (data.productDetails) {
+        const existingAttributes = (apiData.attributes as Record<string, unknown>) || {};
+        apiData.attributes = {
+          ...existingAttributes,
+          ...data.productDetails,
+        };
+      }
 
       await apiPost<{ id: string }>('/listings', apiData);
 
