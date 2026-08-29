@@ -1401,3 +1401,79 @@ export async function fetchHomepageSeo(): Promise<ApiResponse<HomepageSeo>> {
 export async function updateHomepageSeo(data: { title: string; description: string; ogImageUrl?: string; ogImageCloudinaryId?: string }): Promise<ApiResponse<HomepageSeo>> {
   return clientPut<ApiResponse<HomepageSeo>>('/admin/homepage/seo', data)
 }
+
+// ─── Admin Broadcasts ────────────────────────────────────────────────────────
+
+export interface AdminBroadcast {
+  id: string
+  title: string
+  message: string
+  imageUrl: string | null
+  actionUrl: string | null
+  actionLabel: string | null
+  audience: 'ALL_USERS' | 'BUYERS' | 'SELLERS'
+  scheduledAt: string | null
+  sentAt: string | null
+  status: 'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'SENT' | 'CANCELLED' | 'FAILED'
+  totalRecipients: number
+  deliveredCount: number
+  readCount: number
+  failedCount: number
+  createdAt: string
+  updatedAt: string
+  createdBy?: {
+    id: string
+    displayName: string
+    email: string
+  }
+}
+
+export interface AdminBroadcastStats {
+  activeBroadcasts: number
+  sentToday: number
+  totalRecipients: number
+  readRate: number
+}
+
+export async function fetchAdminBroadcasts(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminBroadcast>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return clientGet<PaginatedResponse<AdminBroadcast>>('/notifications/admin/broadcasts' + qs)
+}
+
+export async function fetchAdminBroadcastStats(): Promise<ApiResponse<AdminBroadcastStats>> {
+  return clientGet<ApiResponse<AdminBroadcastStats>>('/notifications/admin/broadcasts/stats')
+}
+
+export async function fetchAdminBroadcast(id: string): Promise<ApiResponse<AdminBroadcast>> {
+  return clientGet<ApiResponse<AdminBroadcast>>('/notifications/admin/broadcasts/' + id)
+}
+
+export async function createAdminBroadcast(data: {
+  title: string
+  message: string
+  imageUrl?: string
+  actionUrl?: string
+  actionLabel?: string
+  audience?: string
+  scheduledAt?: string
+}): Promise<ApiResponse<AdminBroadcast>> {
+  return clientPost<ApiResponse<AdminBroadcast>>('/notifications/admin/broadcasts', data)
+}
+
+export async function updateAdminBroadcast(id: string, data: Partial<AdminBroadcast>): Promise<ApiResponse<AdminBroadcast>> {
+  return clientPatch<ApiResponse<AdminBroadcast>>('/notifications/admin/broadcasts/' + id, data)
+}
+
+export async function deleteAdminBroadcastDraft(id: string): Promise<ApiResponse<unknown>> {
+  return clientDelete<ApiResponse<unknown>>('/notifications/admin/broadcasts/' + id)
+}
+
+export async function sendAdminBroadcastNow(id: string): Promise<ApiResponse<unknown>> {
+  return clientPost<ApiResponse<unknown>>('/notifications/admin/broadcasts/' + id + '/send')
+}
+
+export async function cancelAdminBroadcast(id: string): Promise<ApiResponse<AdminBroadcast>> {
+  return clientPost<ApiResponse<AdminBroadcast>>('/notifications/admin/broadcasts/' + id + '/cancel')
+}

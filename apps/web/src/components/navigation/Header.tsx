@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 
 import MobileNav from './MobileNav';
+import NotificationBell from './NotificationBell';
 import UserMenu from './UserMenu';
 
 const navLinks = [
@@ -77,6 +78,8 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
+            <NotificationBell />
+
             <div className="hidden md:block">
               <UserMenu />
             </div>

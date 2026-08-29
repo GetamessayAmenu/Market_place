@@ -95,11 +95,12 @@ export const profileUpdateSchema = z.object({
 
 // Notification preferences schema
 export const notificationPreferencesSchema = z.object({
-  emailNotifications: z.boolean().default(true),
-  pushNotifications: z.boolean().default(true),
-  chatNotifications: z.boolean().default(true),
-  listingAlerts: z.boolean().default(true),
-  marketingEmails: z.boolean().default(false),
+  chat: z.boolean().default(true),
+  listing: z.boolean().default(true),
+  order: z.boolean().default(true),
+  rental: z.boolean().default(true),
+  customOrder: z.boolean().default(true),
+  promotional: z.boolean().default(true),
 });
 
 // Listing schemas

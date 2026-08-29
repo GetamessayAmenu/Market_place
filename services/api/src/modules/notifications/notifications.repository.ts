@@ -74,4 +74,15 @@ export class NotificationsRepository extends BaseRepository<Notification> {
   async create(data: Prisma.NotificationCreateInput): Promise<Notification> {
     return this.prisma.notification.create({ data });
   }
+
+  async deleteNotification(id: string, userId: string): Promise<boolean> {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, userId },
+    });
+    if (!notification) {
+      return false;
+    }
+    await this.prisma.notification.delete({ where: { id } });
+    return true;
+  }
 }
