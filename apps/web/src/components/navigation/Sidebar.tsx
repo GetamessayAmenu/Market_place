@@ -90,6 +90,7 @@ const defaultItems: SidebarItem[] = [
   { label: 'Insights & Feedback', href: '/seller/insights', icon: <IconChart />, section: 'Seller Hub' },
 
   { label: 'My Rentals', href: '/dashboard/rentals', icon: <IconChart />, section: 'Account' },
+  { label: 'Dispute Center', href: '/dashboard/disputes', icon: <IconShield />, section: 'Account' },
   { label: 'Saved Items', href: '/dashboard/saved', icon: <IconHeart />, section: 'Account' },
   { label: 'Following', href: '/account/following', icon: <IconUsers />, section: 'Account' },
   { label: 'Notifications', href: '/dashboard/notifications', icon: <IconBell />, section: 'Account' },

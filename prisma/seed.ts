@@ -34,6 +34,14 @@ const PERMISSIONS: ReadonlyArray<{ resource: string; action: string; description
   { resource: 'verification', action: 'approve', description: 'Approve verifications' },
   { resource: 'category', action: 'manage', description: 'Manage categories' },
   { resource: 'settings', action: 'manage', description: 'Manage global settings' },
+  { resource: 'dispute', action: 'read', description: 'View disputes' },
+  { resource: 'dispute', action: 'create', description: 'Create disputes' },
+  { resource: 'dispute', action: 'manage', description: 'Manage disputes' },
+  { resource: 'dispute', action: 'assign', description: 'Assign disputes' },
+  { resource: 'dispute', action: 'resolve', description: 'Resolve disputes' },
+  { resource: 'dispute', action: 'escalate', description: 'Escalate disputes' },
+  { resource: 'dispute', action: 'view_evidence', description: 'View dispute evidence' },
+  { resource: 'dispute', action: 'manage_categories', description: 'Manage dispute categories' },
 ];
 
 /** Role slug → permission keys (resource:action) */
@@ -44,6 +52,8 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'conversation:create',
     'notification:read',
     'report:read',
+    'dispute:read',
+    'dispute:create',
   ],
   seller: [
     'listing:create',
@@ -53,6 +63,8 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'conversation:read',
     'conversation:create',
     'notification:read',
+    'dispute:read',
+    'dispute:create',
   ],
   moderator: [
     'listing:read',
@@ -64,6 +76,12 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'report:moderate',
     'conversation:read',
     'verification:read',
+    'dispute:read',
+    'dispute:manage',
+    'dispute:assign',
+    'dispute:resolve',
+    'dispute:escalate',
+    'dispute:view_evidence',
   ],
   admin: [
     'listing:read',
@@ -81,6 +99,13 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'verification:read',
     'verification:approve',
     'category:manage',
+    'dispute:read',
+    'dispute:manage',
+    'dispute:assign',
+    'dispute:resolve',
+    'dispute:escalate',
+    'dispute:view_evidence',
+    'dispute:manage_categories',
   ],
   super_admin: PERMISSIONS.map((p) => `${p.resource}:${p.action}`),
   support: [
@@ -90,6 +115,11 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
     'conversation:read',
     'notification:read',
     'verification:read',
+    'dispute:read',
+    'dispute:manage',
+    'dispute:assign',
+    'dispute:resolve',
+    'dispute:view_evidence',
   ],
 };
 
@@ -288,6 +318,35 @@ async function main(): Promise<void> {
   }
 
   console.log(`Seeded ${CATEGORIES.length} parent categories and ${SUBCATEGORIES.length} subcategories.`);
+
+  // ── Dispute Categories ───────────────────────────────────────────
+  const DISPUTE_CATEGORIES = [
+    { name: 'Item not as described', nameAm: 'ዕቃው እንደ ተገለጸው አይደለም', slug: 'item-not-as-described', description: 'Item received differs significantly from listing description or photos.', sortOrder: 1 },
+    { name: 'Fraud/scam', nameAm: 'ማጭበርበር / ስካም', slug: 'fraud-scam', description: 'Suspected fraudulent transaction or deceptive activity.', sortOrder: 2 },
+    { name: 'Suspicious activity', nameAm: 'ተጠራጣሪ እንቅስቃሴ', slug: 'suspicious-activity', description: 'Unusual behavior, account compromise, or policy violation attempt.', sortOrder: 3 },
+    { name: 'Payment disagreement', nameAm: 'የክፍያ አለመግባባት', slug: 'payment-disagreement', description: 'Discrepancies regarding price, payment method, or agreed amount.', sortOrder: 4 },
+    { name: 'Seller issue', nameAm: 'የሻጭ ችግር', slug: 'seller-issue', description: 'Unresponsive seller, refusal to fulfill, or shipping delays.', sortOrder: 5 },
+    { name: 'Buyer issue', nameAm: 'የገዢ ችግር', slug: 'buyer-issue', description: 'Unresponsive buyer, refusal to pay, or unreasonable demands.', sortOrder: 6 },
+    { name: 'Rental return issue', nameAm: 'የኪራይ መመለስ ችግር', slug: 'rental-return-issue', description: 'Late return, failure to return, or return location dispute.', sortOrder: 7 },
+    { name: 'Rental damage', nameAm: 'የኪራይ ጉዳት', slug: 'rental-damage', description: 'Item returned damaged, stained, or broken.', sortOrder: 8 },
+    { name: 'Custom order disagreement', nameAm: 'የተለየ ትዕዛዝ አለመግባባት', slug: 'custom-order-disagreement', description: 'Custom tailoring measurements, design, or material mismatch.', sortOrder: 9 },
+    { name: 'Item authenticity/counterfeit', nameAm: 'የዕቃው እውነተኛነት / አስመሳይ', slug: 'item-authenticity-counterfeit', description: 'Suspected counterfeit or unauthorized replica.', sortOrder: 10 },
+    { name: 'Harassment/abuse', nameAm: 'ትላላክ / ስድብ', slug: 'harassment-abuse', description: 'Abusive language, harassment, or inappropriate conduct.', sortOrder: 11 },
+    { name: 'No-show', nameAm: 'አልተገኘም', slug: 'no-show', description: 'Party failed to show up for scheduled pickup/handover.', sortOrder: 12 },
+    { name: 'Agreement/transaction issue', nameAm: 'የስምምነት / ግብይት ችግር', slug: 'agreement-transaction-issue', description: 'General disagreement regarding terms or handover conditions.', sortOrder: 13 },
+    { name: 'Other', nameAm: 'ሌላ', slug: 'other', description: 'Other dispute reason not listed above.', sortOrder: 14 },
+  ];
+
+  let disputeCategoriesCreated = 0;
+  for (const dc of DISPUTE_CATEGORIES) {
+    await prisma.disputeCategory.upsert({
+      where: { slug: dc.slug },
+      update: { name: dc.name, nameAm: dc.nameAm, description: dc.description, sortOrder: dc.sortOrder },
+      create: dc,
+    });
+    disputeCategoriesCreated++;
+  }
+  console.log(`Seeded ${disputeCategoriesCreated} dispute categories.`);
 
   // ── Test Listings ─────────────────────────────────────────────────
   console.log('Starting to create test listings...');

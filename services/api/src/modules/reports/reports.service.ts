@@ -4,6 +4,7 @@ import type { Prisma, ReportPriority, ReportStatus } from '@prisma/client';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import { AdminLogsService } from '../admin-logs/admin-logs.service';
+import { DisputesService } from '../disputes/disputes.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { CreateReportDto } from './dto/create-report.dto';
 import type { ReportQueryDto } from './dto/report-query.dto';
@@ -22,6 +23,7 @@ export class ReportsService {
     private readonly reportsRepository: ReportsRepository,
     private readonly adminLogsService: AdminLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly disputesService: DisputesService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -349,7 +351,6 @@ export class ReportsService {
       throw new ReportNotFoundException();
     }
 
-    // Log the specific moderation action in audit logs
     try {
       await this.adminLogsService.createLog({
         actorId: user.id,
@@ -374,5 +375,58 @@ export class ReportsService {
       reportId: id,
       message: `Moderation action ${body.action} executed successfully`,
     };
+  }
+
+  async convertToDispute(
+    user: AuthenticatedUser,
+    reportId: string,
+    dto?: { categoryId?: string; priority?: string; note?: string },
+  ) {
+    const report = await this.reportsRepository.findById(reportId);
+    if (!report) {
+      throw new ReportNotFoundException();
+    }
+
+    const title = `Dispute from Report: ${report.reason}`;
+    const description = dto?.note || report.description || `Converted from report ${reportId}`;
+
+    const dispute = await this.disputesService.create(
+      { id: report.reporterId, email: user.email, role: user.role } as any,
+      {
+        title,
+        description,
+        priority: (dto?.priority || report.priority || 'medium') as any,
+        reportedUserId: report.reportedUserId || undefined,
+        listingId: report.listingId || undefined,
+        orderId: report.orderId || undefined,
+        rentalId: report.rentalId || undefined,
+        customOrderId: report.customOrderId || undefined,
+        conversationId: report.conversationId || undefined,
+        reportId: report.id,
+        categoryId: dto?.categoryId,
+        evidenceUrls: report.evidence || [],
+      },
+    );
+
+    await this.reportsRepository.updateStatus(
+      reportId,
+      'under_review',
+      user.id,
+      `Converted to Dispute ${dispute.ticketNumber}`,
+    );
+
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'report.convert_to_dispute',
+        resource: 'report',
+        resourceId: reportId,
+        metadata: { disputeId: dispute.id, ticketNumber: dispute.ticketNumber },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    return dispute;
   }
 }

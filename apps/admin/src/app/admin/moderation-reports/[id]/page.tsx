@@ -14,6 +14,7 @@ import {
   FileText,
   Send,
 } from 'lucide-react'
+import { convertReportToDispute } from '@/lib/adminApi'
 
 interface DetailedReport {
   id: string
@@ -228,6 +229,24 @@ export default function UnifiedReportDetailInvestigationPage() {
       alert('Action failed')
     } finally {
       setActionSubmitting(false)
+    }
+  }
+
+  const handleConvertToDispute = async () => {
+    if (!report) return;
+    if (!confirm('Convert this report into a formal dispute case?')) return;
+    try {
+      const res = await convertReportToDispute(reportId, {
+        note: `Converted from report ${reportId}: ${report.reason}`,
+      });
+      alert('Report successfully converted to Dispute!');
+      if (res.data?.id) {
+        window.location.href = `/admin/disputes/${res.data.id}`;
+      } else {
+        loadReportDetails();
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to convert report to dispute');
     }
   }
 
@@ -447,6 +466,13 @@ export default function UnifiedReportDetailInvestigationPage() {
                   className="w-full rounded-xl border border-purple-300 bg-purple-50 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
                 >
                   Escalate Report
+                </button>
+
+                <button
+                  onClick={handleConvertToDispute}
+                  className="w-full rounded-xl bg-purple-700 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-800"
+                >
+                  Convert to Dispute Case ⚖️
                 </button>
               </div>
             </div>

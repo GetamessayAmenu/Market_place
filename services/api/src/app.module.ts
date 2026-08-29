@@ -34,6 +34,7 @@ import { HeroBannersModule } from './modules/hero-banners/hero-banners.module';
 import { SellerModule } from './modules/seller/seller.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminChatsModule } from './modules/admin-chats/admin-chats.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { AdminChatsModule } from './modules/admin-chats/admin-chats.module';
     SellerModule,
     ChatModule,
     AdminChatsModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [

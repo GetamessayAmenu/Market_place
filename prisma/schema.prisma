@@ -81,10 +81,14 @@ model User {
   customOrdersAsSeller      CustomOrder[]         @relation("CustomOrderSeller")
   custom_quotes             CustomQuote[]
   disputeComments           DisputeComment[]
+  disputesAssigned          Dispute[]             @relation("DisputeAssignedAdmin")
   disputesEscalated         Dispute[]             @relation("DisputeEscalator")
   disputesAgainst           Dispute[]             @relation("DisputeReportedUser")
+  disputesReopened          Dispute[]             @relation("DisputeReopener")
   disputesReported          Dispute[]             @relation("DisputeReporter")
   disputesResolved          Dispute[]             @relation("DisputeResolver")
+  disputeEvidencesUploaded  DisputeEvidence[]     @relation("DisputeEvidenceUploader")
+  disputeHistoriesActed     DisputeHistory[]      @relation("DisputeHistoryActor")
   favorites                 Favorite[]
   followers                 Follow[]              @relation("Following")
   following                 Follow[]              @relation("Followed")
@@ -471,6 +475,7 @@ model Report {
   order           Order?           @relation(fields: [orderId], references: [id])
   rental          RentalOrder?     @relation(fields: [rentalId], references: [id])
   customOrder     CustomOrder?     @relation(fields: [customOrderId], references: [id])
+  disputes        Dispute[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([priority, status])
@@ -578,6 +583,7 @@ model Order {
   product                  Listing       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   seller                   User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reports                  Report[]
+  disputes                 Dispute[]
 
   @@index([orderNumber])
   @@index([buyerId, status], map: "orders_buyer_status_idx")
@@ -626,6 +632,7 @@ model CustomOrder {
   listing                   Listing       @relation(fields: [listingId], references: [id])
   seller            User              @relation("CustomOrderSeller", fields: [sellerId], references: [id])
   reports           Report[]
+  disputes          Dispute[]
 
   @@index([buyerId, status])
   @@index([sellerId, status])
@@ -822,6 +829,22 @@ model ModerationReport {
   @@map("moderation_reports")
 }
 
+model DisputeCategory {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(100)
+  nameAm      String?   @map("name_am") @db.VarChar(100)
+  slug        String    @unique @db.VarChar(120)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  disputes    Dispute[]
+
+  @@index([isActive, sortOrder])
+  @@map("dispute_categories")
+}
+
 model Dispute {
   id               String           @id @default(uuid()) @db.Uuid
   ticketNumber     String           @unique @map("ticket_number") @db.VarChar(20)
@@ -831,11 +854,19 @@ model Dispute {
   reporterId       String           @map("reporter_id") @db.Uuid
   reportedUserId   String?          @map("reported_user_id") @db.Uuid
   listingId        String?          @map("listing_id") @db.Uuid
+  orderId          String?          @map("order_id") @db.Uuid
+  rentalId         String?          @map("rental_id") @db.Uuid
+  customOrderId    String?          @map("custom_order_id") @db.Uuid
   conversationId   String?          @map("conversation_id") @db.Uuid
+  reportId         String?          @map("report_id") @db.Uuid
+  categoryId       String?          @map("category_id") @db.Uuid
+  assignedAdminId String?          @map("assigned_admin_id") @db.Uuid
   title            String           @db.VarChar(200)
   description      String
   evidenceUrls     String[]         @default([]) @map("evidence_urls")
   chatEvidenceIds  String[]         @default([]) @map("chat_evidence_ids")
+  resolutionOutcome String?         @map("resolution_outcome") @db.VarChar(50)
+  resolutionReason String?          @map("resolution_reason")
   resolutionNote   String?          @map("resolution_note")
   resolutionAction String?          @map("resolution_action") @db.VarChar(100)
   resolvedById     String?          @map("resolved_by_id") @db.Uuid
@@ -843,13 +874,25 @@ model Dispute {
   closedAt         DateTime?        @map("closed_at")
   escalatedAt      DateTime?        @map("escalated_at")
   escalatedById    String?          @map("escalated_by_id") @db.Uuid
+  reopenedById     String?          @map("reopened_by_id") @db.Uuid
+  reopenedAt       DateTime?        @map("reopened_at")
   lastActivityAt   DateTime?        @map("last_activity_at")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
+
   comments         DisputeComment[]
+  evidence         DisputeEvidence[]
+  history          DisputeHistory[]
   conversation     Conversation?    @relation(fields: [conversationId], references: [id])
   escalatedBy      User?            @relation("DisputeEscalator", fields: [escalatedById], references: [id])
+  reopenedBy       User?            @relation("DisputeReopener", fields: [reopenedById], references: [id])
   listing          Listing?         @relation(fields: [listingId], references: [id])
+  order            Order?           @relation(fields: [orderId], references: [id])
+  rental           RentalOrder?     @relation(fields: [rentalId], references: [id])
+  customOrder      CustomOrder?     @relation(fields: [customOrderId], references: [id])
+  report           Report?          @relation(fields: [reportId], references: [id])
+  category         DisputeCategory? @relation(fields: [categoryId], references: [id])
+  assignedAdmin    User?            @relation("DisputeAssignedAdmin", fields: [assignedAdminId], references: [id])
   reportedUser     User?            @relation("DisputeReportedUser", fields: [reportedUserId], references: [id])
   reporter         User             @relation("DisputeReporter", fields: [reporterId], references: [id])
   resolvedBy       User?            @relation("DisputeResolver", fields: [resolvedById], references: [id])
@@ -857,9 +900,53 @@ model Dispute {
   @@index([status, priority, createdAt(sort: Desc)])
   @@index([reporterId])
   @@index([reportedUserId])
+  @@index([assignedAdminId])
   @@index([type, status])
   @@index([ticketNumber])
+  @@index([orderId])
+  @@index([rentalId])
+  @@index([customOrderId])
+  @@index([reportId])
+  @@index([categoryId])
   @@map("disputes")
+}
+
+model DisputeEvidence {
+  id                 String   @id @default(uuid()) @db.Uuid
+  disputeId          String   @map("dispute_id") @db.Uuid
+  uploaderId         String   @map("uploader_id") @db.Uuid
+  fileUrl            String   @map("file_url") @db.VarChar(500)
+  fileName           String?  @map("file_name") @db.VarChar(255)
+  fileType           String?  @map("file_type") @db.VarChar(100)
+  fileSize           Int?     @map("file_size")
+  cloudinaryPublicId String?  @map("cloudinary_public_id") @db.VarChar(255)
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  dispute  Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  uploader User    @relation("DisputeEvidenceUploader", fields: [uploaderId], references: [id])
+
+  @@index([disputeId, createdAt(sort: Desc)])
+  @@index([uploaderId])
+  @@map("dispute_evidence")
+}
+
+model DisputeHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  disputeId String   @map("dispute_id") @db.Uuid
+  actorId   String   @map("actor_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  fromState Json?    @map("from_state")
+  toState   Json?    @map("to_state")
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  actor   User    @relation("DisputeHistoryActor", fields: [actorId], references: [id])
+
+  @@index([disputeId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("dispute_history")
 }
 
 model DisputeComment {
@@ -1031,6 +1118,7 @@ model RentalOrder {
   renter               User                 @relation("RentalRenter", fields: [renterId], references: [id])
   seller               User                 @relation("RentalSeller", fields: [sellerId], references: [id])
   reports              Report[]
+  disputes             Dispute[]
 
   @@index([status, startDate])
   @@index([renterId])
@@ -1258,6 +1346,8 @@ enum DisputeStatus {
   in_progress
   awaiting_response
   under_review
+  waiting_for_info
+  waiting_for_information
   resolved
   closed
   escalated

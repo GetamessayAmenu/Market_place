@@ -187,4 +187,16 @@ export class ReportsController {
   ) {
     return this.reportsService.takeModerationAction(user, id, body);
   }
+
+  /** Admin/moderator: convert a report into a dispute */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions({ resource: 'report', action: 'moderate' })
+  @Post(':id/convert-to-dispute')
+  convertToDispute(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { categoryId?: string; priority?: string; note?: string },
+  ) {
+    return this.reportsService.convertToDispute(user, id, body);
+  }
 }

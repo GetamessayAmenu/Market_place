@@ -1,4 +1,4 @@
-import { clientGet, clientPatch, clientPost, clientPut, clientDelete } from './clientApi'
+import { clientGet, clientPatch, clientPost, clientPut, clientDelete, buildQuery } from './clientApi'
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -140,43 +140,50 @@ export async function fetchAdminOrder(id: string): Promise<ApiResponse<AdminOrde
 
 // ─── Admin Disputes ─────────────────────────────────────────────────────────
 
-export interface AdminDispute {
+export interface AdminDisputeCategory {
   id: string
-  ticketNumber: string
-  type: string
-  status: string
-  priority: string
-  title: string
-  description: string
-  reporterId: string
-  reportedUserId: string
-  listingId: string | null
-  conversationId: string | null
-  resolvedById: string | null
-  escalatedById: string | null
-  closedById: string | null
-  resolution: string | null
-  escalationReason: string | null
+  name: string
+  nameAm?: string | null
+  slug: string
+  description?: string | null
+  sortOrder: number
+  isActive: boolean
   createdAt: string
   updatedAt: string
-  resolvedAt: string | null
-  escalatedAt: string | null
-  closedAt: string | null
-  reporter: {
+}
+
+export interface AdminDisputeEvidence {
+  id: string
+  disputeId: string
+  uploaderId: string
+  fileUrl: string
+  fileName?: string | null
+  fileType?: string | null
+  fileSize?: number | null
+  cloudinaryPublicId?: string | null
+  createdAt: string
+  uploader?: {
     id: string
     displayName: string
     email: string
   }
-  reportedUser: {
+}
+
+export interface AdminDisputeHistory {
+  id: string
+  disputeId: string
+  actorId: string
+  action: string
+  fromState?: any
+  toState?: any
+  note?: string | null
+  createdAt: string
+  actor?: {
     id: string
     displayName: string
     email: string
+    avatarUrl?: string | null
   }
-  listing: {
-    id: string
-    title: string
-  } | null
-  comments: AdminDisputeComment[]
 }
 
 export interface AdminDisputeComment {
@@ -189,55 +196,241 @@ export interface AdminDisputeComment {
   author: {
     id: string
     displayName: string
+    email: string
+    avatarUrl?: string | null
   }
+}
+
+export interface AdminDispute {
+  id: string
+  ticketNumber: string
+  type: string
+  status: 'open' | 'in_progress' | 'awaiting_response' | 'under_review' | 'waiting_for_info' | 'waiting_for_information' | 'resolved' | 'closed' | 'escalated'
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  title: string
+  description: string
+  reporterId: string
+  reportedUserId?: string | null
+  assignedAdminId?: string | null
+  listingId?: string | null
+  orderId?: string | null
+  rentalId?: string | null
+  customOrderId?: string | null
+  conversationId?: string | null
+  reportId?: string | null
+  categoryId?: string | null
+  resolutionOutcome?: string | null
+  resolutionReason?: string | null
+  resolutionNote?: string | null
+  resolutionAction?: string | null
+  resolvedById?: string | null
+  escalatedById?: string | null
+  closedById?: string | null
+  reopenedById?: string | null
+  resolvedAt?: string | null
+  escalatedAt?: string | null
+  closedAt?: string | null
+  reopenedAt?: string | null
+  lastActivityAt?: string | null
+  createdAt: string
+  updatedAt: string
+  reporter?: {
+    id: string
+    displayName: string
+    email: string
+    avatarUrl?: string | null
+    phone?: string | null
+  }
+  reportedUser?: {
+    id: string
+    displayName: string
+    email: string
+    avatarUrl?: string | null
+    phone?: string | null
+  }
+  assignedAdmin?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+  resolvedBy?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+  escalatedBy?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+  reopenedBy?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+  category?: AdminDisputeCategory | null
+  listing?: {
+    id: string
+    title: string
+    slug: string
+    price: number;
+    currency?: string;
+  } | null
+  order?: {
+    id: string
+    orderNumber: string
+    type: string
+    status: string
+    agreedPrice: number
+  } | null
+  rental?: {
+    id: string
+    orderNumber: string
+    status: string
+    startDate: string
+    endDate: string
+    totalAmount: number
+  } | null
+  customOrder?: {
+    id: string
+    status: string
+    agreedPrice?: number | null
+  } | null
+  evidence?: AdminDisputeEvidence[]
+  history?: AdminDisputeHistory[]
+  comments?: AdminDisputeComment[]
+  _count?: {
+    comments: number
+    evidence: number
+  }
+}
+
+export interface AdminDisputeStats {
+  total: number
+  open: number
+  underReview: number
+  waitingForInfo: number
+  escalated: number
+  resolved: number
+  closed: number
+  highPriority: number
+  avgResolutionHours: number
+  repeatOffendersCount: number
+  categories: Array<{ id: string; name: string; slug: string; count: number }>
 }
 
 export async function fetchAdminDisputes(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AdminDispute>> {
   const qs = params ? '?' + new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
-  return clientGet<PaginatedResponse<AdminDispute>>('/admin/disputes' + qs)
+  const res = await clientGet<any>('/disputes/admin/list' + qs)
+  const payload = res.data ?? res
+  const list = Array.isArray(payload.data) ? payload.data : (Array.isArray(payload) ? payload : [])
+  const total = payload.total ?? payload.meta?.total ?? list.length
+  const page = payload.page ?? payload.meta?.page ?? 1
+  const limit = payload.limit ?? payload.meta?.limit ?? 20
+  const totalPages = Math.ceil(total / limit) || 1
+
+  return {
+    success: true,
+    data: list,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages,
+    },
+  }
 }
 
 export async function fetchAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
-  return clientGet<ApiResponse<AdminDispute>>('/admin/disputes/' + id)
+  const res = await clientGet<any>('/disputes/' + id)
+  const data = res.data !== undefined ? res.data : res
+  return { success: true, data }
 }
 
-export async function fetchAdminDisputeStats(): Promise<ApiResponse<Record<string, number>>> {
-  return clientGet<ApiResponse<Record<string, number>>>('/admin/disputes/stats')
+export async function fetchAdminDisputeStats(): Promise<ApiResponse<AdminDisputeStats>> {
+  const res = await clientGet<any>('/disputes/admin/stats')
+  const data = res.data !== undefined ? res.data : res
+  return { success: true, data }
 }
 
-export async function createAdminDispute(data: any): Promise<ApiResponse<AdminDispute>> {
-  return clientPost<ApiResponse<AdminDispute>>('/admin/disputes', data)
-}
-
-export async function updateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id, data)
+export async function assignAdminDispute(id: string, assignedAdminId: string | null): Promise<ApiResponse<AdminDispute>> {
+  const res = await clientPatch<any>('/disputes/' + id + '/assign', { assignedAdminId })
+  return { success: true, data: res.data ?? res }
 }
 
 export async function updateAdminDisputeStatus(id: string, status: string): Promise<ApiResponse<AdminDispute>> {
-  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/status', { status })
+  const res = await clientPatch<any>('/disputes/' + id + '/status', { status })
+  return { success: true, data: res.data ?? res }
 }
 
-export async function resolveAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/resolve', data)
+export async function requestInfoAdminDispute(id: string, targetUser: 'reporter' | 'respondent' | 'both', message: string): Promise<ApiResponse<unknown>> {
+  const res = await clientPost<any>('/disputes/' + id + '/request-info', { targetUser, message })
+  return { success: true, data: res.data ?? res }
 }
 
-export async function escalateAdminDispute(id: string, data: any): Promise<ApiResponse<AdminDispute>> {
-  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/escalate', data)
+export async function resolveAdminDispute(id: string, data: { resolutionOutcome: string; resolutionReason: string; resolutionNote?: string; resolutionAction?: string }): Promise<ApiResponse<AdminDispute>> {
+  const res = await clientPatch<any>('/disputes/' + id + '/resolve', data)
+  return { success: true, data: res.data ?? res }
+}
+
+export async function escalateAdminDispute(id: string, reason?: string): Promise<ApiResponse<AdminDispute>> {
+  const res = await clientPatch<any>('/disputes/' + id + '/escalate', { reason })
+  return { success: true, data: res.data ?? res }
 }
 
 export async function closeAdminDispute(id: string): Promise<ApiResponse<AdminDispute>> {
-  return clientPatch<ApiResponse<AdminDispute>>('/admin/disputes/' + id + '/close', {})
+  const res = await clientPatch<any>('/disputes/' + id + '/close', {})
+  return { success: true, data: res.data ?? res }
 }
 
-export async function addAdminDisputeComment(id: string, data: any): Promise<ApiResponse<AdminDisputeComment>> {
-  return clientPost<ApiResponse<AdminDisputeComment>>('/admin/disputes/' + id + '/comments', data)
+export async function reopenAdminDispute(id: string, reason: string): Promise<ApiResponse<AdminDispute>> {
+  const res = await clientPatch<any>('/disputes/' + id + '/reopen', { reason })
+  return { success: true, data: res.data ?? res }
 }
 
-export async function fetchAdminDisputeComments(id: string, includeInternal?: boolean): Promise<ApiResponse<AdminDisputeComment[]>> {
-  const qs = includeInternal ? '?includeInternal=true' : ''
-  return clientGet<ApiResponse<AdminDisputeComment[]>>('/admin/disputes/' + id + '/comments' + qs)
+export async function takeDisputeAction(id: string, data: { action: string; targetUserId?: string; listingId?: string; reason: string; durationDays?: number }): Promise<ApiResponse<unknown>> {
+  const res = await clientPost<any>('/disputes/' + id + '/action', data)
+  return { success: true, data: res.data ?? res }
+}
+
+export async function addAdminDisputeComment(id: string, data: { content: string; isInternal?: boolean }): Promise<ApiResponse<AdminDisputeComment>> {
+  const res = await clientPost<any>('/disputes/' + id + '/comments', data)
+  return { success: true, data: res.data ?? res }
+}
+
+export async function fetchAdminDisputeComments(id: string): Promise<ApiResponse<AdminDisputeComment[]>> {
+  const res = await clientGet<any>('/disputes/' + id + '/comments')
+  return { success: true, data: res.data ?? res }
+}
+
+// ── Dispute Categories Admin Helpers ──
+
+export async function fetchDisputeCategories(): Promise<AdminDisputeCategory[]> {
+  const res = await clientGet<any>('/dispute-categories')
+  const payload = res.data ?? res
+  return Array.isArray(payload) ? payload : (Array.isArray(payload.data) ? payload.data : [])
+}
+
+export async function createDisputeCategory(data: { name: string; nameAm?: string | undefined; slug: string; description?: string | undefined; sortOrder?: number | undefined; isActive?: boolean | undefined }): Promise<AdminDisputeCategory> {
+  const res = await clientPost<any>('/dispute-categories', data)
+  return res.data ?? res
+}
+
+export async function updateDisputeCategory(id: string, data: { name?: string | undefined; nameAm?: string | undefined; slug?: string | undefined; description?: string | undefined; sortOrder?: number | undefined; isActive?: boolean | undefined }): Promise<AdminDisputeCategory> {
+  const res = await clientPatch<any>('/dispute-categories/' + id, data)
+  return res.data ?? res
+}
+
+export async function deleteDisputeCategory(id: string): Promise<AdminDisputeCategory> {
+  const res = await clientDelete<any>('/dispute-categories/' + id)
+  return res.data ?? res
+}
+
+export async function convertReportToDispute(reportId: string, data?: { categoryId?: string; priority?: string; note?: string }): Promise<ApiResponse<AdminDispute>> {
+  const res = await clientPost<any>('/reports/' + reportId + '/convert-to-dispute', data || {})
+  return { success: true, data: res.data ?? res }
 }
 
 // ─── Admin Taxonomies ───────────────────────────────────────────────────────
@@ -1477,3 +1670,165 @@ export async function sendAdminBroadcastNow(id: string): Promise<ApiResponse<unk
 export async function cancelAdminBroadcast(id: string): Promise<ApiResponse<AdminBroadcast>> {
   return clientPost<ApiResponse<AdminBroadcast>>('/notifications/admin/broadcasts/' + id + '/cancel')
 }
+
+// ─── Admin Dashboard Overview ──────────────────────────────────────────────────
+
+export interface DashboardKpiMetric {
+  current: number
+  previous: number
+  pctChange: number | null
+  trend: 'up' | 'down' | 'neutral'
+  comparisonLabel: string
+}
+
+export interface NeedsAttentionItem {
+  key: string
+  title: string
+  count: number
+  severity: 'urgent' | 'warning' | 'info'
+  description: string
+  category: string
+  actionUrl: string
+  actionLabel: string
+}
+
+export interface ListingOperationalSummary {
+  pending: number
+  active: number
+  rejected: number
+  draft: number
+  expired: number
+  sold: number
+  archived: number
+  total: number
+}
+
+export interface UserSellerSummary {
+  totalUsers: number
+  newUsersPeriod: number
+  activeUsers: number
+  totalSellers: number
+  newSellersPeriod: number
+  activeSellers: number
+  suspendedUsers: number
+  pendingVerifications: number
+}
+
+export interface OrdersOperationalSummary {
+  new: number
+  active: number
+  completed: number
+  cancelled: number
+  total: number
+}
+
+export interface RentalsOperationalSummary {
+  upcoming: number
+  active: number
+  returningOverdue: number
+  completed: number
+  disputed: number
+  total: number
+}
+
+export interface CustomOrdersOperationalSummary {
+  newRequests: number
+  inProgress: number
+  awaitingAction: number
+  completed: number
+  cancelled: number
+  total: number
+}
+
+export interface ModerationHealthSummary {
+  openReports: number
+  flaggedListings: number
+  reportedUsers: number
+  suspendedUsers: number
+  chatFlagsPending: number
+  recentlyResolvedReports: number
+}
+
+export interface NotificationsSummary {
+  unreadAdminCount: number
+  activeBroadcasts: number
+  sentBroadcastsPeriod: number
+}
+
+export interface SystemHealthStatus {
+  api: 'operational' | 'degraded' | 'offline'
+  database: 'operational' | 'degraded' | 'offline'
+  redis: 'operational' | 'degraded' | 'offline'
+  search: 'operational' | 'degraded' | 'offline'
+  backgroundJobs: 'operational' | 'degraded' | 'offline'
+  notifications: 'operational' | 'degraded' | 'offline'
+  timestamp: string
+}
+
+export interface AdminDashboardOverviewData {
+  range: string
+  dateFrom: string
+  dateTo: string
+  lastUpdated: string
+  kpis: {
+    totalUsers: DashboardKpiMetric
+    activeSellers: DashboardKpiMetric
+    activeListings: DashboardKpiMetric
+    orders: DashboardKpiMetric
+    rentals: DashboardKpiMetric
+    customOrders: DashboardKpiMetric
+  }
+  needsAttention: NeedsAttentionItem[]
+  listings: ListingOperationalSummary
+  userSeller: UserSellerSummary
+  orders: OrdersOperationalSummary
+  rentals: RentalsOperationalSummary
+  customOrders: CustomOrdersOperationalSummary
+  moderationHealth: ModerationHealthSummary
+  notificationsSummary: NotificationsSummary
+  systemHealth: SystemHealthStatus
+}
+
+export interface ActivityPoint {
+  date: string
+  newUsers: number
+  newListings: number
+  orders: number
+  rentals: number
+  customOrders: number
+}
+
+export async function fetchAdminDashboardOverview(params?: {
+  range?: string | undefined
+  from?: string | undefined
+  to?: string | undefined
+}): Promise<AdminDashboardOverviewData> {
+  const qs = params ? buildQuery(params) : ''
+  const res = await clientGet<{ success: boolean; data: AdminDashboardOverviewData } | AdminDashboardOverviewData>('/admin/dashboard/overview' + qs)
+  return 'data' in res && res.data ? res.data : (res as AdminDashboardOverviewData)
+}
+
+export async function fetchAdminDashboardActivity(params?: {
+  range?: string | undefined
+  from?: string | undefined
+  to?: string | undefined
+}): Promise<ActivityPoint[]> {
+  const qs = params ? buildQuery(params) : ''
+  const res = await clientGet<{ success: boolean; data: ActivityPoint[] } | ActivityPoint[]>('/admin/dashboard/activity' + qs)
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
+export async function fetchAdminDashboardSystemHealth(): Promise<SystemHealthStatus> {
+  const res = await clientGet<{ success: boolean; data: SystemHealthStatus } | SystemHealthStatus>('/admin/dashboard/system-health')
+  return 'data' in res && res.data ? res.data : (res as SystemHealthStatus)
+}
+
+export async function fetchAdminDashboardRecentActivity(limit = 10): Promise<AuditLog[]> {
+  const res = await clientGet<{ success: boolean; data: AuditLog[] } | AuditLog[]>(`/admin/dashboard/recent-activity?limit=${limit}`)
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+

@@ -1,8 +1,11 @@
-const API_BASE = '/api/v1'
+function getApiBase(): string {
+  if (typeof window !== 'undefined') return '/api/v1'
+  return (process.env.BACKEND_API_URL || 'http://localhost:3001') + '/api/v1'
+}
 let isAuthenticating = false
 
 async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const url = API_BASE + path
+  const url = getApiBase() + path
   let token = typeof window !== 'undefined' ? localStorage.getItem('admin_access_token') : null
 
   const headers: Record<string, string> = {
@@ -22,7 +25,7 @@ async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
     isAuthenticating = true
     try {
       console.log('Session unauthenticated or expired, attempting admin auto-login...')
-      const loginRes = await fetch(API_BASE + '/auth/login', {
+      const loginRes = await fetch(getApiBase() + '/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
