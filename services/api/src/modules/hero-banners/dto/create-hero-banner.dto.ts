@@ -21,7 +21,6 @@ export class CreateHeroBannerDto {
   subtitleAm?: string;
 
   @IsString()
-  @MaxLength(500)
   imageUrl!: string;
 
   @IsOptional()

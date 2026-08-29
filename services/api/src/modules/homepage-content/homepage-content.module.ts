@@ -10,6 +10,9 @@ import { QueueModule } from '../../infrastructure/queue/queue.module';
 import { CmsSchedulingProcessor } from './processors/cms-scheduling.processor';
 import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 
+import { HomepageCmsController } from './homepage-cms.controller';
+import { HomepageCmsService } from './homepage-cms.service';
+
 @Module({
   imports: [
     AdminLogsModule,
@@ -18,8 +21,8 @@ import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
     QueueModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.CMS_SCHEDULING }),
   ],
-  controllers: [HomepageContentController],
-  providers: [HomepageContentService, HomepageContentRepository, CmsSchedulingProcessor],
-  exports: [HomepageContentService],
+  controllers: [HomepageContentController, HomepageCmsController],
+  providers: [HomepageContentService, HomepageCmsService, HomepageContentRepository, CmsSchedulingProcessor],
+  exports: [HomepageContentService, HomepageCmsService],
 })
 export class HomepageContentModule {}

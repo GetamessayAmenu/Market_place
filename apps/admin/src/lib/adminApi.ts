@@ -1,4 +1,4 @@
-import { clientGet, clientPatch, clientPost, clientDelete } from './clientApi'
+import { clientGet, clientPatch, clientPost, clientPut, clientDelete } from './clientApi'
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -727,13 +727,23 @@ export async function fetchTopCategories(): Promise<TopCategory[]> {
 export interface AuditLog {
   id: string
   actorId: string
+  actorType?: string
   action: string
   resource: string
   resourceId?: string | null
+  description?: string | null
   metadata?: Record<string, unknown> | null
+  changes?: Record<string, { before: any; after: any }> | null
   ipAddress?: string | null
   userAgent?: string | null
+  status?: string
   createdAt: string
+  actor?: {
+    id: string
+    displayName?: string | null
+    email?: string
+    role?: { id?: string; name?: string; description?: string } | null
+  } | null
 }
 
 export async function fetchAuditLogs(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<AuditLog>> {
@@ -741,6 +751,18 @@ export async function fetchAuditLogs(params?: Record<string, string | number | b
     Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
   ).toString() : ''
   return clientGet<PaginatedResponse<AuditLog>>('/admin/audit-logs' + qs)
+}
+
+export async function fetchAuditLog(id: string): Promise<ApiResponse<AuditLog>> {
+  return clientGet<ApiResponse<AuditLog>>('/admin/audit-logs/' + id)
+}
+
+export function getAuditLogsExportUrl(params?: Record<string, string | number | boolean | undefined>): string {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return `${apiBase}/admin/audit-logs/export${qs}`
 }
 
 // ─── Content Moderation ─────────────────────────────────────────────────────
@@ -987,9 +1009,13 @@ export async function reorderHomepageContent(itemIds: string[]): Promise<ApiResp
 // ─── Image Upload ───────────────────────────────────────────────────────────
 
 export interface SignedUploadResponse {
-  uploadUrl: string
-  publicId: string
-  resourceType: string
+  timestamp: number
+  signature: string
+  apiKey: string
+  cloudName: string
+  folder: string
+  uploadPreset?: string
+  transformation?: string
 }
 
 export async function signUpload(count: number = 1): Promise<SignedUploadResponse[]> {
@@ -998,6 +1024,43 @@ export async function signUpload(count: number = 1): Promise<SignedUploadRespons
 
 export async function validateUpload(mimeType: string, bytes: number): Promise<{ valid: boolean }> {
   return clientPost<{ valid: boolean }>('/uploads/validate', { mimeType, bytes })
+}
+
+export async function uploadImageFile(file: File): Promise<{ url: string; publicId?: string }> {
+  try {
+    const signedUploads = await signUpload(1)
+    const signedUpload = signedUploads[0]
+    if (signedUpload && signedUpload.cloudName && signedUpload.signature) {
+      const url = `https://api.cloudinary.com/v1_1/${signedUpload.cloudName}/image/upload`
+      const body = new FormData()
+      body.append('file', file)
+      body.append('api_key', signedUpload.apiKey)
+      body.append('timestamp', String(signedUpload.timestamp))
+      body.append('signature', signedUpload.signature)
+      body.append('folder', signedUpload.folder)
+      if (signedUpload.transformation) {
+        body.append('transformation', signedUpload.transformation)
+      }
+
+      const res = await fetch(url, { method: 'POST', body })
+      if (res.ok) {
+        const data = await res.json()
+        return {
+          url: data.secure_url || data.url,
+          publicId: data.public_id,
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Cloudinary upload fallback triggered:', err)
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve({ url: reader.result as string })
+    reader.onerror = (err) => reject(err)
+    reader.readAsDataURL(file)
+  })
 }
 
 // ─── Rentals ────────────────────────────────────────────────────────────────
@@ -1230,4 +1293,111 @@ export async function createVendorKycProfile(data: {
   licenseCloudinaryId?: string
 }): Promise<ApiResponse<VendorKycProfile>> {
   return clientPost<ApiResponse<VendorKycProfile>>('/vendor-kyc', data)
+}
+
+// ─── Homepage CMS Sections, Featured Items & SEO ─────────────────────────────
+
+export interface HomepageSection {
+  id: string
+  sectionKey: string
+  title: string
+  subtitle?: string | null
+  isEnabled: boolean
+  sortOrder: number
+  itemCount: number
+  contentSource: 'automatic' | 'manual'
+  manualItemIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HomepageFeaturedListing {
+  id: string
+  listingId: string
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  listing?: AdminListing | null
+}
+
+export interface HomepageFeaturedSeller {
+  id: string
+  sellerId: string
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  seller?: {
+    id: string
+    displayName?: string
+    email?: string
+    avatarUrl?: string | null
+    location?: string | null
+    sellerType?: string | null
+    emailVerifiedAt?: string | null
+    phoneVerifiedAt?: string | null
+  } | null
+}
+
+export interface HomepageSeo {
+  id: string
+  title: string
+  description: string
+  ogImageUrl?: string | null
+  ogImageCloudinaryId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export async function fetchHomepageSections(): Promise<ApiResponse<HomepageSection[]>> {
+  return clientGet<ApiResponse<HomepageSection[]>>('/admin/homepage/sections')
+}
+
+export async function updateHomepageSection(id: string, data: Partial<HomepageSection>): Promise<ApiResponse<HomepageSection>> {
+  return clientPatch<ApiResponse<HomepageSection>>('/admin/homepage/sections/' + id, data)
+}
+
+export async function reorderHomepageSections(itemIds: string[]): Promise<ApiResponse<unknown>> {
+  return clientPost<ApiResponse<unknown>>('/admin/homepage/sections/reorder', { itemIds })
+}
+
+export async function fetchHomepageFeaturedListings(): Promise<ApiResponse<HomepageFeaturedListing[]>> {
+  return clientGet<ApiResponse<HomepageFeaturedListing[]>>('/admin/homepage/featured-listings')
+}
+
+export async function addHomepageFeaturedListing(listingId: string, sortOrder?: number): Promise<ApiResponse<HomepageFeaturedListing>> {
+  return clientPost<ApiResponse<HomepageFeaturedListing>>('/admin/homepage/featured-listings', { listingId, sortOrder })
+}
+
+export async function removeHomepageFeaturedListing(id: string): Promise<ApiResponse<unknown>> {
+  return clientDelete<ApiResponse<unknown>>('/admin/homepage/featured-listings/' + id)
+}
+
+export async function reorderHomepageFeaturedListings(itemIds: string[]): Promise<ApiResponse<unknown>> {
+  return clientPost<ApiResponse<unknown>>('/admin/homepage/featured-listings/reorder', { itemIds })
+}
+
+export async function fetchHomepageFeaturedSellers(): Promise<ApiResponse<HomepageFeaturedSeller[]>> {
+  return clientGet<ApiResponse<HomepageFeaturedSeller[]>>('/admin/homepage/featured-sellers')
+}
+
+export async function addHomepageFeaturedSeller(sellerId: string, sortOrder?: number): Promise<ApiResponse<HomepageFeaturedSeller>> {
+  return clientPost<ApiResponse<HomepageFeaturedSeller>>('/admin/homepage/featured-sellers', { sellerId, sortOrder })
+}
+
+export async function removeHomepageFeaturedSeller(id: string): Promise<ApiResponse<unknown>> {
+  return clientDelete<ApiResponse<unknown>>('/admin/homepage/featured-sellers/' + id)
+}
+
+export async function reorderHomepageFeaturedSellers(itemIds: string[]): Promise<ApiResponse<unknown>> {
+  return clientPost<ApiResponse<unknown>>('/admin/homepage/featured-sellers/reorder', { itemIds })
+}
+
+export async function fetchHomepageSeo(): Promise<ApiResponse<HomepageSeo>> {
+  return clientGet<ApiResponse<HomepageSeo>>('/admin/homepage/seo')
+}
+
+export async function updateHomepageSeo(data: { title: string; description: string; ogImageUrl?: string; ogImageCloudinaryId?: string }): Promise<ApiResponse<HomepageSeo>> {
+  return clientPut<ApiResponse<HomepageSeo>>('/admin/homepage/seo', data)
 }

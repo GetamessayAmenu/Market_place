@@ -3,6 +3,8 @@ import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class HeroBannersRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -40,6 +42,7 @@ export class HeroBannersRepository {
   }
 
   async findById(id: string) {
+    if (!id || !UUID_REGEX.test(id)) return null;
     return this.prisma.heroBanner.findUnique({
       where: { id },
       include: {
@@ -82,7 +85,6 @@ export class HeroBannersRepository {
       : this.prisma.heroBanner.count();
   }
 
-  // Get active banners for current date (considering holiday themes)
   async getActiveBanners(currentDate: Date = new Date()) {
     return this.prisma.heroBanner.findMany({
       where: {
@@ -92,17 +94,14 @@ export class HeroBannersRepository {
           {
             OR: [
               {
-                // Always active (no schedule)
                 publishAt: null,
                 unpublishAt: null,
               },
               {
-                // Within publish window
                 publishAt: { lte: currentDate },
                 unpublishAt: { gte: currentDate },
               },
               {
-                // Published but no unpublish date
                 publishAt: { lte: currentDate },
                 unpublishAt: null,
               },
@@ -111,11 +110,9 @@ export class HeroBannersRepository {
           {
             OR: [
               {
-                // No holiday theme (always show)
                 holidayTheme: null,
               },
               {
-                // Within holiday theme window
                 themeStartDate: { lte: currentDate },
                 themeEndDate: { gte: currentDate },
               },
@@ -138,7 +135,6 @@ export class HeroBannersRepository {
     });
   }
 
-  // Get banners by holiday theme
   async getByHolidayTheme(theme: string) {
     return this.prisma.heroBanner.findMany({
       where: {
@@ -147,6 +143,22 @@ export class HeroBannersRepository {
         deletedAt: null,
       },
       orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  async findUserById(id: string) {
+    if (!id || !UUID_REGEX.test(id)) return null;
+    try {
+      return await this.prisma.user.findUnique({ where: { id } });
+    } catch {
+      return null;
+    }
+  }
+
+  async findFirstAdminUser() {
+    return this.prisma.user.findFirst({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'asc' },
     });
   }
 }

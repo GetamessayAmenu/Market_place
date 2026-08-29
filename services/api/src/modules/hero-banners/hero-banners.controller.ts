@@ -8,9 +8,11 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 import { HeroBannersService } from './hero-banners.service';
 import type { CreateHeroBannerDto } from './dto/create-hero-banner.dto';
 
+import { Public } from '../../common/decorators/public.decorator';
+
 @Controller('admin/hero-banners')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('super_admin', 'moderator')
+@Roles('admin', 'super_admin', 'moderator')
 export class HeroBannersController {
   constructor(private readonly heroBannersService: HeroBannersService) {}
 
@@ -26,11 +28,13 @@ export class HeroBannersController {
   }
 
   @Get('active')
+  @Public()
   getActiveBanners() {
     return this.heroBannersService.getActiveBanners();
   }
 
   @Get('holiday/:theme')
+  @Public()
   getByHolidayTheme(@Param('theme') theme: string) {
     return this.heroBannersService.getByHolidayTheme(theme);
   }

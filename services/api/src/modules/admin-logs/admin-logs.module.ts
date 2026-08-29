@@ -4,11 +4,12 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 
 import { AdminLogsController } from './admin-logs.controller';
 import { AdminLogsService } from './admin-logs.service';
+import { AuditEventListener } from './listeners/audit-event.listener';
 
 @Module({
   controllers: [AdminLogsController],
-  providers: [AdminLogsService, RolesGuard],
+  providers: [AdminLogsService, AuditEventListener, RolesGuard],
   exports: [AdminLogsService],
 })
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+
 export class AdminLogsModule {}

@@ -94,6 +94,7 @@ model User {
   heroBannersUpdated        HeroBanner[]          @relation("HeroBannerUpdated")
   homepageContentCreated    HomepageContent[]     @relation("HomepageContentCreated")
   homepageContentUpdated    HomepageContent[]     @relation("HomepageContentUpdated")
+  homepageFeaturedSellers   HomepageFeaturedSeller[]
   listings                  Listing[]
   listingRevisionsSubmitted ListingRevision[]    @relation("ListingRevisionSeller")
   listingRevisionsReviewed  ListingRevision[]    @relation("ListingRevisionReviewer")
@@ -254,6 +255,7 @@ model Listing {
   disputes                Dispute[]
   favorites               Favorite[]
   homepageFeaturedContent HomepageContent[]     @relation("HomepageFeaturedListing")
+  homepageFeaturedListings HomepageFeaturedListing[]
   images                  ListingImage[]
   priceHistory            ListingPriceHistory[]
   revisions               ListingRevision[]
@@ -519,20 +521,25 @@ model Notification {
 }
 
 model AdminLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorId    String   @map("actor_id") @db.Uuid
-  action     String   @db.VarChar(100)
-  resource   String   @db.VarChar(50)
-  resourceId String?  @map("resource_id") @db.Uuid
-  metadata   Json?
-  ipAddress  String?  @map("ip_address") @db.VarChar(45)
-  userAgent  String?  @map("user_agent") @db.VarChar(500)
-  createdAt  DateTime @default(now()) @map("created_at")
-  actor      User     @relation(fields: [actorId], references: [id])
+  id          String   @id @default(uuid()) @db.Uuid
+  actorId     String   @map("actor_id") @db.Uuid
+  actorType   String   @default("USER") @map("actor_type") @db.VarChar(30)
+  action      String   @db.VarChar(100)
+  resource    String   @db.VarChar(50)
+  resourceId  String?  @map("resource_id") @db.Uuid
+  description String?  @map("description")
+  metadata    Json?
+  changes     Json?
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  status      String   @default("SUCCESS") @map("status") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at")
+  actor       User     @relation(fields: [actorId], references: [id])
 
   @@index([actorId, createdAt(sort: Desc)])
   @@index([resource, resourceId])
-  @@index([action])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@map("admin_logs")
 }
@@ -902,6 +909,64 @@ model HomepageContent {
   @@map("homepage_content")
 }
 
+model HomepageSection {
+  id            String   @id @default(uuid()) @db.Uuid
+  sectionKey    String   @unique @map("section_key") @db.VarChar(50)
+  title         String   @db.VarChar(200)
+  subtitle      String?  @db.VarChar(300)
+  isEnabled     Boolean  @default(true) @map("is_enabled")
+  sortOrder     Int      @default(0) @map("sort_order")
+  itemCount     Int      @default(8) @map("item_count")
+  contentSource String   @default("automatic") @map("content_source") @db.VarChar(20)
+  manualItemIds String[] @default([]) @map("manual_item_ids")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@index([isEnabled])
+  @@map("homepage_sections")
+}
+
+model HomepageFeaturedListing {
+  id        String   @id @default(uuid()) @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([isActive, sortOrder])
+  @@map("homepage_featured_listings")
+}
+
+model HomepageFeaturedSeller {
+  id        String   @id @default(uuid()) @db.Uuid
+  sellerId  String   @map("seller_id") @db.Uuid
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  seller    User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([isActive, sortOrder])
+  @@map("homepage_featured_sellers")
+}
+
+model HomepageSeo {
+  id                  String   @id @default(uuid()) @db.Uuid
+  title               String   @db.VarChar(200)
+  description         String
+  ogImageUrl          String?  @map("og_image_url") @db.VarChar(500)
+  ogImageCloudinaryId String?  @map("og_image_cloudinary_id") @db.VarChar(255)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("homepage_seo")
+}
+
 model VendorKycProfile {
   id                  String    @id @default(uuid()) @db.Uuid
   userId              String    @unique @map("user_id") @db.Uuid
@@ -1053,7 +1118,7 @@ model HeroBanner {
   titleAm            String?       @map("title_am") @db.VarChar(200)
   subtitle           String?       @db.VarChar(300)
   subtitleAm         String?       @map("subtitle_am") @db.VarChar(300)
-  imageUrl           String        @map("image_url") @db.VarChar(500)
+  imageUrl           String        @map("image_url")
   cloudinaryPublicId String?       @map("cloudinary_public_id") @db.VarChar(255)
   linkUrl            String?       @map("link_url") @db.VarChar(500)
   holidayTheme       HolidayTheme? @map("holiday_theme")

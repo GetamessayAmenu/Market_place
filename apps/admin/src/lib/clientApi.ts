@@ -83,6 +83,13 @@ export function clientPatch<T>(path: string, body?: Record<string, unknown>): Pr
   })
 }
 
+export function clientPut<T>(path: string, body?: Record<string, unknown>): Promise<T> {
+  return clientFetch<T>(path, {
+    method: 'PUT',
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+}
+
 export function clientDelete<T>(path: string): Promise<T> {
   return clientFetch<T>(path, {
     method: 'DELETE',

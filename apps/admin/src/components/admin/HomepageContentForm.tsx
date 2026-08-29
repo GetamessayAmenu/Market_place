@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createHomepageContent, updateHomepageContent, signUpload, type HomepageContent } from '@/lib/adminApi'
+import { createHomepageContent, updateHomepageContent, uploadImageFile, type HomepageContent } from '@/lib/adminApi'
 import { Button } from '@marketplace/ui'
 
 interface HomepageContentFormProps {
@@ -68,28 +68,11 @@ export default function HomepageContentForm({ content, onSuccess, onCancel }: Ho
 
     setUploading(true)
     try {
-      const signedUploads = await signUpload(1)
-      const signedUpload = signedUploads[0]
-      
-      if (!signedUpload) throw new Error('Failed to get signed upload URL')
-      
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('upload_preset', 'homepage_content')
-      formData.append('public_id', signedUpload.publicId)
-
-      const response = await fetch(signedUpload.uploadUrl, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) throw new Error('Upload failed')
-
-      const data = await response.json()
+      const result = await uploadImageFile(file)
       setFormData(prev => ({
         ...prev,
-        imageUrl: data.secure_url,
-        cloudinaryPublicId: data.public_id,
+        imageUrl: result.url,
+        cloudinaryPublicId: result.publicId || '',
       }))
     } catch (err) {
       setError('Failed to upload image. Please try again.')

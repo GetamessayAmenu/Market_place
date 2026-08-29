@@ -20,6 +20,7 @@ export type PermissionResource =
   | 'conversation'
   | 'notification'
   | 'admin_log'
+  | 'audit_log'
   | 'verification'
   | 'category'
   | 'settings';
@@ -32,4 +33,5 @@ export type PermissionAction =
   | 'moderate'
   | 'approve'
   | 'suspend'
+  | 'export'
   | 'manage';
