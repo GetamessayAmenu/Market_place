@@ -24,7 +24,17 @@ const ToastContext = createContext<ToastContextType | null>(null);
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error('useToast must be used within a ToastProvider');
-  return ctx;
+  return {
+    ...ctx,
+    toast: (opts: { title?: string; description?: string; variant?: ToastVariant | 'destructive'; duration?: number }) => {
+      const variant: ToastVariant = opts.variant === 'destructive' ? 'error' : (opts.variant ?? 'default');
+      const payload: Omit<ToastItem, 'id'> = { variant };
+      if (opts.title) payload.title = opts.title;
+      if (opts.description) payload.description = opts.description;
+      if (opts.duration) payload.duration = opts.duration;
+      ctx.addToast(payload);
+    },
+  };
 }
 
 let toastCounter = 0;

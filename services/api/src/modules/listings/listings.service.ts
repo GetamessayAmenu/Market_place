@@ -44,6 +44,7 @@ import {
 } from './policies/listing.policies';
 import { serializeListing, serializeListingSummary } from './serializers/listing.serializer';
 import { buildListingOrderBy, buildListingWhere } from './utils/listing-query.util';
+import { classifyListingChanges } from './utils/listing-change-classifier';
 
 @Injectable()
 export class ListingsService {
@@ -230,6 +231,10 @@ export class ListingsService {
       throw new ListingNotFoundException();
     }
 
+    if (existing.sellerId !== user.id && !canModerateListings(user)) {
+      throw new ListingForbiddenException('You do not have permission to edit this listing.');
+    }
+
     if (dto.categoryId) {
       await this.categoriesService.assertCategoryExists(dto.categoryId);
     }
@@ -242,6 +247,149 @@ export class ListingsService {
       throw new InvalidListingStatusTransitionException(existing.status, dto.status);
     }
 
+    // 1. BEFORE FIRST APPROVAL: Listing status is pending_review
+    if (existing.status === 'pending_review') {
+      // Seller can edit ANY field freely. No re-approval is triggered for every edit.
+      // Final submitted version is updated directly in DB for admin review.
+      return this.applyDirectUpdate(user, existing, dto);
+    }
+
+    // 2. REJECTED LISTING: Listing status is rejected
+    if (existing.status === 'rejected') {
+      // Seller fixes issues and resubmits -> returns to pending_review
+      const { rejectedReason: _, ...restDto } = dto;
+      const resubmissionDto: UpdateListingDto = {
+        ...restDto,
+        status: 'pending_review' as ListingStatus,
+      };
+      const result = await this.applyDirectUpdate(user, existing, resubmissionDto);
+      await this.notificationsService.createRejectedListingResubmittedNotification(
+        existing.sellerId,
+        existing.id,
+        existing.title,
+      );
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'listing.resubmitted',
+        resource: 'listing',
+        resourceId: existing.id,
+      });
+      return result;
+    }
+
+    // 3. AFTER APPROVAL / PUBLISHED: Listing status is active
+    if (existing.status === 'active') {
+      const isModerator = canModerateListings(user);
+      if (isModerator) {
+        // Moderator edits bypass review and apply immediately
+        return this.applyDirectUpdate(user, existing, dto);
+      }
+
+      // Classify changes for seller edits on published listing
+      const classification = classifyListingChanges(existing, dto);
+
+      if (!classification.requiresReview) {
+        // 🟢 Low-risk: Apply immediately and record in audit history
+        const result = await this.applyDirectUpdate(user, existing, dto);
+
+        await this.listingsRepository.createRevision({
+          listing: { connect: { id: existing.id } },
+          seller: { connect: { id: user.id } },
+          status: 'APPROVED',
+          riskLevel: 'LOW',
+          changedFields: classification.changedFields,
+          changes: dto as any,
+          previousData: {
+            title: existing.title,
+            price: Number(existing.price),
+            description: existing.description,
+          } as any,
+        });
+
+        await this.adminLogsService.createLog({
+          actorId: user.id,
+          action: 'listing.edited_low_risk_auto_approved',
+          resource: 'listing',
+          resourceId: existing.id,
+          metadata: { changedFields: classification.changedFields },
+        });
+
+        return result;
+      }
+
+      // 🟡 / 🔴 Significant or High-risk change: Admin review required!
+      // Do NOT replace the public approved version in the Listing table.
+      // Create or update a pending revision.
+      const pendingRevision = await this.listingsRepository.findPendingRevisionByListingId(id);
+      let revision;
+      if (pendingRevision) {
+        revision = await this.listingsRepository.updateRevision(pendingRevision.id, {
+          changedFields: Array.from(new Set([...pendingRevision.changedFields, ...classification.changedFields])),
+          riskLevel: classification.riskLevel,
+          changes: {
+            ...(pendingRevision.changes as Record<string, any>),
+            ...(dto as Record<string, any>),
+          },
+        });
+      } else {
+        revision = await this.listingsRepository.createRevision({
+          listing: { connect: { id: existing.id } },
+          seller: { connect: { id: user.id } },
+          status: 'PENDING_REVIEW',
+          riskLevel: classification.riskLevel,
+          changedFields: classification.changedFields,
+          changes: dto as any,
+          previousData: {
+            title: existing.title,
+            price: Number(existing.price),
+            description: existing.description,
+            categoryId: existing.categoryId,
+            condition: existing.condition,
+            availableForPurchase: existing.availableForPurchase,
+            availableForRent: existing.availableForRent,
+            images: existing.images,
+            attributes: existing.attributes,
+          } as any,
+        });
+      }
+
+      await this.notificationsService.createSignificantChangesSubmittedNotification(
+        existing.sellerId,
+        existing.id,
+        existing.title,
+      );
+
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'listing.revision_submitted',
+        resource: 'listing',
+        resourceId: existing.id,
+        metadata: { revisionId: revision.id, riskLevel: classification.riskLevel },
+      });
+
+      const serialized = serializeListing(existing);
+      return {
+        ...serialized,
+        pendingRevision: {
+          id: revision.id,
+          status: revision.status,
+          riskLevel: revision.riskLevel,
+          changedFields: revision.changedFields,
+          createdAt: revision.createdAt,
+        },
+      };
+    }
+
+    // Default fall-through (draft, archived, sold)
+    return this.applyDirectUpdate(user, existing, dto);
+  }
+
+  private async applyDirectUpdate(
+    user: AuthenticatedUser,
+    existing: ListingWithRelations,
+    dto: UpdateListingDto,
+  ) {
+    const id = existing.id;
     const updateData: Prisma.ListingUpdateInput = {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined ? { description: dto.description } : {}),
@@ -304,14 +452,11 @@ export class ListingsService {
 
     if (dto.status) {
       Object.assign(updateData, this.applyStatusChange(dto.status, existing));
-      // Handle rejection reason for rejected status
       if (dto.status === 'rejected' && dto.rejectedReason) {
         updateData.rejectedReason = dto.rejectedReason;
+      } else if (dto.status === 'pending_review') {
+        updateData.rejectedReason = null;
       }
-    } else if (existing.sellerId === user.id && !canModerateListings(user) && existing.status === 'rejected') {
-      // Automatic resubmission: REJECTED -> edit -> PENDING_REVIEW
-      updateData.status = 'pending_review';
-      updateData.rejectedReason = null;
     }
 
     if (dto.title && dto.title !== existing.title) {
@@ -363,7 +508,6 @@ export class ListingsService {
         metadata: { newStatus: dto.status, rejectedReason: dto.rejectedReason },
       });
 
-      // Send notifications for approval/rejection
       if (dto.status === 'active') {
         await this.notificationsService.createListingApprovedNotification(
           listing.sellerId,
@@ -682,6 +826,111 @@ export class ListingsService {
       limit: 100,
     });
     return logs.data;
+  }
+
+  // ─── Revision Moderation Methods ──────────────────────────────────────────
+
+  async getPendingRevisions(query: ListingQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const result = await this.listingsRepository.findPendingRevisions({ page, limit });
+    return toPaginatedResponse(result);
+  }
+
+  async getListingRevisions(listingId: string) {
+    return this.listingsRepository.findRevisionsByListingId(listingId);
+  }
+
+  async getRevisionById(revisionId: string) {
+    const revision = await this.listingsRepository.findRevisionById(revisionId);
+    if (!revision) {
+      throw new ListingNotFoundException();
+    }
+    return revision;
+  }
+
+  async approveRevision(revisionId: string, adminUser: AuthenticatedUser) {
+    if (!canModerateListings(adminUser)) {
+      throw new ListingForbiddenException('You do not have permission to moderate revisions.');
+    }
+
+    const revision = await this.listingsRepository.findRevisionById(revisionId);
+    if (!revision || revision.status !== 'PENDING_REVIEW') {
+      throw new ListingNotFoundException();
+    }
+
+    const existingListing = await this.listingsRepository.findByIdWithRelations(revision.listingId);
+    if (!existingListing) {
+      throw new ListingNotFoundException();
+    }
+
+    // Apply revision changes to public Listing record
+    const changesDto = revision.changes as UpdateListingDto;
+    const updatedListing = await this.applyDirectUpdate(adminUser, existingListing, changesDto);
+
+    // Update revision status to APPROVED
+    await this.listingsRepository.updateRevision(revision.id, {
+      status: 'APPROVED',
+      reviewedBy: { connect: { id: adminUser.id } },
+      reviewedAt: new Date(),
+    });
+
+    await this.adminLogsService.createLog({
+      actorId: adminUser.id,
+      action: 'listing.revision_approved',
+      resource: 'listing',
+      resourceId: existingListing.id,
+      metadata: { revisionId: revision.id, changedFields: revision.changedFields },
+    });
+
+    await this.notificationsService.createRevisionApprovedNotification(
+      existingListing.sellerId,
+      existingListing.id,
+      existingListing.title,
+    );
+
+    return updatedListing;
+  }
+
+  async rejectRevision(revisionId: string, adminUser: AuthenticatedUser, reason?: string) {
+    if (!canModerateListings(adminUser)) {
+      throw new ListingForbiddenException('You do not have permission to moderate revisions.');
+    }
+
+    const revision = await this.listingsRepository.findRevisionById(revisionId);
+    if (!revision || revision.status !== 'PENDING_REVIEW') {
+      throw new ListingNotFoundException();
+    }
+
+    const existingListing = await this.listingsRepository.findByIdWithRelations(revision.listingId);
+    if (!existingListing) {
+      throw new ListingNotFoundException();
+    }
+
+    // Update revision status to REJECTED - previous approved version remains public in DB!
+    const updatedRevision = await this.listingsRepository.updateRevision(revision.id, {
+      status: 'REJECTED',
+      rejectionReason: reason ?? null,
+      reviewedBy: { connect: { id: adminUser.id } },
+      reviewedAt: new Date(),
+    });
+
+    await this.adminLogsService.createLog({
+      actorId: adminUser.id,
+      action: 'listing.revision_rejected',
+      resource: 'listing',
+      resourceId: existingListing.id,
+      metadata: { revisionId: revision.id, reason },
+    });
+
+    await this.notificationsService.createRevisionRejectedNotification(
+      existingListing.sellerId,
+      existingListing.id,
+      existingListing.title,
+      reason,
+    );
+
+    return updatedRevision;
   }
 
   private async updateStatus(

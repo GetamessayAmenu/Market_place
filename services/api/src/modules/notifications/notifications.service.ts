@@ -168,6 +168,75 @@ export class NotificationsService {
     );
   }
 
+  async createSignificantChangesSubmittedNotification(
+    sellerId: string,
+    listingId: string,
+    listingTitle: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'system',
+      title: 'Changes submitted for review',
+      body: `Your updates to "${listingTitle}" have been submitted for admin review. The current approved version remains public.`,
+      data: { listingId, listingTitle },
+    });
+  }
+
+  async createRejectedListingResubmittedNotification(
+    sellerId: string,
+    listingId: string,
+    listingTitle: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'system',
+      title: 'Listing resubmitted',
+      body: `Your rejected listing "${listingTitle}" has been resubmitted for admin review.`,
+      data: { listingId, listingTitle },
+    });
+  }
+
+  async createRevisionApprovedNotification(
+    sellerId: string,
+    listingId: string,
+    listingTitle: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'listing_approved',
+      title: 'Listing update approved',
+      body: `Your changes to listing "${listingTitle}" have been approved and are now public.`,
+      data: { listingId, listingTitle },
+    });
+
+    this.eventEmitter.emit(
+      NOTIFICATION_DOMAIN_EVENTS.LISTING_APPROVED,
+      new ListingApprovedEvent(sellerId, listingId, listingTitle),
+    );
+  }
+
+  async createRevisionRejectedNotification(
+    sellerId: string,
+    listingId: string,
+    listingTitle: string,
+    reason?: string,
+  ): Promise<void> {
+    await this.notificationsRepository.create({
+      user: { connect: { id: sellerId } },
+      type: 'listing_rejected',
+      title: 'Listing update rejected',
+      body: reason
+        ? `Your changes to listing "${listingTitle}" were rejected: ${reason}. The previous approved version remains public.`
+        : `Your changes to listing "${listingTitle}" were rejected. The previous approved version remains public.`,
+      data: { listingId, listingTitle, reason },
+    });
+
+    this.eventEmitter.emit(
+      NOTIFICATION_DOMAIN_EVENTS.LISTING_REJECTED,
+      new ListingRejectedEvent(sellerId, listingId, listingTitle, reason),
+    );
+  }
+
   async createListingFavoritedNotification(
     sellerId: string,
     listingId: string,

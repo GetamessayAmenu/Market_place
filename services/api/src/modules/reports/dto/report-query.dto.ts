@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import type { ReportStatus, ReportTargetType } from '@prisma/client';
+import type { ReportPriority, ReportStatus, ReportTargetType } from '@prisma/client';
 
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
@@ -13,6 +13,14 @@ export class ReportQueryDto extends PaginationQueryDto {
   status?: ReportStatus;
 
   @IsOptional()
+  @IsEnum(['low', 'medium', 'high', 'critical'] as const)
+  priority?: ReportPriority;
+
+  @IsOptional()
+  @IsString()
+  assignedAdminId?: string;
+
+  @IsOptional()
   @IsString()
   reporterId?: string;
 
@@ -23,6 +31,14 @@ export class ReportQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   listingId?: string;
+
+  @IsOptional()
+  @IsString()
+  conversationId?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 
   @IsOptional()
   @IsString()

@@ -48,6 +48,9 @@ export default function AdminLoginPage() {
       // Backend returns {success: true, data: {user, tokens}}
       if (result.success && result.data) {
         console.log('Login successful, user:', result.data.user)
+        if (result.data.tokens?.accessToken) {
+          localStorage.setItem('admin_access_token', result.data.tokens.accessToken)
+        }
         // Login successful, redirect to admin dashboard
         // Wait a moment for cookies to be set, then redirect
         setTimeout(() => {

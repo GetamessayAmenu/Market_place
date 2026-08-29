@@ -2,13 +2,14 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { HeroBannersService } from './hero-banners.service';
 import type { CreateHeroBannerDto } from './dto/create-hero-banner.dto';
 
 @Controller('admin/hero-banners')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('super_admin', 'moderator')
 export class HeroBannersController {
   constructor(private readonly heroBannersService: HeroBannersService) {}

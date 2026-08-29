@@ -92,7 +92,8 @@ function TypeBadge({ type }: { type: OrderType }) {
     RENTAL: { color: 'bg-purple-100 text-purple-700', icon: <IconRental />, label: 'Rental' },
     CUSTOM_TAILORING: { color: 'bg-orange-100 text-orange-700', icon: <IconCustom />, label: 'Custom Tailoring' },
   };
-  const { color, icon, label } = config[type];
+  const item = (type && config[type]) || { color: 'bg-blue-100 text-blue-700', icon: <IconSale />, label: type || 'Sale' };
+  const { color, icon, label } = item;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${color}`}>
       {icon}

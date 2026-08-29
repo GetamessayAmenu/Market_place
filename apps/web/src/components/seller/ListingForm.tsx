@@ -99,7 +99,7 @@ const STEP_ICONS = {
   ),
 };
 
-function getSteps(type: 'sale' | 'rent' | null): StepDef[] {
+function getSteps(_type: 'sale' | 'rent' | null): StepDef[] {
   const steps: StepDef[] = [
     { id: 'photos', label: 'Photos', description: 'Upload 1-8 product photos', icon: STEP_ICONS.image },
     { id: 'info', label: 'Basic Information', description: 'Title, category, description', icon: STEP_ICONS.info },
@@ -121,22 +121,76 @@ interface ImageUploadSectionProps {
 }
 
 function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectionProps) {
-  const { uploadImage, isUploading, uploadError, clearError } = useImageUpload();
+  const { uploadImages, isUploading, uploadProgress, uploadError, clearError } = useImageUpload();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [validationNotice, setValidationNotice] = React.useState<string | null>(null);
   const dragCounterRef = React.useRef(0);
+
+  const processBatchUpload = React.useCallback(
+    async (fileList: File[]) => {
+      setValidationNotice(null);
+      if (!fileList || fileList.length === 0) return;
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+
+      const validFiles: File[] = [];
+      let skippedInvalid = 0;
+      let skippedSize = 0;
+
+      for (const file of fileList) {
+        if (!allowedTypes.includes(file.type)) {
+          skippedInvalid++;
+          continue;
+        }
+        if (file.size > maxSizeBytes) {
+          skippedSize++;
+          continue;
+        }
+        validFiles.push(file);
+      }
+
+      if (skippedInvalid > 0 || skippedSize > 0) {
+        setValidationNotice(
+          `Skipped ${skippedInvalid + skippedSize} file(s) (JPEG/PNG/WebP only, under 5MB each).`,
+        );
+      }
+
+      if (validFiles.length === 0) return;
+
+      const remainingSlots = 8 - images.length;
+      if (remainingSlots <= 0) {
+        setValidationNotice('Maximum 8 photos limit reached.');
+        return;
+      }
+
+      const batchToUpload = validFiles.slice(0, remainingSlots);
+      if (validFiles.length > remainingSlots) {
+        setValidationNotice(
+          `Selected ${validFiles.length} photos, but only ${remainingSlots} slot(s) available. Uploading first ${remainingSlots}.`,
+        );
+      }
+
+      const uploaded = await uploadImages(batchToUpload);
+      if (uploaded && uploaded.length > 0) {
+        const nextImages = [
+          ...images,
+          ...uploaded.map((img, idx) => ({
+            ...img,
+            sortOrder: images.length + idx,
+          })),
+        ];
+        onImagesChange(nextImages);
+      }
+    },
+    [images, uploadImages, onImagesChange],
+  );
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-    for (const file of Array.from(files)) {
-      if (images.length >= 8) break;
-      const result = await uploadImage(file);
-      if (result) {
-        const updated = [...images, { ...result, sortOrder: images.length }];
-        onImagesChange(updated);
-      }
-    }
+    await processBatchUpload(Array.from(files));
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -166,16 +220,8 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     e.stopPropagation();
     setIsDragging(false);
     dragCounterRef.current = 0;
-    
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    for (const file of files) {
-      if (images.length >= 8) break;
-      const result = await uploadImage(file);
-      if (result) {
-        const updated = [...images, { ...result, sortOrder: images.length }];
-        onImagesChange(updated);
-      }
-    }
+    const files = Array.from(e.dataTransfer.files);
+    await processBatchUpload(files);
   }
 
   function handleRemove(index: number) {
@@ -205,10 +251,11 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-medium">Product Photos</h3>
-        <p className="text-sm text-muted-foreground">Upload 1-8 photos. The first photo will be the main product image. Show clear photos of the complete clothing item.</p>
+        <p className="text-sm text-muted-foreground">Upload 1-8 photos at once. The first photo will be the main product image. Show clear photos of the complete clothing item.</p>
       </div>
 
       {uploadError && <Alert variant="error" onDismiss={clearError}>{uploadError}</Alert>}
+      {validationNotice && <Alert variant="warning" onDismiss={() => setValidationNotice(null)}>{validationNotice}</Alert>}
       {error !== undefined && <p className="text-sm text-destructive">{error}</p>}
 
       <div
@@ -228,18 +275,27 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
             </svg>
           </div>
           <div>
-            <p className="text-sm font-medium">Drag and drop photos here</p>
-            <p className="text-xs text-muted-foreground">or click to browse</p>
+            <p className="text-sm font-medium">Drag and drop multiple photos here</p>
+            <p className="text-xs text-muted-foreground">or click to select multiple photos from device</p>
           </div>
           <Button type="button" variant="outline" onClick={() => { fileInputRef.current?.click(); }} disabled={isUploading || images.length >= 8}>
-            {isUploading ? <span className="flex items-center gap-2"><Spinner size="sm" /> Uploading...</span> : 'Select Photos'}
+            {isUploading ? (
+              <span className="flex items-center gap-2">
+                <Spinner size="sm" />
+                {uploadProgress
+                  ? `Uploading ${uploadProgress.completed} of ${uploadProgress.total} (${uploadProgress.percentage}%)...`
+                  : 'Uploading photos...'}
+              </span>
+            ) : (
+              'Select Multiple Photos'
+            )}
           </Button>
         </div>
       </div>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{images.length}/8 photos</span>
-        <span>JPEG, PNG, WebP • Max 5MB each</span>
+        <span>JPEG, PNG, WebP • Max 5MB each • Multi-select supported</span>
       </div>
 
       {images.length > 0 && (

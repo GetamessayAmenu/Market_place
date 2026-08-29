@@ -198,11 +198,11 @@ export class UsersRepository {
     });
   }
 
-  async findUserListings(userId: string) {
+  async findUserListings(userId: string, isOwner = false) {
     return this.prisma.listing.findMany({
       where: {
         sellerId: userId,
-        status: 'active',
+        ...(isOwner ? {} : { status: 'active' }),
         deletedAt: null,
       },
       select: {
@@ -211,11 +211,18 @@ export class UsersRepository {
         price: true,
         condition: true,
         city: true,
+        status: true,
+        rejectedReason: true,
         availableForPurchase: true,
         availableForRent: true,
         customOrderAvailable: true,
         rentalPricePerDay: true,
         createdAt: true,
+        images: {
+          where: { deletedAt: null },
+          select: { url: true, isPrimary: true },
+          take: 1,
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,

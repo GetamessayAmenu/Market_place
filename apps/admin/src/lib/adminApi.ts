@@ -444,8 +444,51 @@ export async function bulkListingAction(listingIds: string[], action: 'approve' 
   })
 }
 
+export interface ListingRevision {
+  id: string
+  listingId: string
+  sellerId: string
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+  riskLevel: 'LOW' | 'SIGNIFICANT' | 'HIGH'
+  changedFields: string[]
+  changes: Record<string, any>
+  previousData: Record<string, any>
+  rejectionReason?: string | null
+  createdAt: string
+  updatedAt: string
+  reviewedAt?: string | null
+  seller?: { id: string; displayName?: string; email?: string } | null
+  reviewedBy?: { id: string; displayName?: string; email?: string } | null
+  listing?: AdminListing | null
+}
+
 export async function fetchListingHistory(id: string): Promise<AuditLog[]> {
   return clientGet<AuditLog[]>('/admin/listings/' + id + '/history')
+}
+
+export async function fetchPendingRevisions(params?: Record<string, string | number | boolean | undefined>): Promise<PaginatedResponse<ListingRevision>> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return clientGet<PaginatedResponse<ListingRevision>>('/admin/listings/revisions/pending' + qs)
+}
+
+export async function fetchListingRevisions(listingId: string): Promise<ListingRevision[]> {
+  return clientGet<ListingRevision[]>('/admin/listings/' + listingId + '/revisions')
+}
+
+export async function fetchRevision(revisionId: string): Promise<ListingRevision> {
+  return clientGet<ListingRevision>('/admin/listings/revisions/' + revisionId)
+}
+
+export async function approveRevision(revisionId: string): Promise<AdminListing> {
+  return clientPost<AdminListing>('/admin/listings/revisions/' + revisionId + '/approve')
+}
+
+export async function rejectRevision(revisionId: string, reason?: string): Promise<ListingRevision> {
+  return clientPost<ListingRevision>('/admin/listings/revisions/' + revisionId + '/reject', {
+    ...(reason ? { reason } : {}),
+  })
 }
 
 // ─── Admin Users ─────────────────────────────────────────────────────────────

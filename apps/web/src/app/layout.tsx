@@ -42,8 +42,8 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-      <body className={inter.className}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`} suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
         <Providers>
           <PublicLayout>{children}</PublicLayout>
         </Providers>

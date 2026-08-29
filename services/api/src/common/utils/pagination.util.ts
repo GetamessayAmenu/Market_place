@@ -17,6 +17,7 @@ export function toPaginatedResponse<T>(
   };
 
   return {
+    success: true,
     data: result.items,
     meta,
   };

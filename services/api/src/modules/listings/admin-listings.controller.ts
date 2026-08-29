@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { BulkListingActionDto } from '../listings/dto/bulk-listing-action.dto';
@@ -14,7 +15,7 @@ import { ListingsService } from '../listings/listings.service';
  * Allows moderators to see listings in any status (including pending_review).
  */
 @Controller('admin/listings')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'super_admin', 'moderator', 'support')
 export class AdminListingsController {
   constructor(private readonly listingsService: ListingsService) {}
@@ -86,6 +87,38 @@ export class AdminListingsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.listingsService.setFeatured(id, dto.featured, user);
+  }
+
+  @Get('revisions/pending')
+  getPendingRevisions(@Query() query: ListingQueryDto) {
+    return this.listingsService.getPendingRevisions(query);
+  }
+
+  @Get('revisions/:revisionId')
+  getRevisionById(@Param('revisionId') revisionId: string) {
+    return this.listingsService.getRevisionById(revisionId);
+  }
+
+  @Post('revisions/:revisionId/approve')
+  approveRevision(
+    @Param('revisionId') revisionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.listingsService.approveRevision(revisionId, user);
+  }
+
+  @Post('revisions/:revisionId/reject')
+  rejectRevision(
+    @Param('revisionId') revisionId: string,
+    @Body() dto: ModerationActionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.listingsService.rejectRevision(revisionId, user, dto.reason);
+  }
+
+  @Get(':id/revisions')
+  getListingRevisions(@Param('id') id: string) {
+    return this.listingsService.getListingRevisions(id);
   }
 
   @Get(':id/history')

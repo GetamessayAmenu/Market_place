@@ -31,11 +31,6 @@ export default function ShopLocationMap({
     ? `https://www.google.com/maps?q=${latitude},${longitude}`
     : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`
 
-  // Generate embed URL for iframe
-  const embedUrl = latitude && longitude
-    ? `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${latitude},${longitude}`
-    : `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${mapsQuery}`
-
   return (
     <div className={className}>
       <div className="rounded-lg border bg-card overflow-hidden">

@@ -56,8 +56,9 @@ export default function CatalogClient() {
   const { data: categoriesRes } = useCategories()
 
   const categoryOptions: SelectOption[] = useMemo(() => {
-    const cats = categoriesRes?.data ?? []
-    return cats.map((c) => ({ value: c.id, label: c.name }))
+    const raw: any = categoriesRes
+    const cats: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []
+    return cats.map((c: any) => ({ value: c.id, label: c.name }))
   }, [categoriesRes])
 
   const conditionOptions: SelectOption[] = [

@@ -14,6 +14,13 @@ export const CHAT_SERVER_EVENTS = {
   USER_OFFLINE: 'chat:user_offline',
   ERROR: 'chat:error',
   JOINED: 'chat:joined',
+  USER_RESTRICTED: 'chat:user_restricted',
+} as const;
+
+export const ADMIN_SERVER_EVENTS = {
+  NEW_REPORT: 'admin:new_report',
+  HIGH_RISK_ALERT: 'admin:high_risk_alert',
+  MESSAGING_RESTRICTED: 'admin:messaging_restricted',
 } as const;
 
 export const ORDER_CLIENT_EVENTS = {

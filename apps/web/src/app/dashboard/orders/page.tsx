@@ -1,8 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import { Button, Card, CardContent, Alert, Badge } from '@marketplace/ui';
 import { useAuth } from '../../../hooks/useAuth';
 import { apiGet } from '../../../lib/api';
@@ -50,7 +49,7 @@ interface Order {
   } | null;
 }
 
-export default function OrdersPage() {
+function OrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const user = useAuth((s) => s.user);
@@ -273,5 +272,13 @@ export default function OrdersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">Loading orders...</div>}>
+      <OrdersContent />
+    </Suspense>
   );
 }

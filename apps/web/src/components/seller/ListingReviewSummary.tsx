@@ -150,8 +150,8 @@ export default function ListingReviewSummary({ data }: ListingReviewSummaryProps
         {data.listingType === 'rent' && data.pricing.rentalDeposit && (
           <Row label="Deposit" value={'$' + Number(data.pricing.rentalDeposit).toLocaleString()} />
         )}
-        {data.listingType === 'custom' && data.pricing.estimatedDays && (
-          <Row label="Est. days" value={data.pricing.estimatedDays} />
+        {data.listingType === 'custom' && data.pricing.estimatedProductionDays && (
+          <Row label="Est. days" value={data.pricing.estimatedProductionDays} />
         )}
         {data.listingType === 'sale' && data.pricing.sku && (
           <Row label="SKU" value={data.pricing.sku} />

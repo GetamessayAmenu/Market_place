@@ -12,6 +12,7 @@ import {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { OrderQueryDto } from './dto/order-query.dto';
@@ -25,7 +26,7 @@ import { AlternativeDateSuggestionDto } from './dto/alternative-date.dto';
 import { OrdersService } from './orders.service';
 
 @Controller('admin/orders')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'super_admin')
 export class AdminOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -47,7 +48,7 @@ export class AdminOrdersController {
 }
 
 @Controller('orders')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('buyer', 'seller')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}

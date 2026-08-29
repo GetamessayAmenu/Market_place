@@ -16,6 +16,7 @@ export interface ImageUploaderProps {
   images: UploadedImage[];
   onImagesChange: (images: UploadedImage[]) => void;
   onUpload: (file: File) => Promise<UploadedImage | null>;
+  onUploadMultiple?: (files: File[]) => Promise<UploadedImage[]>;
   variant?: ImageUploaderVariant;
   maxImages?: number;
   isUploading?: boolean;
@@ -32,6 +33,7 @@ export default function ImageUploader({
   images,
   onImagesChange,
   onUpload,
+  onUploadMultiple,
   variant = 'grid',
   maxImages = 10,
   isUploading = false,
@@ -41,23 +43,46 @@ export default function ImageUploader({
 }: ImageUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [progressText, setProgressText] = useState<string | null>(null);
+
+  const processFiles = useCallback(async (fileList: File[]) => {
+    if (!fileList || fileList.length === 0) return;
+    const remaining = maxImages - images.length;
+    if (remaining <= 0) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    const valid = fileList.filter((f) => allowed.includes(f.type) && f.size <= 5 * 1024 * 1024);
+    const toUpload = valid.slice(0, remaining);
+
+    if (toUpload.length === 0) return;
+
+    let newImages: UploadedImage[] = [];
+    if (onUploadMultiple) {
+      newImages = await onUploadMultiple(toUpload);
+    } else {
+      setProgressText(`Uploading ${toUpload.length} image(s)...`);
+      const results = await Promise.all(toUpload.map((f) => onUpload(f)));
+      newImages = results.filter((r): r is UploadedImage => r !== null);
+      setProgressText(null);
+    }
+
+    if (newImages.length > 0) {
+      const updated = [
+        ...images,
+        ...newImages.map((img, idx) => ({ ...img, sortOrder: images.length + idx })),
+      ];
+      onImagesChange(updated);
+    }
+  }, [images, maxImages, onUpload, onUploadMultiple, onImagesChange]);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-
-    for (const file of Array.from(files)) {
-      if (images.length >= maxImages) break;
-      const result = await onUpload(file);
-      if (result) {
-        const updated = [...images, { ...result, sortOrder: images.length }];
-        onImagesChange(updated);
-      }
-    }
+    await processFiles(Array.from(files));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [images, maxImages, onUpload, onImagesChange]);
+  }, [processFiles]);
 
   const handleRemove = useCallback((index: number) => {
     const updated = images.filter((_, i) => i !== index).map((img, i) => ({ ...img, sortOrder: i }));
@@ -102,17 +127,9 @@ export default function ImageUploader({
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    const files = e.dataTransfer.files;
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
-      if (images.length >= maxImages) break;
-      const result = await onUpload(file);
-      if (result) {
-        const updated = [...images, { ...result, sortOrder: images.length }];
-        onImagesChange(updated);
-      }
-    }
-  }, [images, maxImages, onUpload, onImagesChange]);
+    const files = Array.from(e.dataTransfer.files);
+    await processFiles(files);
+  }, [processFiles]);
 
   const atLimit = images.length >= maxImages;
 
@@ -215,7 +232,7 @@ export default function ImageUploader({
           {isUploading ? (
             <div className="flex flex-col items-center gap-2">
               <Spinner size="md" />
-              <span className="text-sm text-muted-foreground">Uploading...</span>
+              <span className="text-sm text-muted-foreground">{progressText || 'Uploading...'}</span>
             </div>
           ) : (
             <>

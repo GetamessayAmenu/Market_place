@@ -10,6 +10,7 @@ export interface PaginatedMeta {
 }
 
 export interface PaginatedResponse<T> {
+  readonly success: true;
   readonly data: readonly T[];
   readonly meta: PaginatedMeta;
 }

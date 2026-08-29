@@ -42,13 +42,12 @@ export class CustomOrdersRepository extends BaseRepository<CustomOrder> {
     agreedPrice?: Prisma.Decimal;
   }): Promise<CustomOrderWithRelations> {
     // Find or create conversation for this listing and buyer/seller pair
-    const conversation = await this.prisma.conversation.findUnique({
+    const conversation = await this.prisma.conversation.findFirst({
       where: {
-        listingId_buyerId_sellerId: {
-          listingId: data.listingId,
-          buyerId: data.buyerId,
-          sellerId: data.sellerId,
-        },
+        listingId: data.listingId,
+        buyerId: data.buyerId,
+        sellerId: data.sellerId,
+        deletedAt: null,
       },
     });
 

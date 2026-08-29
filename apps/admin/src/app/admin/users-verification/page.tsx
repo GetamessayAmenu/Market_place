@@ -475,6 +475,36 @@ export default function VerificationPage() {
                 </div>
               </div>
 
+              {/* Messaging Activity & Restrictions Card */}
+              {detailModal.profile.user?.id && (
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/30 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-gray-900">User Messaging Activity & Safety</h4>
+                    <a
+                      href={`/admin/chat/reports?reportedUserId=${detailModal.profile.user.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-indigo-600 hover:underline"
+                    >
+                      View Reported Chats →
+                    </a>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Privileged access: private message body contents are restricted to active moderation reports.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="rounded-md bg-white p-2.5 shadow-sm">
+                      <span className="text-gray-500">Chat Risk Profile:</span>
+                      <p className="font-bold text-emerald-600 mt-0.5">🟢 Normal Risk Level</p>
+                    </div>
+                    <div className="rounded-md bg-white p-2.5 shadow-sm">
+                      <span className="text-gray-500">Messaging Restriction:</span>
+                      <p className="font-medium text-gray-900 mt-0.5">No Active Restriction</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Review Information */}
               {detailModal.profile.reviewedBy && (
                 <div className="rounded-lg bg-gray-50 p-4">

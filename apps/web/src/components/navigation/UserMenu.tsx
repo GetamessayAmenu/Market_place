@@ -51,7 +51,7 @@ const routeMap: Record<string, string> = {
   account: '/dashboard/settings/account',
   notifications: '/dashboard/settings/notifications',
   seller: '/dashboard/seller',
-  'my-listings': '/dashboard/seller/listings',
+  'my-listings': '/seller/catalog',
   'seller-orders': '/dashboard/seller/orders',
   payouts: '/dashboard/seller/payouts',
   login: '/login',

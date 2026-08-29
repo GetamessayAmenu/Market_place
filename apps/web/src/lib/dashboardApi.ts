@@ -111,7 +111,7 @@ export async function fetchCustomOrderPipeline(_sellerId: string): Promise<Custo
 export async function fetchInventoryAlerts(_sellerId: string): Promise<InventoryAlert[]> {
   await delay(300);
   // TODO: return apiGet<InventoryAlert[]>(`/seller/${_sellerId}/inventory/alerts`);
-  return [...MOCK_INVENTORY_ALERTS];
+  return [...liveInventoryAlerts];
 }
 
 export async function fetchPerformanceInsights(_sellerId: string): Promise<PerformanceInsights> {
@@ -129,7 +129,7 @@ export async function fetchGrowthRecommendations(_sellerId: string): Promise<Gro
 export async function fetchNotifications(_sellerId: string): Promise<Notification[]> {
   await delay(250);
   // TODO: return apiGet<Notification[]>(`/seller/${_sellerId}/notifications`);
-  return [...MOCK_NOTIFICATIONS];
+  return [...liveNotifications];
 }
 
 export async function fetchRevenueChart(
@@ -194,7 +194,6 @@ export async function markRentalCondition(
 // Re-export types for convenience
 export type {
   CustomOrderPipeline,
-  ConversationMessage,
   DashboardKpis,
   GrowthRecommendation,
   InventoryAlert,

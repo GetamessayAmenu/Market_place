@@ -41,7 +41,7 @@ export interface ListingActionsProps {
 
 export default function ListingActions({
   listingId,
-  price,
+  price: _price,
   currency,
   availableForRent,
   rentalPricePerDay,
@@ -52,9 +52,9 @@ export default function ListingActions({
   contactOptions,
   supportsReadyMade = true,
   supportsCustomDesign = false,
-  startingCustomPrice,
-  estimatedProductionDays,
-  customizationOptions,
+  startingCustomPrice: _startingCustomPrice,
+  estimatedProductionDays: _estimatedProductionDays,
+  customizationOptions: _customizationOptions,
 }: ListingActionsProps) {
   const router = useRouter()
   const { user } = useAuth()
@@ -138,6 +138,17 @@ export default function ListingActions({
         {supportsCustomDesign && <Badge variant="info">Custom Design</Badge>}
         {availableForRent && <Badge variant="warning">Available to Rent</Badge>}
       </div>
+
+      {/* Rent action CTA */}
+      {availableForRent && rentalPricePerDay != null && !showRentPicker && (
+        <Button
+          variant="outline"
+          className="w-full border-amber-500 text-amber-700 hover:bg-amber-50"
+          onClick={handleRentClick}
+        >
+          Rent Item ({currency} {rentalPricePerDay.toLocaleString()}/day)
+        </Button>
+      )}
 
       {/* Rent date picker */}
       {showRentPicker && availableForRent && rentalPricePerDay != null && (

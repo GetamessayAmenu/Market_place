@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const PUBLIC_PATHS = ['/login', '/admin']
+const PUBLIC_PATHS = ['/login', '/admin/forbidden']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow public paths
-  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path + '/'))) {
-    return NextResponse.next()
-  }
-
-  // Allow Next.js internals and API routes
+  // Allow Next.js internals, static assets, and proxy API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/api')
   ) {
+    return NextResponse.next()
+  }
+
+  // Allow explicitly public paths
+  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path + '/'))) {
     return NextResponse.next()
   }
 

@@ -3,6 +3,8 @@ import React from 'react'
 import OrdersTable from '../../components/admin/OrdersTable'
 import { fetchAdminOrders } from '../../lib/adminApi'
 
+export const dynamic = 'force-dynamic'
+
 export default async function OrdersPage() {
   let initialData
   let errorMessage = null

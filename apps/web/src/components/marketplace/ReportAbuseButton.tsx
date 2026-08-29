@@ -1,7 +1,7 @@
 'use client'
 
 import { apiPost } from '../../lib/api'
-import { Button, Modal, Radio, RadioGroup, Textarea, useToast } from '@marketplace/ui'
+import { Button, Modal, RadioGroup, Textarea, useToast } from '@marketplace/ui'
 import React, { useState } from 'react'
 
 export interface ReportAbuseButtonProps {
@@ -104,11 +104,11 @@ export default function ReportAbuseButton({ listingId, listingTitle }: ReportAbu
           </div>
 
           <RadioGroup
+            name="report-reason"
             label="Reason for reporting"
             value={reason}
             onChange={setReason}
             options={reportReasons}
-            required
           />
 
           <Textarea

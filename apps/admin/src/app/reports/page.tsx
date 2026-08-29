@@ -3,6 +3,8 @@ import React from 'react'
 import ReportsTable from '../../components/admin/ReportsTable'
 import { fetchReports } from '../../lib/adminApi'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ReportsPage() {
 
   let initialData

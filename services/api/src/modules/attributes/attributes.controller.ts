@@ -12,6 +12,7 @@ import {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { CreateAttributeDto } from './dto/create-attribute.dto';
@@ -20,7 +21,7 @@ import { UpdateAttributeDto } from './dto/update-attribute.dto';
 import { AttributesService } from './attributes.service';
 
 @Controller('admin/attributes')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'super_admin')
 export class AttributesController {
   constructor(private readonly attributesService: AttributesService) {}

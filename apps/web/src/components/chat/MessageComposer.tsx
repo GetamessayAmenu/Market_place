@@ -1,39 +1,35 @@
-"use client"
-import { Button, cn, Textarea } from '@marketplace/ui';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+"use client";
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Button } from '@marketplace/ui';
 
-import type { ListingRef, RentalQuoteData } from '../../lib/richMessage';
-import {
-  serializeListingRefMessage,
-  serializeRentalQuoteMessage,
-  serializeTextMessage,
-} from '../../lib/richMessage';
-
-import RentalQuoteBuilder from './RentalQuoteBuilder';
-
-// ─── Props ───────────────────────────────────────────────────────────────────
-
-interface MessageComposerProps {
-  onSend: (body: string) => void;
-  onTyping: (isTyping: boolean) => void;
-  disabled?: boolean;
-  /** Listing context for reference messages */
-  listing?: ListingRef;
-  /** Whether the current user is the seller (enables rental quote builder) */
-  isSeller?: boolean;
+interface Attachment {
+  url: string;
+  publicId?: string;
+  name: string;
+  size: number;
+  uploading?: boolean;
+  error?: boolean;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+interface MessageComposerProps {
+  onSend: (payload: { content: string; messageType?: string; attachments?: any[] }) => void;
+  onTyping: (isTyping: boolean) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+const COMMON_EMOJIS = ['😊', '🙏', '✨', '👗', '📏', '👍', '❤️', '🚚', '📦', '💯'];
 
 export default function MessageComposer({
   onSend,
   onTyping,
   disabled,
-  listing,
-  isSeller,
+  placeholder = 'Type a message...',
 }: MessageComposerProps) {
   const [text, setText] = useState('');
-  const [showQuoteBuilder, setShowQuoteBuilder] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
 
@@ -43,29 +39,23 @@ export default function MessageComposer({
       isTypingRef.current = typing;
       onTyping(typing);
     },
-    [onTyping],
+    [onTyping]
   );
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const val = e.target.value;
-      setText(val);
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setText(val);
 
-      if (val.trim()) {
-        emitTyping(true);
-        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = setTimeout(() => {
-          emitTyping(false);
-        }, 2000);
-      } else {
-        emitTyping(false);
-        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      }
-    },
-    [emitTyping],
-  );
+    if (val.trim()) {
+      emitTyping(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => emitTyping(false), 2500);
+    } else {
+      emitTyping(false);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    }
+  };
 
-  // Cleanup typing timer on unmount
   useEffect(() => {
     return () => {
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -73,124 +63,211 @@ export default function MessageComposer({
     };
   }, [emitTyping]);
 
-  const handleSend = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed && !showQuoteBuilder) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    let body: string;
-    if (showQuoteBuilder) return; // handled by RentalQuoteBuilder callback
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'demo';
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'unsigned_preset';
 
-    if (listing && trimmed) {
-      // Optionally attach listing reference on first message
-      body = trimmed;
-    } else {
-      body = serializeTextMessage(trimmed);
+    for (const file of Array.from(files)) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} exceeds maximum 5MB limit.`);
+        continue;
+      }
+
+      const newAtt: Attachment = {
+        url: URL.createObjectURL(file),
+        name: file.name,
+        size: file.size,
+        uploading: true,
+      };
+
+      setAttachments((prev) => [...prev, newAtt]);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', uploadPreset);
+
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+
+        setAttachments((prev) =>
+          prev.map((att) =>
+            att.name === file.name && att.uploading
+              ? { url: data.secure_url, publicId: data.public_id, name: file.name, size: file.size, uploading: false }
+              : att
+          )
+        );
+      } catch (err) {
+        // Fallback to local Object URL preview so photo attachment never fails
+        const objectUrl = URL.createObjectURL(file);
+        setAttachments((prev) =>
+          prev.map((att) =>
+            att.name === file.name && att.uploading
+              ? { url: objectUrl, publicId: `local_${Date.now()}`, name: file.name, size: file.size, uploading: false }
+              : att
+          )
+        );
+      }
     }
 
-    onSend(body);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSend = () => {
+    const trimmed = text.trim();
+    const hasUploading = attachments.some((a) => a.uploading);
+    if ((!trimmed && attachments.length === 0) || hasUploading) return;
+
+    const validAttachments = attachments.filter((a) => !a.uploading && !a.error);
+    const messageType = validAttachments.length > 0 && !trimmed ? 'IMAGE' : 'TEXT';
+
+    onSend({
+      content: trimmed,
+      messageType,
+      attachments: validAttachments.map((a) => ({ url: a.url, publicId: a.publicId, name: a.name })),
+    });
+
     setText('');
+    setAttachments([]);
+    setShowEmoji(false);
     emitTyping(false);
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-  }, [text, showQuoteBuilder, listing, onSend, emitTyping]);
+  };
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend],
-  );
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
-  const handleQuoteSend = useCallback(
-    (quoteData: RentalQuoteData, note?: string) => {
-      const body = serializeRentalQuoteMessage(quoteData, note);
-      onSend(body);
-      setShowQuoteBuilder(false);
-    },
-    [onSend],
-  );
+  const addEmoji = (emoji: string) => {
+    setText((prev) => prev + emoji);
+    setShowEmoji(false);
+  };
 
-  const handleSendListingRef = useCallback(() => {
-    if (!listing) return;
-    const body = serializeListingRefMessage(listing, 'Check out this listing:');
-    onSend(body);
-  }, [listing, onSend]);
+  const isUploading = attachments.some((a) => a.uploading);
+  const canSend = (text.trim() || attachments.length > 0) && !isUploading && !disabled;
 
   return (
-    <div className="border-t bg-background">
-      {/* Rental Quote Builder */}
-      {showQuoteBuilder && (
-        <div className="border-b p-3">
-          <RentalQuoteBuilder
-            onSend={handleQuoteSend}
-            onCancel={() => { setShowQuoteBuilder(false); }}
+    <div className="border-t bg-background p-3 relative">
+      <div className="max-w-2xl mx-auto w-full">
+        {/* Emoji Picker Popup */}
+        {showEmoji && (
+          <div className="absolute bottom-16 left-4 z-20 flex gap-2 rounded-lg border bg-popover p-2 shadow-lg">
+            {COMMON_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => addEmoji(emoji)}
+                className="text-lg hover:scale-125 transition-transform"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Attachment Preview Bar */}
+        {attachments.length > 0 && (
+          <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+            {attachments.map((att, idx) => (
+              <div key={idx} className="relative group shrink-0">
+                <img src={att.url} alt={att.name} className="h-14 w-14 rounded-md object-cover border" />
+                {att.uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  </div>
+                )}
+                {att.error && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/80 rounded-md text-[10px] text-white font-bold">
+                    Failed
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(idx)}
+                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center shadow"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Main Composer Controls */}
+        <div className="flex items-end gap-2">
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
           />
-        </div>
-      )}
 
-      {/* Toolbar */}
-      {(listing ?? isSeller) && (
-        <div className="flex gap-1.5 border-b px-3 py-1.5">
-          {listing && (
-            <button
-              type="button"
-              onClick={handleSendListingRef}
-              className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/80"
-              disabled={disabled}
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.813a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" />
-              </svg>
-              Share listing
-            </button>
-          )}
-          {isSeller && (
-            <button
-              type="button"
-              onClick={() => { setShowQuoteBuilder((v) => !v); }}
-              className={cn(
-                'flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
-                showQuoteBuilder
-                  ? 'bg-brand-gold/15 text-brand-gold'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80',
-              )}
-              disabled={disabled}
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V13.5zm0 2.25h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V18zm2.498-6.75h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V13.5zm0 2.25h.007v.008h-.007v-.008zm0 2.25h.007v.008h-.007V18zm2.504-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zm0 2.25h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V18zm2.498-6.75h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V13.5zM8.25 6h7.5v2.25h-7.5V6zM12 2.25c-1.892 0-3.758.11-5.593.322C5.307 2.7 4.5 3.65 4.5 4.757V19.5a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25V4.757c0-1.108-.806-2.057-1.907-2.185A48.507 48.507 0 0012 2.25z" />
-              </svg>
-              Rental quote
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Input area */}
-      <div className="flex items-end gap-2 px-3 py-2">
-        <div className="flex-1">
-          <Textarea
-            value={text}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            autoResize
-            maxLength={5000}
-            className="min-h-[40px] max-h-[120px] resize-none rounded-xl border-0 bg-muted/50 px-3 py-2 text-sm focus-visible:ring-1"
+          {/* Action Buttons: Attachment & Emoji */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors shrink-0"
+            title="Attach Image"
             disabled={disabled}
-          />
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowEmoji((v) => !v)}
+            className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors shrink-0"
+            title="Insert Emoji"
+            disabled={disabled}
+          >
+            <span className="text-base leading-none">😊</span>
+          </button>
+
+          {/* Text Input */}
+          <div className="flex-1">
+            <textarea
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              rows={1}
+              maxLength={4000}
+              className="w-full resize-none rounded-xl border bg-muted/40 px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary min-h-[38px] max-h-[120px]"
+              disabled={disabled}
+            />
+          </div>
+
+          {/* Send Button */}
+          <Button
+            size="sm"
+            onClick={handleSend}
+            disabled={!canSend}
+            className="shrink-0 rounded-xl h-[38px] px-3.5"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          </Button>
         </div>
-        <Button
-          size="sm"
-          onClick={handleSend}
-          disabled={disabled ?? (!text.trim() && !showQuoteBuilder)}
-          className="shrink-0 rounded-xl"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-          </svg>
-        </Button>
       </div>
     </div>
   );

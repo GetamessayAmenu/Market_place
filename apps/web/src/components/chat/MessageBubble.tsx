@@ -74,13 +74,7 @@ export default function MessageBubble({
         )}
 
         {/* Rich content or plain text */}
-        {rich.type !== 'text' ? (
-          <RichMessageRenderer message={rich} isOwn={isOwn} />
-        ) : (
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-            {rich.body}
-          </p>
-        )}
+        <RichMessageRenderer message={message} isOwn={isOwn} />
 
         {/* Attachments */}
         {rich.attachments && rich.attachments.length > 0 && (

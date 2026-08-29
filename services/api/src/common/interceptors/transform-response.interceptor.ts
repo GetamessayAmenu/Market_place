@@ -4,19 +4,21 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import type { ApiSuccessResponse } from '@marketplace/types';
 import { map, type Observable } from 'rxjs';
 
 @Injectable()
 export class TransformResponseInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<ApiSuccessResponse<unknown>> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
-      map(
-        (data): ApiSuccessResponse<unknown> => ({
+      map((data): unknown => {
+        if (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+          return data;
+        }
+        return {
           success: true,
           data,
-        }),
-      ),
+        };
+      }),
     );
   }
 }

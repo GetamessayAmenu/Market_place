@@ -5,11 +5,19 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 
 export type ReportWithRelations = Prisma.ReportGetPayload<{
   include: {
-    reporter: { select: { id: true; displayName: true; email: true } };
-    reportedUser: { select: { id: true; displayName: true; email: true; status: true } };
-    listing: { select: { id: true; title: true; slug: true; status: true } };
-    message: { select: { id: true; body: true; createdAt: true } };
-    resolvedBy: { select: { id: true; displayName: true } };
+    reporter: { select: { id: true; displayName: true; email: true; avatarUrl: true } };
+    reportedUser: { select: { id: true; displayName: true; email: true; status: true; avatarUrl: true } };
+    listing: { select: { id: true; title: true; slug: true; status: true; price: true } };
+    message: { select: { id: true; body: true; createdAt: true; senderId: true } };
+    resolvedBy: { select: { id: true; displayName: true; email: true } };
+    assignedAdmin: { select: { id: true; displayName: true; email: true } };
+    conversation: {
+      include: {
+        buyer: { select: { id: true; displayName: true; email: true } };
+        seller: { select: { id: true; displayName: true; email: true } };
+        listing: { select: { id: true; title: true; slug: true; status: true } };
+      };
+    };
   };
 }>;
 
@@ -18,11 +26,19 @@ export class ReportsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly include = {
-    reporter: { select: { id: true, displayName: true, email: true } },
-    reportedUser: { select: { id: true, displayName: true, email: true, status: true } },
-    listing: { select: { id: true, title: true, slug: true, status: true } },
-    message: { select: { id: true, body: true, createdAt: true } },
-    resolvedBy: { select: { id: true, displayName: true } },
+    reporter: { select: { id: true, displayName: true, email: true, avatarUrl: true } },
+    reportedUser: { select: { id: true, displayName: true, email: true, status: true, avatarUrl: true } },
+    listing: { select: { id: true, title: true, slug: true, status: true, price: true } },
+    message: { select: { id: true, body: true, createdAt: true, senderId: true } },
+    resolvedBy: { select: { id: true, displayName: true, email: true } },
+    assignedAdmin: { select: { id: true, displayName: true, email: true } },
+    conversation: {
+      include: {
+        buyer: { select: { id: true, displayName: true, email: true } },
+        seller: { select: { id: true, displayName: true, email: true } },
+        listing: { select: { id: true, title: true, slug: true, status: true } },
+      },
+    },
   } as const;
 
   async findById(id: string): Promise<ReportWithRelations | null> {
@@ -99,6 +115,24 @@ export class ReportsRepository {
     });
   }
 
+  async assignAdmin(id: string, adminId: string | null): Promise<ReportWithRelations> {
+    return this.prisma.report.update({
+      where: { id },
+      data: {
+        assignedAdminId: adminId,
+      },
+      include: this.include,
+    });
+  }
+
+  async updatePriority(id: string, priority: any): Promise<ReportWithRelations> {
+    return this.prisma.report.update({
+      where: { id },
+      data: { priority },
+      include: this.include,
+    });
+  }
+
   async closeReport(id: string, note?: string): Promise<ReportWithRelations> {
     return this.prisma.report.update({
       where: { id },
@@ -128,7 +162,7 @@ export class ReportsRepository {
       where: { conversationId },
       include: {
         sender: {
-          select: { id: true, displayName: true, email: true },
+          select: { id: true, displayName: true, email: true, avatarUrl: true },
         },
       },
       orderBy: { createdAt: 'asc' },

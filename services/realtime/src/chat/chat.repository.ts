@@ -140,7 +140,11 @@ export class ChatRepository {
     const now = new Date();
     const [message] = await this.prisma.$transaction([
       this.prisma.message.create({
-        data,
+        data: {
+          conversationId: data.conversationId,
+          senderId: data.senderId,
+          content: data.body,
+        },
         include: {
           sender: { select: { id: true, displayName: true, avatarUrl: true } },
         },
@@ -210,5 +214,27 @@ export class ChatRepository {
       buyer: { id: order.buyerId, displayName: 'Buyer' },
       seller: { id: order.sellerId, displayName: 'Seller' },
     };
+  }
+
+  async checkActiveMessagingRestriction(userId: string) {
+    const active = await this.prisma.messagingRestriction.findFirst({
+      where: {
+        userId,
+        isActive: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!active) return null;
+
+    if (active.type === 'temporary' && active.expiresAt && active.expiresAt <= new Date()) {
+      await this.prisma.messagingRestriction.update({
+        where: { id: active.id },
+        data: { isActive: false },
+      });
+      return null;
+    }
+
+    return active;
   }
 }

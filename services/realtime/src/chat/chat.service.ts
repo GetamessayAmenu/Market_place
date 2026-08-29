@@ -131,7 +131,7 @@ export class ChatService {
   }
 
   async sendMessage(user: SocketUser, dto: SendMessageDto): Promise<SerializedMessage> {
-    this.assertCanSend(user);
+    await this.assertCanSend(user);
     this.validateMessageBody(dto.body);
 
     const conversation = await this.assertParticipant(dto.conversationId, user.id);
@@ -181,9 +181,19 @@ export class ChatService {
     return conversation;
   }
 
-  private assertCanSend(user: SocketUser): void {
+  private async assertCanSend(user: SocketUser): Promise<void> {
     if (user.status === 'suspended' || user.status === 'banned') {
-      throw new ChatNotAllowedException('Your account cannot send messages');
+      throw new ChatNotAllowedException('Your account is suspended or banned.');
+    }
+
+    const restriction = await this.chatRepository.checkActiveMessagingRestriction(user.id);
+    if (restriction) {
+      const expireStr = restriction.expiresAt
+        ? ` until ${new Date(restriction.expiresAt).toLocaleDateString()}`
+        : '';
+      throw new ChatNotAllowedException(
+        `Messaging restricted (${restriction.type})${expireStr}: ${restriction.reason}`,
+      );
     }
   }
 

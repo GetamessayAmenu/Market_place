@@ -322,8 +322,13 @@ export class UsersService {
     }));
   }
 
-  async findUserListings(userId: string) {
-    const listings = await this.usersRepository.findUserListings(userId);
+  async findUserListings(userId: string, viewer?: { id: string }) {
+    const isOwner = viewer?.id === userId;
+    const rawListings = await this.usersRepository.findUserListings(userId, isOwner);
+    const listings = rawListings.map((l) => ({
+      ...l,
+      primaryImageUrl: l.images?.[0]?.url ?? null,
+    }));
 
     return {
       success: true,

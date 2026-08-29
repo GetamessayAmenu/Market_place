@@ -20,7 +20,7 @@ export default function ListingsCustomOrdersPage() {
   const loadItems = async () => {
     try {
       setLoading(true)
-      const API_BASE = 'http://localhost:3001/api/v1'
+      const API_BASE = '/api/v1'
       
       // Build query parameters based on tab and filter
       const params: Record<string, string | number | boolean> = {
@@ -97,7 +97,7 @@ export default function ListingsCustomOrdersPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      const API_BASE = 'http://localhost:3001/api/v1'
+      const API_BASE = '/api/v1'
       console.log('Approving listing:', id)
       const response = await fetch(`${API_BASE}/admin/listings/${id}/approve`, {
         method: 'POST',
@@ -126,7 +126,7 @@ export default function ListingsCustomOrdersPage() {
 
   const handleReject = async (id: string, reason?: string) => {
     try {
-      const API_BASE = 'http://localhost:3001/api/v1'
+      const API_BASE = '/api/v1'
       const response = await fetch(`${API_BASE}/admin/listings/${id}/reject`, {
         method: 'POST',
         headers: {
@@ -153,7 +153,7 @@ export default function ListingsCustomOrdersPage() {
 
   const handleArchive = async (id: string, reason?: string) => {
     try {
-      const API_BASE = 'http://localhost:3001/api/v1'
+      const API_BASE = '/api/v1'
       const response = await fetch(`${API_BASE}/admin/listings/${id}/hide`, {
         method: 'POST',
         headers: {
@@ -180,7 +180,7 @@ export default function ListingsCustomOrdersPage() {
 
   const handleActivate = async (id: string) => {
     try {
-      const API_BASE = 'http://localhost:3001/api/v1'
+      const API_BASE = '/api/v1'
       const response = await fetch(`${API_BASE}/admin/listings/${id}/approve`, {
         method: 'POST',
         headers: {

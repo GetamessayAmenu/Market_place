@@ -52,7 +52,7 @@ export default function ListingCard({
   className,
   supportsReadyMade = true,
   supportsCustomDesign = false,
-  startingCustomPrice,
+  startingCustomPrice: _startingCustomPrice,
 }: ListingCardProps) {
   const isSold = status === 'sold-out';
   const showBadges = supportsReadyMade || supportsCustomDesign;

@@ -88,7 +88,11 @@ export interface SellerStats {
 // ─── Listings API ────────────────────────────────────────────────────────────
 
 export async function fetchMyListings(params?: Record<string, string | number | boolean | undefined>): Promise<SellerListingsResponse> {
-  // The backend GET /listings supports sellerId filter; we pass it from the hook
+  const sellerId = params?.sellerId;
+  if (sellerId) {
+    const { sellerId: _, ...queryParams } = params ?? {};
+    return apiGet<SellerListingsResponse>(`/users/${String(sellerId)}/listings`, queryParams);
+  }
   return apiGet<SellerListingsResponse>('/listings', params);
 }
 

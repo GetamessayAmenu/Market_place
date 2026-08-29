@@ -618,6 +618,7 @@ export function generateRevenueChartData(range: '7d' | '30d' | '90d' | '1y'): Re
       label: fmt(d),
       value: Math.max(0, Math.round(base + trend + noise)),
       date: d.toISOString(),
+      category: 'sale',
     });
   }
 

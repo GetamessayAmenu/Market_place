@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { BulkModerationActionDto } from './dto/moderation-action.dto';
@@ -16,7 +17,7 @@ import { ModerationService } from './moderation.service';
  * Allows moderators to moderate reviews, images, and other content.
  */
 @Controller('admin/moderation')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'super_admin', 'moderator', 'support')
 export class ModerationController {
   constructor(private readonly moderationService: ModerationService) {}

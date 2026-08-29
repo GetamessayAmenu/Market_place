@@ -16,16 +16,16 @@ export interface SerializedMessage {
 
 export interface SerializedConversation {
   readonly id: string;
-  readonly listingId: string;
+  readonly listingId: string | null;
   readonly buyerId: string;
   readonly sellerId: string;
   readonly lastMessageAt: string | null;
   readonly createdAt: string;
-  readonly listing: {
+  readonly listing?: {
     readonly id: string;
     readonly title: string;
     readonly slug: string;
-  };
+  } | null;
   readonly buyer: {
     readonly id: string;
     readonly displayName: string;
@@ -44,7 +44,7 @@ export function serializeMessage(message: MessageWithSender): SerializedMessage 
   return {
     id: message.id,
     conversationId: message.conversationId,
-    body: message.body,
+    body: message.content,
     senderId: message.senderId,
     readAt: message.readAt?.toISOString() ?? null,
     createdAt: message.createdAt.toISOString(),

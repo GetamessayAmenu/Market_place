@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Button, Card, CardContent, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Badge } from '@marketplace/ui';
+import { Button, Card, CardContent, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@marketplace/ui';
 import Link from 'next/link';
 import useAuth from '../../../hooks/useAuth';
+import { useMyListings } from '../../../hooks/useSeller';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { blackoutDateSchema, type BlackoutDateInput } from '../../../lib/validations/seller';
@@ -51,24 +52,19 @@ const IconCalendar = () => (
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
-function StockStatusBadge({ status }: { status: Listing['status'] }) {
-  const variants = {
-    in_stock: { variant: 'success' as const, label: 'In Stock' },
-    rented_out: { variant: 'warning' as const, label: 'Rented Out' },
-    out_of_stock: { variant: 'error' as const, label: 'Out of Stock' },
-  };
-  const { variant, label } = variants[status];
-  return <Badge variant={variant}>{label}</Badge>;
-}
-
-function ModerationStatusBadge({ status }: { status: Listing['moderationStatus'] }) {
-  const config = {
+function ModerationStatusBadge({ status }: { status?: string | null }) {
+  const config: Record<string, { color: string; label: string; tooltip: string }> = {
     draft: {
       color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
       label: 'Draft',
       tooltip: 'Listing is saved as draft and not submitted for review',
     },
     pending_review: {
+      color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      label: 'Pending Approval',
+      tooltip: 'Under review by platform moderators before going live',
+    },
+    pending: {
       color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
       label: 'Pending Approval',
       tooltip: 'Under review by platform moderators before going live',
@@ -88,14 +84,30 @@ function ModerationStatusBadge({ status }: { status: Listing['moderationStatus']
       label: 'Archived',
       tooltip: 'Listing has been archived and is not visible',
     },
+    sold: {
+      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      label: 'Sold',
+      tooltip: 'Listing item has been sold',
+    },
+    expired: {
+      color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      label: 'Expired',
+      tooltip: 'Listing has expired',
+    },
   };
 
-  const { color, label, tooltip } = config[status];
+  const item = (status && config[status]) || {
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+    label: status ? String(status) : 'Pending Approval',
+    tooltip: 'Under review by platform moderators before going live',
+  };
+
+  const { color, label, tooltip } = item;
 
   return (
     <div className="group relative inline-block">
       <span className={`px-2 py-1 rounded text-xs font-medium ${color}`}>
-        {status === 'pending_review' && '🟡 '}
+        {(status === 'pending_review' || status === 'pending') && '🟡 '}
         {status === 'active' && '🟢 '}
         {status === 'rejected' && '🔴 '}
         {label}
@@ -223,9 +235,41 @@ function BlackoutCalendar() {
 export default function CatalogPage() {
   const user = useAuth((s) => s.user);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'in_stock' | 'rented_out' | 'out_of_stock'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending_review' | 'rejected' | 'sold'>('all');
   const [feedbackModal, setFeedbackModal] = useState<{ listing: Listing | null }>({ listing: null });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const { data: listingsRes } = useMyListings(user?.id ?? '');
+
+  const rawItems: any[] = Array.isArray(listingsRes)
+    ? listingsRes
+    : Array.isArray(listingsRes?.data)
+    ? listingsRes.data
+    : Array.isArray((listingsRes as any)?.data?.data)
+    ? (listingsRes as any).data.data
+    : Array.isArray((listingsRes as any)?.items)
+    ? (listingsRes as any).items
+    : [];
+
+  const listings: Listing[] = rawItems.map((l: any) => {
+    const businessModels: ('sale' | 'rental' | 'custom')[] = [];
+    if (l.availableForPurchase) businessModels.push('sale');
+    if (l.availableForRent) businessModels.push('rental');
+    if (l.customOrderAvailable) businessModels.push('custom');
+    if (businessModels.length === 0) businessModels.push('sale');
+
+    return {
+      id: l.id,
+      title: l.title,
+      price: typeof l.price === 'string' ? parseFloat(l.price) : Number(l.price || 0),
+      status: l.status === 'sold' || l.status === 'rented' ? 'out_of_stock' : 'in_stock',
+      moderationStatus: l.status as Listing['moderationStatus'],
+      businessModels,
+      city: l.city || undefined,
+      condition: l.condition,
+      rejectedReason: l.rejectedReason,
+    };
+  });
 
   // Real-time moderation updates via Socket.IO
   useEffect(() => {
@@ -258,54 +302,18 @@ export default function CatalogPage() {
     };
   }, [user?.id]);
 
-  // Mock data - TODO: Replace with actual API calls using useMyListings hook
-  const listings: Listing[] = [
-    {
-      id: '1',
-      title: 'Traditional Habesha Kemis with Tilf Embroidery',
-      price: 3500,
-      status: 'in_stock',
-      moderationStatus: 'active',
-      businessModels: ['sale', 'custom'],
-      city: 'Addis Ababa',
-      condition: 'new',
-    },
-    {
-      id: '2',
-      title: 'Ethiopian Gabi - White Cotton',
-      price: 800,
-      status: 'rented_out',
-      moderationStatus: 'pending_review',
-      businessModels: ['sale', 'rental'],
-      city: 'Addis Ababa',
-      condition: 'excellent',
-    },
-    {
-      id: '3',
-      title: 'Modern Dress with Ethiopian Patterns',
-      price: 1200,
-      status: 'in_stock',
-      moderationStatus: 'rejected',
-      businessModels: ['sale'],
-      city: 'Bole',
-      condition: 'new',
-      rejectedReason: 'Photos are unclear. Please provide better quality images showing the fabric details.',
-    },
-    {
-      id: '4',
-      title: 'Custom Netela - Handwoven',
-      price: 450,
-      status: 'out_of_stock',
-      moderationStatus: 'pending_review',
-      businessModels: ['sale', 'custom'],
-      city: 'Shiro Meda',
-      condition: 'good',
-    },
-  ];
-
   const filteredListings = listings.filter((listing) => {
     const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || listing.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'pending_review') {
+        matchesStatus = listing.moderationStatus === 'pending_review' || (listing.moderationStatus as string) === 'pending';
+      } else if (statusFilter === 'sold') {
+        matchesStatus = (listing.moderationStatus as string) === 'sold' || (listing.moderationStatus as string) === 'rented';
+      } else {
+        matchesStatus = listing.moderationStatus === statusFilter;
+      }
+    }
     return matchesSearch && matchesStatus;
   });
 
@@ -351,12 +359,13 @@ export default function CatalogPage() {
               <select
                 value={statusFilter}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as any)}
-                className="w-40 rounded-md border bg-background px-3 py-2 text-sm"
+                className="w-48 rounded-md border bg-background px-3 py-2 text-sm"
               >
-                <option value="all">All Status</option>
-                <option value="in_stock">In Stock</option>
-                <option value="rented_out">Rented Out</option>
-                <option value="out_of_stock">Out of Stock</option>
+                <option value="all">All Statuses</option>
+                <option value="active">Published / Approved</option>
+                <option value="pending_review">Pending Review</option>
+                <option value="rejected">Rejected</option>
+                <option value="sold">Sold / Rented</option>
               </select>
             </div>
           </div>
@@ -368,7 +377,6 @@ export default function CatalogPage() {
                 <TableHead>Business Models</TableHead>
                 <TableHead>Price (ETB)</TableHead>
                 <TableHead>Moderation Status</TableHead>
-                <TableHead>Stock Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -377,7 +385,9 @@ export default function CatalogPage() {
                 <TableRow key={listing.id}>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{listing.title}</p>
+                      <Link href={`/products/${listing.id}`} className="font-medium hover:text-primary transition-colors">
+                        {listing.title}
+                      </Link>
                       <p className="text-xs text-muted-foreground">{listing.city}</p>
                     </div>
                   </TableCell>
@@ -393,11 +403,13 @@ export default function CatalogPage() {
                       <ModerationStatusBadge status={listing.moderationStatus} />
                     </button>
                   </TableCell>
-                  <TableCell>
-                    <StockStatusBadge status={listing.status} />
-                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end items-center gap-2">
+                      <Link href={`/products/${listing.id}`}>
+                        <Button variant="ghost" size="sm" className="text-xs">
+                          View
+                        </Button>
+                      </Link>
                       <Link href={`/seller/catalog/${listing.id}/edit`}>
                         <Button variant="ghost" size="sm">
                           <IconEdit />

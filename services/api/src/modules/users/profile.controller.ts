@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OptionalAuth } from '../../common/decorators/optional-auth.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -42,9 +43,10 @@ export class ProfileController {
   }
 
   @Public()
+  @OptionalAuth()
   @Get(':id/listings')
-  findUserListings(@Param('id') id: string) {
-    return this.usersService.findUserListings(id);
+  findUserListings(@Param('id') id: string, @CurrentUser() viewer?: AuthenticatedUser) {
+    return this.usersService.findUserListings(id, viewer);
   }
 
   // ─── Store Follow Feature ───────────────────────────────────────────────────

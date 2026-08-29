@@ -10,7 +10,7 @@ export interface MarkUnavailableButtonProps {
   isOwner: boolean
 }
 
-export default function MarkUnavailableButton({ listingId, listingTitle, isOwner }: MarkUnavailableButtonProps) {
+export default function MarkUnavailableButton({ listingId, listingTitle: _listingTitle, isOwner }: MarkUnavailableButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()

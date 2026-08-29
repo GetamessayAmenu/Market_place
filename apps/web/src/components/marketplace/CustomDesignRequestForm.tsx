@@ -30,7 +30,7 @@ interface CustomDesignRequestFormProps {
     colors: string[]
     embroideryTypes: string[]
     customNotesAllowed: boolean
-  }
+  } | undefined
   onSubmit: (data: CustomDesignFormData) => Promise<void>
   isSubmitting?: boolean
   onCancel?: () => void

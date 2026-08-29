@@ -23,7 +23,7 @@ interface CustomOrderFormProps {
     colors: string[]
     embroideryTypes: string[]
     customNotesAllowed: boolean
-  }
+  } | undefined
   onClose: () => void
   onSuccess: () => void
 }
@@ -87,6 +87,7 @@ export default function CustomOrderForm({
       // Prepare submission data
       const submissionData = {
         listingId,
+        sellerId,
         ...(formData.selectedSize ? { selectedSize: formData.selectedSize } : {}),
         ...(customizationOptions?.requiresMeasurements ? { measurements: formData.measurements } : {}),
         ...(formData.selectedFabric ? { selectedFabric: formData.selectedFabric } : {}),
@@ -194,12 +195,11 @@ export default function CustomOrderForm({
             label="Fabric Preference"
             value={formData.selectedFabric}
             onChange={(e) => handleInputChange('selectedFabric', e.target.value)}
-          >
-            <option value="">Select fabric type</option>
-            {customizationOptions.fabricTypes.map(fabric => (
-              <option key={fabric} value={fabric}>{fabric}</option>
-            ))}
-          </FormSelect>
+            options={[
+              { value: '', label: 'Select fabric type' },
+              ...customizationOptions.fabricTypes.map(fabric => ({ value: fabric, label: fabric }))
+            ]}
+          />
         )}
 
         {/* Color Selection */}
@@ -208,12 +208,11 @@ export default function CustomOrderForm({
             label="Color Preference"
             value={formData.selectedColor}
             onChange={(e) => handleInputChange('selectedColor', e.target.value)}
-          >
-            <option value="">Select color</option>
-            {customizationOptions.colors.map(color => (
-              <option key={color} value={color}>{color}</option>
-            ))}
-          </FormSelect>
+            options={[
+              { value: '', label: 'Select color' },
+              ...customizationOptions.colors.map(color => ({ value: color, label: color }))
+            ]}
+          />
         )}
 
         {/* Embroidery Notes */}

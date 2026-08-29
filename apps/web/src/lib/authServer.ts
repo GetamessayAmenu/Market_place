@@ -19,8 +19,14 @@ export async function requireUser(): Promise<AuthUser> {
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.toString()
     const res = await serverGet<MeResponse>('/auth/me', { cookieHeader })
+    if (!res || !res.user) {
+      redirect('/login')
+    }
     return res.user
-  } catch {
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.message === 'NEXT_REDIRECT') {
+      throw err
+    }
     redirect('/login')
   }
 }
@@ -34,8 +40,11 @@ export async function optionalUser(): Promise<AuthUser | null> {
     const cookieStore = await cookies()
     const cookieHeader = cookieStore.toString()
     const res = await serverGet<MeResponse>('/auth/me', { cookieHeader })
-    return res.user
-  } catch {
+    return res?.user || null
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.message === 'NEXT_REDIRECT') {
+      throw err
+    }
     return null
   }
 }

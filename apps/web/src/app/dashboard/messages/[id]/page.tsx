@@ -23,7 +23,6 @@ export default async function ConversationPage({ params }: Props) {
 
   let conversation: ChatConversation | null = null;
   let messages: MessagesResponse['data'] = [];
-  let totalPages = 1;
 
   try {
     const convRes = await serverGet<ChatConversation>(`/conversations/${params.id}`);
@@ -41,7 +40,6 @@ export default async function ConversationPage({ params }: Props) {
       params: { limit: 50 },
     });
     messages = msgRes.data;
-    totalPages = msgRes.meta.totalPages;
   } catch {
     // Show empty thread
   }
@@ -52,7 +50,6 @@ export default async function ConversationPage({ params }: Props) {
         conversation={conversation}
         currentUserId={user.id}
         initialMessages={messages}
-        totalPages={totalPages}
       />
     </div>
   );

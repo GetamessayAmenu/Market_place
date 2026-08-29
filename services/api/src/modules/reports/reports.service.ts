@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, ReportStatus } from '@prisma/client';
+import type { Prisma, ReportPriority, ReportStatus } from '@prisma/client';
 
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
@@ -14,6 +14,7 @@ import {
   ReportNotFoundException,
 } from './exceptions/report.exceptions';
 import { ReportsRepository } from './reports.repository';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ReportsService {
@@ -21,6 +22,7 @@ export class ReportsService {
     private readonly reportsRepository: ReportsRepository,
     private readonly adminLogsService: AdminLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateReportDto) {
@@ -35,10 +37,13 @@ export class ReportsService {
       throw new DuplicateReportException();
     }
 
+    const priority: ReportPriority = (dto.priority as ReportPriority) || 'medium';
+
     const data: Prisma.ReportCreateInput = {
       reporter: { connect: { id: user.id } },
       targetType: dto.targetType,
       reason: dto.reason,
+      priority,
       ...(dto.description ? { description: dto.description } : {}),
       ...(dto.listingId ? { listing: { connect: { id: dto.listingId } } } : {}),
       ...(dto.reportedUserId ? { reportedUser: { connect: { id: dto.reportedUserId } } } : {}),
@@ -46,7 +51,17 @@ export class ReportsService {
       ...(dto.conversationId ? { conversation: { connect: { id: dto.conversationId } } } : {}),
     };
 
-    return this.reportsRepository.create(data);
+    const report = await this.reportsRepository.create(data);
+
+    this.eventEmitter.emit('report.created', {
+      reportId: report.id,
+      reporterId: user.id,
+      targetType: dto.targetType,
+      priority,
+      conversationId: dto.conversationId,
+    });
+
+    return report;
   }
 
   async findOne(_user: AuthenticatedUser, id: string) {
@@ -63,10 +78,14 @@ export class ReportsService {
 
     const where: Prisma.ReportWhereInput = {
       ...(query.status ? { status: query.status as any } : {}),
+      ...(query.priority ? { priority: query.priority as any } : {}),
       ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.assignedAdminId ? { assignedAdminId: query.assignedAdminId } : {}),
       ...(query.reporterId ? { reporterId: query.reporterId } : {}),
       ...(query.reportedUserId ? { reportedUserId: query.reportedUserId } : {}),
       ...(query.listingId ? { listingId: query.listingId } : {}),
+      ...(query.conversationId ? { conversationId: query.conversationId } : {}),
+      ...(query.reason ? { reason: { contains: query.reason, mode: 'insensitive' } } : {}),
       ...(query.search ? {
         OR: [
           { reason: { contains: query.search, mode: 'insensitive' } },
@@ -131,6 +150,64 @@ export class ReportsService {
     return updated;
   }
 
+  async assignAdmin(user: AuthenticatedUser, id: string, assignedAdminId: string | null) {
+    const report = await this.reportsRepository.findById(id);
+    if (!report) {
+      throw new ReportNotFoundException();
+    }
+
+    const updated = await this.reportsRepository.assignAdmin(id, assignedAdminId);
+
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'report.assign',
+        resource: 'report',
+        resourceId: id,
+        metadata: {
+          assignedAdminId,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    return updated;
+  }
+
+  async escalate(user: AuthenticatedUser, id: string, note?: string) {
+    const report = await this.reportsRepository.findById(id);
+    if (!report) {
+      throw new ReportNotFoundException();
+    }
+
+    await this.reportsRepository.updatePriority(id, 'critical');
+    const updated = await this.reportsRepository.updateStatus(id, 'investigating' as any, user.id, note);
+
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'report.escalate',
+        resource: 'report',
+        resourceId: id,
+        metadata: {
+          previousPriority: report.priority,
+          note,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    this.eventEmitter.emit('report.escalated', {
+      reportId: id,
+      escalatedBy: user.id,
+      note,
+    });
+
+    return updated;
+  }
+
   async setUnderReview(_user: AuthenticatedUser, id: string) {
     const report = await this.reportsRepository.findById(id);
     if (!report) {
@@ -181,17 +258,6 @@ export class ReportsService {
       // non-fatal
     }
 
-    try {
-      await this.notificationsService.createReportStatusUpdatedNotification(
-        report.reporterId,
-        id,
-        'investigating',
-        report.targetType,
-      );
-    } catch {
-      // non-fatal
-    }
-
     return updated;
   }
 
@@ -199,9 +265,6 @@ export class ReportsService {
     const report = await this.reportsRepository.findById(id);
     if (!report) {
       throw new ReportNotFoundException();
-    }
-    if (report.status !== 'resolved' && report.status !== 'dismissed') {
-      throw new ReportAlreadyResolvedException();
     }
 
     const updated = await this.reportsRepository.closeReport(id, note);
@@ -217,17 +280,6 @@ export class ReportsService {
           note,
         },
       });
-    } catch {
-      // non-fatal
-    }
-
-    try {
-      await this.notificationsService.createReportStatusUpdatedNotification(
-        report.reporterId,
-        id,
-        'closed',
-        report.targetType,
-      );
     } catch {
       // non-fatal
     }

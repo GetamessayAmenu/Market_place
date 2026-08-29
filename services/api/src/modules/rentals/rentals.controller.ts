@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { RentalsService } from './rentals.service';
@@ -13,7 +14,7 @@ import type { CreateConditionLogDto } from './dto/create-condition-log.dto';
 import type { CreateBlackoutDateDto } from './dto/create-blackout-date.dto';
 
 @Controller('rentals')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class RentalsController {
   constructor(private readonly rentalsService: RentalsService) {}
 

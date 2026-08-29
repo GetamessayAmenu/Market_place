@@ -3,6 +3,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
@@ -30,7 +31,7 @@ export class VerificationController {
   }
 
   /** Admin: list all verification requests */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator', 'support')
   @Get('admin/verifications')
   findAll(@Query() query: AdminVerificationQueryDto) {
@@ -38,7 +39,7 @@ export class VerificationController {
   }
 
   /** Admin: review a verification request */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator')
   @Patch('admin/verifications/:id')
   review(
@@ -50,7 +51,7 @@ export class VerificationController {
   }
 
   /** Admin: get verification details with history */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator', 'support')
   @Get('admin/verifications/:id/detail')
   getVerificationDetail(@Param('id') id: string) {
@@ -58,7 +59,7 @@ export class VerificationController {
   }
 
   /** Admin: update verification status */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator')
   @Patch('admin/verifications/:id/status')
   updateVerificationStatus(
@@ -70,7 +71,7 @@ export class VerificationController {
   }
 
   /** Admin: grant verified designer badge */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin', 'moderator')
   @Post('admin/users/:userId/verified-designer')
   grantVerifiedDesigner(
@@ -82,7 +83,7 @@ export class VerificationController {
   }
 
   /** Admin: revoke verified designer badge */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin', 'moderator')
   @Delete('admin/users/:userId/verified-designer')
   revokeVerifiedDesigner(
@@ -94,7 +95,7 @@ export class VerificationController {
   }
 
   /** Admin: list vendor KYC profiles */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator')
   @Get('admin/vendor-kyc')
   findVendorKycProfiles(@Query() query: VendorKycQueryDto) {
@@ -102,7 +103,7 @@ export class VerificationController {
   }
 
   /** Admin: get single vendor KYC profile */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator')
   @Get('admin/vendor-kyc/:id')
   findVendorKycProfile(@Param('id') id: string) {
@@ -110,7 +111,7 @@ export class VerificationController {
   }
 
   /** Admin: review vendor KYC profile */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'super_admin', 'moderator')
   @Patch('admin/vendor-kyc/:id/review')
   reviewVendorKyc(
@@ -122,7 +123,7 @@ export class VerificationController {
   }
 
   /** Seller: create vendor KYC profile */
-  @UseGuards(RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('seller')
   @Post('vendor-kyc')
   createVendorKycProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateVendorKycDto) {

@@ -171,6 +171,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     return result;
   }
 
+  @SubscribeMessage('admin:join_chats')
+  async handleAdminJoin(@ConnectedSocket() socket: Socket) {
+    this.socketAuth.getSocketUser(socket);
+    await socket.join('admin:chats');
+    return { success: true, room: 'admin:chats' };
+  }
+
   private userRoom(userId: string): string {
     return `user:${userId}`;
   }

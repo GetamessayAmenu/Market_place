@@ -3,6 +3,8 @@ import React from 'react'
 import UsersTable from '../../components/admin/UsersTable'
 import { fetchAdminUsers } from '../../lib/adminApi'
 
+export const dynamic = 'force-dynamic'
+
 export default async function UsersPage() {
 
   let initialData

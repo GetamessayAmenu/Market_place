@@ -11,6 +11,7 @@ import {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { CreateDisputeCommentDto } from './dto/create-dispute-comment.dto';
@@ -21,7 +22,7 @@ import type { UpdateDisputeDto } from './dto/update-dispute.dto';
 import { DisputesService } from './disputes.service';
 
 @Controller('admin/disputes')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('super_admin', 'moderator', 'support')
 export class DisputesController {
   constructor(private readonly disputesService: DisputesService) {}

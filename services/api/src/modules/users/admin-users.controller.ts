@@ -10,6 +10,7 @@ import {
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 
@@ -18,7 +19,7 @@ import { UserQueryDto } from './dto/user-query.dto';
 import { UsersService } from './users.service';
 
 @Controller('admin/users')
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'super_admin', 'moderator', 'support')
 export class AdminUsersController {
   constructor(private readonly usersService: UsersService) {}

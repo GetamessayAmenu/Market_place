@@ -3,13 +3,6 @@
 import { useState, useMemo } from 'react'
 import { cn } from '@marketplace/ui'
 
-// Simple SVG icon components
-const CalendarIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
-)
-
 const ClockIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -81,7 +74,7 @@ export interface RentalRequestData {
   startDate: string
   endDate: string
   pricingTier: 'DAILY' | 'THREE_DAY_EVENT' | 'WEEKLY'
-  pickupHub?: string
+  pickupHub?: string | undefined
 }
 
 type PricingTier = 'DAILY' | 'THREE_DAY_EVENT' | 'WEEKLY'
@@ -101,14 +94,6 @@ export default function RentalWidget({
   const [endDate, setEndDate] = useState('')
   const [pickupHub, setPickupHub] = useState('')
 
-  const isDateBlackout = (date: Date): boolean => {
-    return blackoutDates.some((blackout) => {
-      const start = new Date(blackout.startDate)
-      const end = new Date(blackout.endDate)
-      return date >= start && date <= end
-    })
-  }
-
   const getDisabledDates = (): string[] => {
     const disabled: string[] = []
     blackoutDates.forEach((blackout) => {
@@ -116,7 +101,8 @@ export default function RentalWidget({
       const end = new Date(blackout.endDate)
       const current = new Date(start)
       while (current <= end) {
-        disabled.push(current.toISOString().split('T')[0])
+        const dateStr = current.toISOString().split('T')[0]
+        if (dateStr) disabled.push(dateStr)
         current.setDate(current.getDate() + 1)
       }
     })
@@ -162,13 +148,14 @@ export default function RentalWidget({
 
   const handleSubmit = () => {
     if (isValidRequest) {
-      onSubmitRequest({
+      const payload: RentalRequestData = {
         listingId,
         startDate,
         endDate,
         pricingTier: selectedTier,
-        pickupHub: pickupHub || undefined,
-      })
+      }
+      if (pickupHub) payload.pickupHub = pickupHub
+      onSubmitRequest(payload)
     }
   }
 
@@ -274,7 +261,6 @@ export default function RentalWidget({
               min={minDate}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              disabledDates={disabledDates}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50 disabled:opacity-50"
             />
           </div>

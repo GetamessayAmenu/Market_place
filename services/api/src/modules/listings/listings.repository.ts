@@ -260,4 +260,87 @@ export class ListingsRepository extends BaseRepository<Listing> {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  // ─── Revision Management ───────────────────────────────────────────────────
+
+  async createRevision(data: Prisma.ListingRevisionCreateInput) {
+    return this.prisma.listingRevision.create({
+      data,
+      include: {
+        listing: { select: { id: true, title: true, slug: true, status: true, price: true, currency: true } },
+        seller: { select: { id: true, displayName: true, email: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
+
+  async findPendingRevisionByListingId(listingId: string) {
+    return this.prisma.listingRevision.findFirst({
+      where: { listingId, status: 'PENDING_REVIEW' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        listing: { select: { id: true, title: true, slug: true, status: true } },
+        seller: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
+
+  async findRevisionById(id: string) {
+    return this.prisma.listingRevision.findUnique({
+      where: { id },
+      include: {
+        listing: {
+          include: listingInclude,
+        },
+        seller: { select: { id: true, displayName: true, email: true, phone: true, location: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
+
+  async updateRevision(id: string, data: Prisma.ListingRevisionUpdateInput) {
+    return this.prisma.listingRevision.update({
+      where: { id },
+      data,
+      include: {
+        listing: { select: { id: true, title: true, slug: true, status: true } },
+        seller: { select: { id: true, displayName: true, email: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
+
+  async findPendingRevisions(params: { page: number; limit: number }) {
+    const { page, limit } = params;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.prisma.listingRevision.findMany({
+        where: { status: 'PENDING_REVIEW' },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          listing: {
+            include: listingInclude,
+          },
+          seller: { select: { id: true, displayName: true, email: true } },
+        },
+      }),
+      this.prisma.listingRevision.count({ where: { status: 'PENDING_REVIEW' } }),
+    ]);
+
+    return { items, total, page, limit };
+  }
+
+  async findRevisionsByListingId(listingId: string) {
+    return this.prisma.listingRevision.findMany({
+      where: { listingId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        seller: { select: { id: true, displayName: true, email: true } },
+        reviewedBy: { select: { id: true, displayName: true, email: true } },
+      },
+    });
+  }
 }

@@ -5,14 +5,24 @@ export function useSocket() {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3002'
-    socketRef.current = io(url, { 
+    const url = process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3001'
+    const token = typeof window !== 'undefined' ? localStorage.getItem('admin_access_token') : null
+
+    const socket = io(url, { 
+      auth: { token },
       withCredentials: true, 
-      transports: ['websocket', 'polling'] 
+      transports: ['polling', 'websocket'],
+      autoConnect: Boolean(token),
     })
+
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connection warning:', err.message)
+    })
+
+    socketRef.current = socket
     
     return () => {
-      socketRef.current?.disconnect()
+      socket.disconnect()
     }
   }, [])
 

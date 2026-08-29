@@ -113,7 +113,7 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
     setLoading(true)
     setError(null)
     try {
-      const res = await clientGet<PaginatedResponse<AdminListing>>(
+      const res = await clientGet<any>(
         '/admin/listings' + buildQuery({
           page: p,
           limit: 10,
@@ -122,9 +122,13 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
           search: q || undefined
         })
       )
-      setListings(Array.isArray(res.data) ? res.data : [])
-      setTotalPages(res.meta.totalPages)
-      setTotal(res.meta.total)
+      const rawData = res?.data?.data ? res.data.data : (res?.data ? res.data : []);
+      const items = Array.isArray(rawData) ? rawData : (Array.isArray(res) ? res : []);
+      const meta = res?.data?.meta || res?.meta || { total: items.length, page: p, limit: 10, totalPages: 1 };
+
+      setListings(items)
+      setTotalPages(meta.totalPages || 1)
+      setTotal(meta.total || items.length)
     } catch (err) {
       console.error('Failed to load listings:', err)
       setError('Failed to load listings. Please check your connection and try again.')
@@ -137,14 +141,15 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
   const fetchStatusCounts = useCallback(async () => {
     try {
       const [pendingRes, approvedRes, rejectedRes] = await Promise.all([
-        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'pending_review', limit: 1 })),
-        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'active', limit: 1 })),
-        clientGet<PaginatedResponse<AdminListing>>('/admin/listings' + buildQuery({ status: 'rejected', limit: 1 })),
+        clientGet<any>('/admin/listings' + buildQuery({ status: 'pending_review', limit: 1 })),
+        clientGet<any>('/admin/listings' + buildQuery({ status: 'active', limit: 1 })),
+        clientGet<any>('/admin/listings' + buildQuery({ status: 'rejected', limit: 1 })),
       ])
+      const getMetaTotal = (r: any) => r?.meta?.total ?? r?.data?.meta?.total ?? (Array.isArray(r?.data) ? r.data.length : 0);
       setStatusCounts({
-        pending: pendingRes.meta.total,
-        approved: approvedRes.meta.total,
-        rejected: rejectedRes.meta.total,
+        pending: getMetaTotal(pendingRes),
+        approved: getMetaTotal(approvedRes),
+        rejected: getMetaTotal(rejectedRes),
       })
     } catch {
       // Silently fail for counts
@@ -316,7 +321,19 @@ export default function ListingsTable({ initialData }: ListingsTableProps) {
         )}
       </div>
 
-      {error && <Alert variant="error">{error}</Alert>}
+      {error && (
+        <Alert variant="error" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>{error}</div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => void fetchData(page, statusFilter, typeFilter, search)}>
+              Retry
+            </Button>
+            <a href="/login">
+              <Button size="sm">Sign In to Admin</Button>
+            </a>
+          </div>
+        </Alert>
+      )}
 
       {/* Table */}
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">

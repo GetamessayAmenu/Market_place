@@ -27,6 +27,10 @@ export class CreateReportDto {
   messageId?: string;
 
   @IsOptional()
+  @IsEnum(['low', 'medium', 'high', 'critical'] as const)
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+
+  @IsOptional()
   @IsUUID()
   conversationId?: string;
 }

@@ -95,6 +95,8 @@ model User {
   homepageContentCreated    HomepageContent[]     @relation("HomepageContentCreated")
   homepageContentUpdated    HomepageContent[]     @relation("HomepageContentUpdated")
   listings                  Listing[]
+  listingRevisionsSubmitted ListingRevision[]    @relation("ListingRevisionSeller")
+  listingRevisionsReviewed  ListingRevision[]    @relation("ListingRevisionReviewer")
   sentMessages              Message[]
   moderationItemsModerated  ModerationItem[]      @relation("ModerationItemsModerated")
   moderationReportsFiled    ModerationReport[]    @relation("ModerationReportsFiled")
@@ -111,6 +113,9 @@ model User {
   reportsAgainst            Report[]              @relation("ReportedUser")
   reportsFiled              Report[]              @relation("ReportsFiled")
   reportsResolved           Report[]              @relation("ReportsResolved")
+  reportsAssigned           Report[]              @relation("ReportsAssigned")
+  messagingRestrictions     MessagingRestriction[] @relation("UserRestrictions")
+  createdRestrictions       MessagingRestriction[] @relation("RestrictionCreator")
   reviewsModerated          Review[]              @relation("ReviewsModerated")
   reviewsWritten            Review[]              @relation("ReviewsWritten")
   reviewsReceived           Review[]              @relation("ReviewsReceived")
@@ -122,6 +127,8 @@ model User {
   verificationHistoryActor  VerificationHistory[] @relation("VerificationHistoryActor")
   verificationReviews       VerificationRequest[] @relation("VerificationReviewer")
   verificationRequests      VerificationRequest[]
+  userBlocksBlocked         UserBlock[]           @relation("UserBlocker")
+  userBlocksReceived        UserBlock[]           @relation("UserBlocked")
 
   @@index([roleId])
   @@index([status])
@@ -249,6 +256,7 @@ model Listing {
   homepageFeaturedContent HomepageContent[]     @relation("HomepageFeaturedListing")
   images                  ListingImage[]
   priceHistory            ListingPriceHistory[]
+  revisions               ListingRevision[]
   category                Category              @relation(fields: [categoryId], references: [id])
   seller                  User                  @relation(fields: [sellerId], references: [id])
   orders                  Order[]
@@ -333,51 +341,70 @@ model StoreFollow {
 }
 
 model Conversation {
-  id            String        @id @default(uuid()) @db.Uuid
-  listingId     String        @map("listing_id") @db.Uuid
-  buyerId       String        @map("buyer_id") @db.Uuid
-  sellerId      String        @map("seller_id") @db.Uuid
-  lastMessageAt DateTime?     @map("last_message_at")
-  deletedAt     DateTime?     @map("deleted_at")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  isFlagged     Boolean       @default(false) @map("is_flagged")
-  riskScore     Int           @default(0) @map("risk_score")
-  chatFlagLogs  ChatFlagLog[]
-  buyer         User          @relation("BuyerConversations", fields: [buyerId], references: [id])
-  listing       Listing       @relation(fields: [listingId], references: [id])
-  seller        User          @relation("SellerConversations", fields: [sellerId], references: [id])
-  customOrders  CustomOrder[]
-  disputes      Dispute[]
-  messages      Message[]
-  orders        Order?
-  reports       Report[]
+  id               String        @id @default(uuid()) @db.Uuid
+  listingId        String?       @map("listing_id") @db.Uuid
+  buyerId          String        @map("buyer_id") @db.Uuid
+  sellerId         String        @map("seller_id") @db.Uuid
+  orderId          String?       @map("order_id") @db.Uuid
+  rentalId         String?       @map("rental_id") @db.Uuid
+  customOrderId    String?       @map("custom_order_id") @db.Uuid
+  archivedByBuyer  Boolean       @default(false) @map("archived_by_buyer")
+  archivedBySeller Boolean       @default(false) @map("archived_by_seller")
+  lastMessageAt    DateTime?     @map("last_message_at")
+  deletedAt        DateTime?     @map("deleted_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  isFlagged        Boolean       @default(false) @map("is_flagged")
+  riskScore        Int           @default(0) @map("risk_score")
+  chatFlagLogs     ChatFlagLog[]
+  buyer            User          @relation("BuyerConversations", fields: [buyerId], references: [id])
+  listing          Listing?      @relation(fields: [listingId], references: [id])
+  order            Order?        @relation("OrderConversations", fields: [orderId], references: [id])
+  rental           RentalOrder?  @relation("RentalConversations", fields: [rentalId], references: [id])
+  customOrderRef   CustomOrder?  @relation("CustomOrderConversations", fields: [customOrderId], references: [id])
+  seller           User          @relation("SellerConversations", fields: [sellerId], references: [id])
+  customOrders     CustomOrder[]
+  disputes         Dispute[]
+  messages         Message[]
+  orders           Order?
+  reports          Report[]
 
-  @@unique([listingId, buyerId, sellerId])
   @@index([buyerId, lastMessageAt(sort: Desc)])
   @@index([sellerId, lastMessageAt(sort: Desc)])
+  @@index([listingId])
+  @@index([orderId])
+  @@index([rentalId])
+  @@index([customOrderId])
   @@index([isFlagged, riskScore(sort: Desc)])
   @@index([deletedAt])
   @@map("conversations")
 }
 
 model Message {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @map("conversation_id") @db.Uuid
-  senderId       String       @map("sender_id") @db.Uuid
-  content        String       @map("body")
-  readAt         DateTime?    @map("read_at")
-  deletedAt      DateTime?    @map("deleted_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  isFlagged      Boolean      @default(false) @map("is_flagged")
+  id             String                @id @default(uuid()) @db.Uuid
+  conversationId String                @map("conversation_id") @db.Uuid
+  senderId       String                @map("sender_id") @db.Uuid
+  content        String                @map("body")
+  messageType    MessageType           @default(TEXT) @map("message_type")
+  attachments    Json?
+  replyToId      String?               @map("reply_to_id") @db.Uuid
+  readAt         DateTime?             @map("read_at")
+  editedAt       DateTime?             @map("edited_at")
+  deletedAt      DateTime?             @map("deleted_at")
+  deliveryStatus MessageDeliveryStatus @default(SENT) @map("delivery_status")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  isFlagged      Boolean               @default(false) @map("is_flagged")
   metadata       Json?
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User         @relation(fields: [senderId], references: [id])
+  conversation   Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                  @relation(fields: [senderId], references: [id])
+  replyTo        Message?              @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]             @relation("MessageReplies")
   reports        Report[]
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
+  @@index([replyToId])
   @@index([isFlagged])
   @@index([readAt])
   @@index([deletedAt])
@@ -407,36 +434,61 @@ model ChatFlagLog {
 }
 
 model Report {
-  id             String           @id @default(uuid()) @db.Uuid
-  reporterId     String           @map("reporter_id") @db.Uuid
-  targetType     ReportTargetType @map("target_type")
-  listingId      String?          @map("listing_id") @db.Uuid
-  reportedUserId String?          @map("reported_user_id") @db.Uuid
-  messageId      String?          @map("message_id") @db.Uuid
-  conversationId String?          @map("conversation_id") @db.Uuid
-  reason         String           @db.VarChar(100)
-  description    String?
-  status         ReportStatus     @default(pending)
-  resolvedById   String?          @map("resolved_by_id") @db.Uuid
-  resolvedAt     DateTime?        @map("resolved_at")
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
-  closedAt       DateTime?        @map("closed_at")
-  evidence       String[]         @default([])
-  resolutionNote String?          @map("resolution_note")
-  conversation   Conversation?    @relation(fields: [conversationId], references: [id])
-  listing        Listing?         @relation(fields: [listingId], references: [id])
-  message        Message?         @relation(fields: [messageId], references: [id])
-  reportedUser   User?            @relation("ReportedUser", fields: [reportedUserId], references: [id])
-  reporter       User             @relation("ReportsFiled", fields: [reporterId], references: [id])
-  resolvedBy     User?            @relation("ReportsResolved", fields: [resolvedById], references: [id])
+  id              String           @id @default(uuid()) @db.Uuid
+  reporterId      String           @map("reporter_id") @db.Uuid
+  targetType      ReportTargetType @map("target_type")
+  listingId       String?          @map("listing_id") @db.Uuid
+  reportedUserId  String?          @map("reported_user_id") @db.Uuid
+  messageId       String?          @map("message_id") @db.Uuid
+  conversationId  String?          @map("conversation_id") @db.Uuid
+  reason          String           @db.VarChar(100)
+  description     String?
+  status          ReportStatus     @default(pending)
+  priority        ReportPriority   @default(medium)
+  assignedAdminId String?          @map("assigned_admin_id") @db.Uuid
+  resolvedById    String?          @map("resolved_by_id") @db.Uuid
+  resolvedAt      DateTime?        @map("resolved_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  closedAt        DateTime?        @map("closed_at")
+  evidence        String[]         @default([])
+  resolutionNote  String?          @map("resolution_note")
+  assignedAdmin   User?            @relation("ReportsAssigned", fields: [assignedAdminId], references: [id])
+  conversation    Conversation?    @relation(fields: [conversationId], references: [id])
+  listing         Listing?         @relation(fields: [listingId], references: [id])
+  message         Message?         @relation(fields: [messageId], references: [id])
+  reportedUser    User?            @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reporter        User             @relation("ReportsFiled", fields: [reporterId], references: [id])
+  resolvedBy      User?            @relation("ReportsResolved", fields: [resolvedById], references: [id])
 
   @@index([status, createdAt(sort: Desc)])
+  @@index([priority, status])
   @@index([targetType, status])
   @@index([reporterId])
   @@index([listingId])
   @@index([reportedUserId])
+  @@index([assignedAdminId])
   @@map("reports")
+}
+
+model MessagingRestriction {
+  id          String                   @id @default(uuid()) @db.Uuid
+  userId      String                   @map("user_id") @db.Uuid
+  type        MessagingRestrictionType
+  reason      String                   @db.VarChar(500)
+  createdById String                   @map("created_by_id") @db.Uuid
+  startsAt    DateTime                 @default(now()) @map("starts_at")
+  expiresAt   DateTime?                @map("expires_at")
+  isActive    Boolean                  @default(true) @map("is_active")
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  user      User @relation("UserRestrictions", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User @relation("RestrictionCreator", fields: [createdById], references: [id])
+
+  @@index([userId, isActive])
+  @@index([expiresAt])
+  @@map("messaging_restrictions")
 }
 
 model Notification {
@@ -500,6 +552,7 @@ model Order {
   createdAt                DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt                DateTime?     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   customQuotes             CustomQuote[]
+  conversationsAsOrder     Conversation[]@relation("OrderConversations")
   buyer                    User          @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   conversations            Conversation? @relation(fields: [conversationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   product                  Listing       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -546,9 +599,10 @@ model CustomOrder {
   selectedColor     String?           @map("selected_color") @db.VarChar(100)
   selectedFabric    String?           @map("selected_fabric") @db.VarChar(100)
   selectedSize      String?           @map("selected_size") @db.VarChar(50)
-  buyer             User              @relation("CustomOrderBuyer", fields: [buyerId], references: [id])
-  conversation      Conversation?     @relation(fields: [conversationId], references: [id])
-  listing           Listing           @relation(fields: [listingId], references: [id])
+  buyer                     User          @relation("CustomOrderBuyer", fields: [buyerId], references: [id])
+  conversation              Conversation? @relation(fields: [conversationId], references: [id])
+  conversationsAsCustomOrder Conversation[]@relation("CustomOrderConversations")
+  listing                   Listing       @relation(fields: [listingId], references: [id])
   seller            User              @relation("CustomOrderSeller", fields: [sellerId], references: [id])
 
   @@index([buyerId, status])
@@ -666,6 +720,31 @@ model ListingPriceHistory {
 
   @@index([listingId])
   @@map("listing_price_history")
+}
+
+model ListingRevision {
+  id              String                @id @default(uuid()) @db.Uuid
+  listingId       String                @map("listing_id") @db.Uuid
+  sellerId        String                @map("seller_id") @db.Uuid
+  status          ListingRevisionStatus @default(PENDING_REVIEW)
+  riskLevel       String                @default("SIGNIFICANT") @db.VarChar(20)
+  changedFields   String[]              @map("changed_fields")
+  changes         Json
+  previousData    Json                  @map("previous_data")
+  rejectionReason String?               @map("rejection_reason") @db.VarChar(500)
+  reviewedById    String?               @map("reviewed_by_id") @db.Uuid
+  reviewedAt      DateTime?             @map("reviewed_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  listing         Listing               @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  seller          User                  @relation("ListingRevisionSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  reviewedBy      User?                 @relation("ListingRevisionReviewer", fields: [reviewedById], references: [id])
+
+  @@index([listingId, status])
+  @@index([sellerId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("listing_revisions")
 }
 
 model ModerationItem {
@@ -864,10 +943,11 @@ model RentalOrder {
   pickupHub            String?              @map("pickup_hub") @db.VarChar(100)
   cancellationReason   String?              @map("cancellation_reason")
   offlineDepositStatus String?              @map("offline_deposit_status") @db.VarChar(50)
-  pricingTierUsed      RentalPricingTier?   @map("pricing_tier_used")
-  conditionLogs        RentalConditionLog[]
-  extensions           RentalExtension[]
-  listing              Listing              @relation(fields: [listingId], references: [id])
+  pricingTierUsed       RentalPricingTier?   @map("pricing_tier_used")
+  conditionLogs         RentalConditionLog[]
+  extensions            RentalExtension[]
+  conversationsAsRental Conversation[]       @relation("RentalConversations")
+  listing               Listing              @relation(fields: [listingId], references: [id])
   renter               User                 @relation("RentalRenter", fields: [renterId], references: [id])
   seller               User                 @relation("RentalSeller", fields: [sellerId], references: [id])
 
@@ -1021,6 +1101,13 @@ enum ListingStatus {
   archived
 }
 
+enum ListingRevisionStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum CategoryType {
   product
   rental
@@ -1067,6 +1154,18 @@ enum ReportStatus {
   dismissed
   investigating
   closed
+}
+
+enum ReportPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum MessagingRestrictionType {
+  temporary
+  permanent
 }
 
 enum DisputeStatus {
@@ -1257,4 +1356,37 @@ enum OrderStatus {
   RENTAL_ACTIVE
   RETURN_INITIATED
   RETURNED_INSPECTED
+}
+
+model UserBlock {
+  id            String   @id @default(uuid()) @db.Uuid
+  blockerId     String   @map("blocker_id") @db.Uuid
+  blockedUserId String   @map("blocked_user_id") @db.Uuid
+  reason        String?  @db.VarChar(255)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  blocker     User @relation("UserBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedUser User @relation("UserBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedUserId])
+  @@index([blockerId])
+  @@index([blockedUserId])
+  @@map("user_blocks")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  LISTING_PREVIEW
+  ORDER_REF
+  RENTAL_REF
+  CUSTOM_ORDER_REF
+  SYSTEM
+  CUSTOM_QUOTE
+}
+
+enum MessageDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
 }

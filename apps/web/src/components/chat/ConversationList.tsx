@@ -1,11 +1,7 @@
-"use client"
-import { Avatar, Badge, cn, EmptyState, Input, Skeleton } from '@marketplace/ui';
+"use client";
 import React, { useMemo, useState } from 'react';
-
+import { Avatar, Badge, cn, EmptyState, Input, Skeleton } from '@marketplace/ui';
 import { type ChatConversation, formatRelativeTime, getOtherUser, getUserRole } from '../../lib/chatApi';
-import { getMessagePreview } from '../../lib/richMessage';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 type ConversationFilter = 'all' | 'unread' | 'buying' | 'rentals' | 'custom';
 
@@ -14,7 +10,7 @@ interface ConversationListProps {
   currentUserId: string;
   selectedId?: string;
   onSelect: (conv: ChatConversation) => void;
-  typingUserIds: Set<string>;
+  typingUserIds?: Set<string>;
   loading?: boolean;
 }
 
@@ -26,14 +22,12 @@ const FILTER_OPTIONS: { value: ConversationFilter; label: string }[] = [
   { value: 'custom', label: 'Custom Orders' },
 ];
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export default function ConversationList({
   conversations,
   currentUserId,
   selectedId,
   onSelect,
-  typingUserIds,
+  typingUserIds = new Set(),
   loading,
 }: ConversationListProps) {
   const [search, setSearch] = useState('');
@@ -47,10 +41,17 @@ export default function ConversationList({
       const q = search.toLowerCase();
       items = items.filter((c) => {
         const other = getOtherUser(c, currentUserId);
+        const listingTitle = c.listing?.title?.toLowerCase() || '';
+        const orderNum = c.order?.orderNumber?.toLowerCase() || '';
+        const rentalNum = c.rental?.orderNumber?.toLowerCase() || '';
+        const lastMsg = c.lastMessage?.body || c.lastMessage?.content || '';
+
         return (
           other.displayName.toLowerCase().includes(q) ||
-          c.listing.title.toLowerCase().includes(q) ||
-          (c.lastMessage ? getMessagePreview(c.lastMessage.body, 200).toLowerCase().includes(q) : false)
+          listingTitle.includes(q) ||
+          orderNum.includes(q) ||
+          rentalNum.includes(q) ||
+          lastMsg.toLowerCase().includes(q)
         );
       });
     }
@@ -58,15 +59,22 @@ export default function ConversationList({
     // Type filter
     if (filter === 'unread') {
       items = items.filter((c) => (c.unreadCount ?? 0) > 0);
+    } else if (filter === 'buying') {
+      items = items.filter((c) => c.buyerId === currentUserId);
+    } else if (filter === 'rentals') {
+      items = items.filter((c) => !!c.rentalId || !!c.rental);
+    } else if (filter === 'custom') {
+      items = items.filter((c) => !!c.customOrderId || !!c.customOrderRef);
     }
 
-    // Sort: unread first, then by lastMessageAt
+    // Sort: unread first, then by lastMessageAt / updatedAt
     return [...items].sort((a, b) => {
       const aUnread = (a.unreadCount ?? 0) > 0 ? 1 : 0;
       const bUnread = (b.unreadCount ?? 0) > 0 ? 1 : 0;
       if (aUnread !== bUnread) return bUnread - aUnread;
-      const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
-      const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+
+      const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : new Date(a.createdAt).getTime();
+      const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : new Date(b.createdAt).getTime();
       return bTime - aTime;
     });
   }, [conversations, search, filter, currentUserId]);
@@ -88,29 +96,29 @@ export default function ConversationList({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
       {/* Search */}
       <div className="border-b px-3 py-2">
         <Input
           size="sm"
-          placeholder="Search conversations..."
+          placeholder="Search by name, product, or order..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); }}
-          className="w-full"
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full text-xs"
         />
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b px-3 py-2">
+      <div className="flex gap-1 overflow-x-auto border-b px-3 py-2 no-scrollbar">
         {FILTER_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
-            onClick={() => { setFilter(opt.value); }}
+            onClick={() => setFilter(opt.value)}
             className={cn(
-              'whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              'whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors shrink-0',
               filter === opt.value
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-primary text-primary-foreground font-semibold'
                 : 'text-muted-foreground hover:bg-muted'
             )}
           >
@@ -125,12 +133,12 @@ export default function ConversationList({
           <div className="px-4 py-12">
             <EmptyState
               icon={
-                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="h-8 w-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               }
               title={search ? 'No matching conversations' : 'No conversations yet'}
-              description={search ? 'Try a different search term.' : 'When you message someone, conversations will appear here.'}
+              description={search ? 'Try a different search query.' : 'Your conversations with buyers and sellers will appear here.'}
             />
           </div>
         ) : (
@@ -140,53 +148,53 @@ export default function ConversationList({
             const isTyping = typingUserIds.has(other.id);
             const unread = conv.unreadCount ?? 0;
             const isSelected = conv.id === selectedId;
+            const contextTitle = conv.listing?.title || (conv.order ? `Order #${conv.order.orderNumber}` : conv.rental ? `Rental #${conv.rental.orderNumber}` : 'General Inquiry');
+            const contextImg = conv.listing?.images?.[0]?.url;
 
             return (
               <button
                 key={conv.id}
                 type="button"
-                onClick={() => { onSelect(conv); }}
+                onClick={() => onSelect(conv)}
                 className={cn(
-                  'flex w-full items-start gap-3 border-b px-3 py-3 text-left transition-colors',
-                  isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : 'hover:bg-muted/50'
+                  'flex w-full items-start gap-3 border-b px-3 py-3 text-left transition-colors relative',
+                  isSelected ? 'bg-muted/60 border-l-4 border-l-primary' : 'hover:bg-muted/40'
                 )}
               >
-                <Avatar
-                  src={other.avatarUrl}
-                  alt={other.displayName}
-                  size="md"
-                />
+                <div className="relative shrink-0">
+                  <Avatar src={other?.avatarUrl || null} alt={other?.displayName || 'User'} size="md" />
+                </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={cn('truncate text-sm', unread > 0 ? 'font-semibold text-foreground' : 'font-medium text-foreground/80')}>
-                      {other.displayName}
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={cn('truncate text-xs font-semibold', unread > 0 ? 'text-foreground font-bold' : 'text-foreground/90')}>
+                      {other?.displayName || 'User'}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
-                      {formatRelativeTime(conv.lastMessageAt)}
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {formatRelativeTime(conv.lastMessageAt || conv.createdAt)}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="truncate text-xs text-muted-foreground">
-                      {conv.listing.title}
+                    {contextImg && (
+                      <img src={contextImg} alt="" className="h-4 w-4 rounded object-cover shrink-0" />
+                    )}
+                    <span className="truncate text-[11px] font-medium text-muted-foreground">
+                      {contextTitle}
                     </span>
                     <Badge
                       variant="outline"
-                      className={cn(
-                        'shrink-0 px-1 py-0 text-[10px]',
-                        role === 'buyer' ? 'border-brand-green/30 text-brand-green' : 'border-brand-gold/30 text-brand-gold'
-                      )}
+                      className="shrink-0 px-1 py-0 text-[9px] border-muted-foreground/30"
                     >
                       {role === 'buyer' ? 'Buyer' : 'Seller'}
                     </Badge>
                   </div>
 
-                  <p className={cn('mt-0.5 truncate text-xs', unread > 0 ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+                  <p className={cn('mt-0.5 truncate text-[11px]', unread > 0 ? 'text-foreground font-semibold' : 'text-muted-foreground')}>
                     {isTyping ? (
-                      <span className="italic text-primary">typing...</span>
+                      <span className="italic text-primary font-medium">typing...</span>
                     ) : conv.lastMessage ? (
-                      getMessagePreview(conv.lastMessage.body)
+                      conv.lastMessage.body || conv.lastMessage.content || 'Sent an attachment'
                     ) : (
                       <span className="italic">No messages yet</span>
                     )}
@@ -194,7 +202,7 @@ export default function ConversationList({
                 </div>
 
                 {unread > 0 && (
-                  <Badge variant="error" className="ml-1 shrink-0 min-w-[20px] justify-center px-1.5 py-0.5 text-[10px]">
+                  <Badge variant="error" className="ml-1 shrink-0 min-w-[18px] justify-center px-1 py-0 text-[10px] font-bold">
                     {unread > 99 ? '99+' : String(unread)}
                   </Badge>
                 )}

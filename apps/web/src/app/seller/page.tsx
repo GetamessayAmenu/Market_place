@@ -345,7 +345,7 @@ export default function SellerOverviewPage() {
           <QuickActionCard
             icon={<IconPlus />}
             label="Add New Listing"
-            href="/seller/listings/new"
+            href="/seller/catalog/new"
           />
           <QuickActionCard
             icon={<IconMessages />}

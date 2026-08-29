@@ -61,7 +61,8 @@ function VerificationSection() {
     rejected: { color: 'bg-red-100 text-red-700', label: 'Rejected' },
   };
 
-  const { color, label } = statusConfig[verification.status];
+  const item = (verification.status && statusConfig[verification.status]) || { color: 'bg-gray-100 text-gray-700', label: 'Not Submitted' };
+  const { color, label } = item;
 
   const handleSubmitVerification = (data: VerificationDocumentsInput) => {
     console.log('Verification documents:', data);

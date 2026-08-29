@@ -63,7 +63,7 @@ export interface BlackoutCalendarProps {
 }
 
 export default function BlackoutCalendar({
-  listingId,
+  listingId: _listingId,
   existingBlackoutDates = [],
   onSave,
   onDelete,
@@ -199,7 +199,7 @@ export default function BlackoutCalendar({
         >
           {showAddForm ? (
             <>
-              <X className="h-4 w-4" />
+              <XIcon className="h-4 w-4" />
               Cancel
             </>
           ) : (
@@ -320,7 +320,7 @@ export default function BlackoutCalendar({
             const isInNewBlackout = isDateInNewBlackout(date)
             const blackoutInfo = getBlackoutForDate(date)
             const isToday = date.toDateString() === new Date().toDateString()
-            const isPast = date < new Date().setHours(0, 0, 0, 0)
+            const isPast = date.getTime() < new Date().setHours(0, 0, 0, 0)
 
             return (
               <div
@@ -389,7 +389,7 @@ export default function BlackoutCalendar({
                     className="rounded-lg p-2 text-red-600 hover:bg-red-100 transition-colors"
                     title="Delete blackout period"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2Icon className="h-4 w-4" />
                   </button>
                 </div>
               ))}

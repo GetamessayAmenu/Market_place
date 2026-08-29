@@ -1,6 +1,6 @@
 'use client'
 
-import { Avatar, Badge } from '@marketplace/ui'
+import { Avatar } from '@marketplace/ui'
 import Link from 'next/link'
 import React from 'react'
 
@@ -102,7 +102,7 @@ export default function SellerInfoCard({ seller, responseTime, className }: Sell
         <TrustBadges
           emailVerified={Boolean(seller.emailVerifiedAt)}
           phoneVerified={Boolean(seller.phoneVerifiedAt)}
-          memberSince={seller.createdAt ? new Date(seller.createdAt).getFullYear().toString() : undefined}
+          {...(seller.createdAt ? { memberSince: new Date(seller.createdAt).getFullYear().toString() } : {})}
         />
 
         {/* View Profile Link */}

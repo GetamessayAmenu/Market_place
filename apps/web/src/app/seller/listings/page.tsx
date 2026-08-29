@@ -6,6 +6,7 @@ import { Card, CardContent } from '@marketplace/ui'
 import Link from 'next/link'
 import React, { useState } from 'react'
 import useAuth from '../../../hooks/useAuth'
+import { useMyListings } from '../../../hooks/useSeller'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -35,33 +36,16 @@ const IconEdit = () => (
   </svg>
 )
 
-const IconPause = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-  </svg>
-)
-
-const IconPlay = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-  </svg>
-)
-
-const IconCheck = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-)
-
 const IconMore = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM17.25 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
   </svg>
 )
 
-const IconToggle = () => (
+const IconEye = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.573 16.49 16.638 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 )
 
@@ -121,24 +105,26 @@ function ListingCard({ listing }: { listing: Listing }) {
       <CardContent className="p-4">
         <div className="flex gap-4">
           {/* Thumbnail */}
-          <div className="h-24 w-24 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+          <Link href={`/products/${listing.id}`} className="h-24 w-24 rounded-lg bg-muted overflow-hidden flex-shrink-0 block">
             {listing.imageUrl ? (
               <img 
                 src={listing.imageUrl} 
                 alt={listing.title}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover hover:scale-105 transition-transform"
               />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
                 No Image
               </div>
             )}
-          </div>
+          </Link>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-medium text-sm line-clamp-2">{listing.title}</h3>
+              <Link href={`/products/${listing.id}`} className="font-medium text-sm line-clamp-2 hover:text-primary transition-colors">
+                {listing.title}
+              </Link>
               <StatusBadge status={listing.status} />
             </div>
 
@@ -159,8 +145,9 @@ function ListingCard({ listing }: { listing: Listing }) {
             )}
 
             <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-              <span>{listing.views.toLocaleString()} views</span>
-              <span>{listing.inquiries} inquiries</span>
+              <Link href={`/products/${listing.id}`} className="font-medium text-primary hover:underline flex items-center gap-1">
+                <IconEye /> View Listing
+              </Link>
             </div>
           </div>
 
@@ -179,51 +166,22 @@ function ListingCard({ listing }: { listing: Listing }) {
               <div className="absolute right-0 top-full mt-1 w-48 bg-background border rounded-lg shadow-lg z-10">
                 <div className="p-1">
                   <Link
-                    href={`/seller/listings/${listing.id}/edit`}
+                    href={`/products/${listing.id}`}
+                    className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md"
+                    onClick={() => setShowActions(false)}
+                  >
+                    <IconEye />
+                    View Listing
+                  </Link>
+
+                  <Link
+                    href={`/seller/catalog/${listing.id}/edit`}
                     className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md"
                     onClick={() => setShowActions(false)}
                   >
                     <IconEdit />
                     Edit Listing
                   </Link>
-                  
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md text-left"
-                    onClick={() => {
-                      setShowActions(false)
-                      // Handle pause/unpause
-                    }}
-                  >
-                    {listing.status === 'active' ? <IconPause /> : <IconPlay />}
-                    {listing.status === 'active' ? 'Pause Listing' : 'Activate Listing'}
-                  </button>
-
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md text-left"
-                    onClick={() => {
-                      setShowActions(false)
-                      // Handle mark as sold/rented
-                    }}
-                  >
-                    <IconCheck />
-                    Mark as {listing.businessModels.includes('rental') ? 'Rented' : 'Sold'}
-                  </button>
-
-                  {listing.customAvailable && (
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded-md text-left"
-                      onClick={() => {
-                        setShowActions(false)
-                        // Handle custom toggle
-                      }}
-                    >
-                      <IconToggle />
-                      Toggle Custom Orders
-                    </button>
-                  )}
                 </div>
               </div>
             )}
@@ -245,9 +203,9 @@ interface TabFilterProps {
 function TabFilter({ activeTab, onTabChange, counts }: TabFilterProps) {
   const tabs = [
     { id: 'all', label: 'All' },
-    { id: 'active', label: 'Active' },
-    { id: 'paused', label: 'Paused' },
-    { id: 'pending', label: 'Pending Moderation' },
+    { id: 'active', label: 'Published / Approved' },
+    { id: 'pending_review', label: 'Pending Review' },
+    { id: 'rejected', label: 'Rejected' },
     { id: 'sold', label: 'Sold/Rented' },
   ]
 
@@ -289,88 +247,57 @@ export default function ListingsManagementPage() {
   const user = useAuth((s: any) => s.user)
   const [activeTab, setActiveTab] = useState('all')
 
-  // Mock data - replace with API calls
-  const listings: Listing[] = [
-    {
-      id: '1',
-      title: 'Traditional Habesha Kemis - Green with Gold Tilf Embroidery',
-      price: 8500,
-      currency: 'ETB',
-      imageUrl: undefined,
-      status: 'active',
-      businessModels: ['ready-made', 'rental', 'custom'],
-      views: 342,
-      inquiries: 12,
-      createdAt: '2024-01-15',
-      customAvailable: true,
-      rentalAvailable: true,
-    },
-    {
-      id: '2',
-      title: 'Modern Ethiopian Dress - White with Menen Pattern',
-      price: 4200,
-      currency: 'ETB',
-      imageUrl: undefined,
-      status: 'active',
-      businessModels: ['ready-made'],
-      views: 287,
-      inquiries: 8,
-      createdAt: '2024-01-10',
-    },
-    {
-      id: '3',
-      title: 'Custom Shemma - Royal Blue with Silver Thread',
-      price: 6200,
-      currency: 'ETB',
-      imageUrl: undefined,
-      status: 'paused',
-      businessModels: ['custom'],
-      views: 198,
-      inquiries: 5,
-      createdAt: '2024-01-05',
-      customAvailable: true,
-    },
-    {
-      id: '4',
-      title: 'Habesha Gabi - Traditional Black with Red Border',
-      price: 3500,
-      currency: 'ETB',
-      imageUrl: undefined,
-      status: 'pending',
-      businessModels: ['ready-made', 'rental'],
-      views: 45,
-      inquiries: 2,
-      createdAt: '2024-01-20',
-      rentalAvailable: true,
-    },
-    {
-      id: '5',
-      title: 'Wedding Habesha Kemis - Ivory with Gold Accents',
-      price: 12000,
-      currency: 'ETB',
-      imageUrl: undefined,
-      status: 'sold',
-      businessModels: ['ready-made', 'custom'],
-      views: 521,
-      inquiries: 23,
-      createdAt: '2023-12-20',
-      customAvailable: true,
-    },
-  ]
+  const { data: listingsRes, isLoading } = useMyListings(user?.id ?? '')
+
+  const rawItems: any[] = Array.isArray(listingsRes)
+    ? listingsRes
+    : Array.isArray(listingsRes?.data)
+    ? listingsRes.data
+    : Array.isArray((listingsRes as any)?.data?.data)
+    ? (listingsRes as any).data.data
+    : Array.isArray((listingsRes as any)?.items)
+    ? (listingsRes as any).items
+    : []
+
+  const listings: Listing[] = rawItems.map((l: any) => {
+    const businessModels: BusinessModel[] = []
+    if (l.availableForPurchase) businessModels.push('ready-made')
+    if (l.availableForRent) businessModels.push('rental')
+    if (l.customOrderAvailable) businessModels.push('custom')
+    if (businessModels.length === 0) businessModels.push('ready-made')
+
+    return {
+      id: l.id,
+      title: l.title,
+      price: typeof l.price === 'string' ? parseFloat(l.price) : Number(l.price || 0),
+      currency: l.currency || 'ETB',
+      imageUrl: l.primaryImageUrl || l.images?.[0]?.url,
+      status: l.status || 'pending_review',
+      rejectedReason: l.rejectedReason,
+      businessModels,
+      views: 0,
+      inquiries: 0,
+      createdAt: l.createdAt,
+      customAvailable: l.customOrderAvailable,
+      rentalAvailable: l.availableForRent,
+    }
+  })
 
   const tabCounts: Record<string, number> = {
     all: listings.length,
     active: listings.filter(l => l.status === 'active').length,
-    paused: listings.filter(l => l.status === 'paused').length,
-    pending: listings.filter(l => l.status === 'pending').length,
+    pending_review: listings.filter(l => l.status === 'pending_review' || l.status === 'pending').length,
+    rejected: listings.filter(l => l.status === 'rejected').length,
     sold: listings.filter(l => l.status === 'sold' || l.status === 'rented').length,
   }
 
   const filteredListings = activeTab === 'all' 
     ? listings 
-    : activeTab === 'sold'
-      ? listings.filter(l => l.status === 'sold' || l.status === 'rented')
-      : listings.filter(l => l.status === activeTab)
+    : activeTab === 'pending_review'
+      ? listings.filter(l => l.status === 'pending_review' || l.status === 'pending')
+      : activeTab === 'sold'
+        ? listings.filter(l => l.status === 'sold' || l.status === 'rented')
+        : listings.filter(l => l.status === activeTab)
 
   if (!user) {
     return (
@@ -409,7 +336,13 @@ export default function ListingsManagementPage() {
 
       {/* Listings Grid */}
       <div className="grid grid-cols-1 gap-4">
-        {filteredListings.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-12 text-center text-muted-foreground">
+              Loading listings...
+            </CardContent>
+          </Card>
+        ) : filteredListings.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-muted-foreground">No listings found in this category.</p>

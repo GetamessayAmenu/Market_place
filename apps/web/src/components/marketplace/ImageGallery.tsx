@@ -149,9 +149,18 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
     }
   };
 
+  const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  useEffect(() => {
+    const activeThumb = thumbnailRefs.current[activeIndex];
+    if (activeThumb) {
+      activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeIndex]);
+
   if (images.length === 0) {
     return (
-      <div className={cn('aspect-[4/3] rounded-lg bg-muted flex items-center justify-center', className)}>
+      <div className={cn('aspect-[4/3] rounded-xl bg-muted flex items-center justify-center border', className)}>
         <p className="text-muted-foreground">No images available</p>
       </div>
     );
@@ -159,15 +168,15 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
 
   return (
     <>
-      <div className={cn('space-y-3', className)}>
+      <div className={cn('space-y-3 w-full', className)}>
         {/* Main image container */}
         <div 
           ref={containerRef}
-          className="relative group"
+          className="relative group w-full"
         >
           {/* Main image */}
           <div 
-            className="relative aspect-[4/3] overflow-hidden rounded-lg bg-muted cursor-zoom-in"
+            className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-muted/40 border shadow-sm cursor-zoom-in flex items-center justify-center"
             onClick={handleMainImageClick}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
@@ -175,14 +184,14 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
             {activeImage && (
               <img
                 src={activeImage.url}
-                alt={activeImage.alt ?? 'Listing image'}
-                className="h-full w-full object-contain"
+                alt={activeImage.alt ?? 'Product image'}
+                className="h-full w-full object-contain transition-all duration-200"
               />
             )}
 
             {/* Image counter */}
             {images.length > 1 && (
-              <div className="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm">
+              <div className="absolute top-3 left-3 bg-black/65 text-white text-xs font-medium px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm pointer-events-none">
                 {activeIndex + 1} / {images.length}
               </div>
             )}
@@ -193,8 +202,7 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setActiveIndex(prev => prev > 0 ? prev - 1 : images.length - 1); }}
-                  disabled={activeIndex === 0}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0 disabled:cursor-not-allowed hidden md:block"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/85 text-white p-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hidden md:block"
                   aria-label="Previous image"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -204,8 +212,7 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setActiveIndex(prev => prev < images.length - 1 ? prev + 1 : 0); }}
-                  disabled={activeIndex === images.length - 1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-0 disabled:cursor-not-allowed hidden md:block"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/85 text-white p-2.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm hidden md:block"
                   aria-label="Next image"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -220,7 +227,7 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
               <button
                 type="button"
                 onClick={handleShare}
-                className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm"
+                className="bg-black/60 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-transform hover:scale-105"
                 aria-label="Share"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,60 +238,40 @@ export default function ImageGallery({ images, className, listingTitle }: ImageG
 
             {/* Swipe indicator for mobile */}
             {images.length > 1 && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm md:hidden">
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1 rounded-full backdrop-blur-sm md:hidden pointer-events-none">
                 Swipe to navigate
               </div>
             )}
           </div>
+        </div>
 
-          {/* Thumbnails - Desktop: side, Tablet/Mobile: horizontal */}
-          {images.length > 1 && (
-            <div className="hidden lg:flex lg:flex-col lg:gap-2 lg:absolute lg:right-[-88px] lg:top-0 lg:bottom-0 lg:w-20 lg:overflow-y-auto">
+        {/* Horizontal Thumbnails Strip Below Main Photo */}
+        {images.length > 1 && (
+          <div className="w-full">
+            <div className="flex items-center gap-2.5 overflow-x-auto py-1 px-0.5 scrollbar-thin scrollbar-thumb-muted-foreground/30 scroll-smooth snap-x snap-mandatory">
               {images.map((img, idx) => (
                 <button
-                  key={img.url}
+                  key={idx}
+                  ref={(el) => { thumbnailRefs.current[idx] = el; }}
                   type="button"
                   onClick={() => handleThumbnailClick(idx)}
                   className={cn(
-                    'flex-shrink-0 h-20 w-full rounded-md overflow-hidden border-2 transition-colors',
-                    idx === activeIndex ? 'border-primary' : 'border-transparent hover:border-border'
+                    'relative flex-shrink-0 h-20 w-20 md:h-24 md:w-24 rounded-lg overflow-hidden border-2 transition-all duration-200 snap-start cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    idx === activeIndex
+                      ? 'border-primary ring-2 ring-primary/20 scale-[1.02] shadow-sm opacity-100'
+                      : 'border-border/60 hover:border-primary/50 opacity-75 hover:opacity-100 hover:scale-[1.01]'
                   )}
-                  aria-label={'View image ' + String(idx + 1)}
+                  aria-label={`View product photo ${idx + 1} of ${images.length}`}
                 >
                   <img
                     src={img.url}
-                    alt={img.alt ?? 'Thumbnail ' + String(idx + 1)}
+                    alt={img.alt ?? `Thumbnail ${idx + 1}`}
                     className="h-full w-full object-cover"
                     loading="lazy"
                   />
                 </button>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* Horizontal thumbnails for tablet and mobile */}
-        {images.length > 1 && (
-          <div className="flex lg:hidden gap-2 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
-            {images.map((img, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleThumbnailClick(idx)}
-                className={cn(
-                  'flex-shrink-0 h-20 w-20 rounded-md overflow-hidden border-2 transition-colors snap-start',
-                  idx === activeIndex ? 'border-primary' : 'border-transparent hover:border-border'
-                )}
-                aria-label={'View image ' + String(idx + 1)}
-              >
-                <img
-                  src={img.url}
-                  alt={img.alt ?? 'Thumbnail ' + String(idx + 1)}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </button>
-            ))}
           </div>
         )}
       </div>

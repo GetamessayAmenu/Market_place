@@ -12,7 +12,6 @@ import { ChatService } from './chat.service';
 import { ChatSafetyService } from './chat.safety.service';
 import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
-import { eventEmitter } from '../users/users.service';
 
 @WebSocketGateway({
   cors: {
@@ -25,21 +24,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 
+  // Active user socket map (userId -> Set of socketIds)
   private readonly userSockets = new Map<string, Set<string>>();
+  // Online presence timestamp map (userId -> Date)
+  private readonly onlineUsers = new Map<string, Date>();
 
   constructor(
     private readonly chatService: ChatService,
     private readonly chatSafetyService: ChatSafetyService,
     private readonly jwtService: JwtService,
-  ) {
-    // Listen for store follower updates and emit via Socket.IO
-    eventEmitter.on('store_follower_updated', (data) => {
-      this.server.to(`user:${data.storeId}`).emit('store_follower_updated', {
-        followerCount: data.followerCount,
-        isFollowing: data.isFollowing,
-      });
-    });
-  }
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
@@ -62,18 +56,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       client.data.user = user;
 
-      // Track user socket
+      // Track socket
       if (!this.userSockets.has(user.id)) {
         this.userSockets.set(user.id, new Set());
       }
       this.userSockets.get(user.id)!.add(client.id);
+      this.onlineUsers.set(user.id, new Date());
 
-      // Join user's personal room for direct messages
+      // Join user room
       client.join(`user:${user.id}`);
 
-      console.log(`User ${user.id} connected to chat`);
+      // Broadcast online status to global room or queryable
+      this.server.emit('chat:presence_update', {
+        userId: user.id,
+        isOnline: true,
+        lastSeen: new Date().toISOString(),
+      });
     } catch (error) {
-      console.error('WebSocket connection error:', error);
       client.disconnect();
     }
   }
@@ -86,190 +85,125 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         sockets.delete(client.id);
         if (sockets.size === 0) {
           this.userSockets.delete(user.id);
+          this.onlineUsers.set(user.id, new Date());
+          
+          this.server.emit('chat:presence_update', {
+            userId: user.id,
+            isOnline: false,
+            lastSeen: new Date().toISOString(),
+          });
         }
       }
-      console.log(`User ${user.id} disconnected from chat`);
     }
   }
 
+  // ─── Socket Event Handlers ───────────────────────────────────────────────────
+
+  @SubscribeMessage('chat:join')
   @SubscribeMessage('join_conversation')
   async handleJoinConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string }
   ) {
     const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
+    if (!user || !data?.conversationId) return;
 
     try {
       await this.chatService.getConversation(data.conversationId, user);
       client.join(`conversation:${data.conversationId}`);
-      
-      // Send success response
-      client.emit('joined_conversation', { conversationId: data.conversationId });
-    } catch (error) {
-      client.emit('error', { message: 'Failed to join conversation' });
+      client.emit('chat:joined', { conversationId: data.conversationId });
+    } catch (error: any) {
+      client.emit('chat:error', { message: error.message || 'Failed to join conversation' });
     }
   }
 
+  @SubscribeMessage('chat:leave')
   @SubscribeMessage('leave_conversation')
   async handleLeaveConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string }
   ) {
+    if (!data?.conversationId) return;
     client.leave(`conversation:${data.conversationId}`);
-    client.emit('left_conversation', { conversationId: data.conversationId });
+    client.emit('chat:left', { conversationId: data.conversationId });
   }
 
+  @SubscribeMessage('chat:send')
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; content: string; mediaUrls?: string[] }
+    @MessageBody() data: {
+      conversationId: string;
+      content: string;
+      messageType?: any;
+      attachments?: any;
+      replyToId?: string;
+    }
   ) {
     const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
+    if (!user || !data?.conversationId) return;
 
     try {
-      const message = await this.chatService.sendMessage(
-        data.conversationId,
-        user,
-        data.content
-      );
-      
-      // Scan message for safety violations
-      await this.chatSafetyService.scanMessage(message.id, data.conversationId, data.content);
-      
-      // Broadcast message to all users in the conversation
+      const payload: { content: string; messageType?: any; attachments?: any; replyToId?: string } = {
+        content: data.content,
+      };
+      if (data.messageType) payload.messageType = data.messageType;
+      if (data.attachments) payload.attachments = data.attachments;
+      if (data.replyToId) payload.replyToId = data.replyToId;
+
+      const message = await this.chatService.sendMessage(data.conversationId, user, payload);
+
+      // Safety scan
+      await this.chatSafetyService.scanMessage(message.id, data.conversationId, data.content || '');
+
+      // Broadcast to room
+      this.server.to(`conversation:${data.conversationId}`).emit('chat:new_message', message);
       this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
-      
-      // Also send to sender's personal room
-      client.emit('message_sent', message);
-    } catch (error) {
-      client.emit('error', { message: 'Failed to send message' });
+      client.emit('chat:sent_ack', message);
+    } catch (error: any) {
+      client.emit('chat:error', { message: error.message || 'Failed to send message' });
     }
   }
 
-  @SubscribeMessage('send_custom_quote')
-  async handleSendCustomQuote(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; quote: { proposedPrice: number; proposedDeposit?: number; notes?: string } }
-  ) {
-    const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
-
-    try {
-      // Send quote as a structured message
-      const quoteMessage = JSON.stringify({
-        type: 'custom_quote',
-        ...data.quote,
-        senderId: user.id,
-        senderName: user.email.split('@')[0],
-      });
-
-      const message = await this.chatService.sendMessage(
-        data.conversationId,
-        user,
-        quoteMessage
-      );
-
-      // Broadcast to conversation
-      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
-      this.server.to(`conversation:${data.conversationId}`).emit('custom_quote_sent', {
-        conversationId: data.conversationId,
-        quote: data.quote,
-        messageId: message.id,
-      });
-
-      client.emit('quote_sent', message);
-    } catch (error) {
-      client.emit('error', { message: 'Failed to send quote' });
-    }
-  }
-
-  @SubscribeMessage('accept_quote')
-  async handleAcceptQuote(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; quoteId: string }
-  ) {
-    const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
-
-    try {
-      // Send acceptance message
-      const acceptMessage = JSON.stringify({
-        type: 'quote_accepted',
-        quoteId: data.quoteId,
-        senderId: user.id,
-      });
-
-      const message = await this.chatService.sendMessage(
-        data.conversationId,
-        user,
-        acceptMessage
-      );
-
-      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
-      this.server.to(`conversation:${data.conversationId}`).emit('quote_accepted', {
-        conversationId: data.conversationId,
-        quoteId: data.quoteId,
-      });
-
-      client.emit('quote_accepted', message);
-    } catch (error) {
-      client.emit('error', { message: 'Failed to accept quote' });
-    }
-  }
-
-  @SubscribeMessage('update_order_status')
-  async handleUpdateOrderStatus(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; orderId: string; status: string }
-  ) {
-    const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
-
-    try {
-      // This would typically call the orders service
-      // For now, send a system message about the status update
-      const statusMessage = JSON.stringify({
-        type: 'system_status_update',
-        orderId: data.orderId,
-        status: data.status,
-        senderId: user.id,
-      });
-
-      const message = await this.chatService.sendMessage(
-        data.conversationId,
-        user,
-        statusMessage
-      );
-
-      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message);
-      this.server.to(`conversation:${data.conversationId}`).emit('order_status_updated', {
-        conversationId: data.conversationId,
-        orderId: data.orderId,
-        status: data.status,
-      });
-
-      client.emit('order_status_updated', message);
-    } catch (error) {
-      client.emit('error', { message: 'Failed to update order status' });
-    }
-  }
-
+  @SubscribeMessage('chat:read')
   @SubscribeMessage('mark_as_read')
   async handleMarkAsRead(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string }
   ) {
     const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
+    if (!user || !data?.conversationId) return;
 
     try {
       await this.chatService.markAsRead(data.conversationId, user);
-      client.emit('marked_as_read', { conversationId: data.conversationId });
-    } catch (error) {
-      client.emit('error', { message: 'Failed to mark as read' });
+      this.server.to(`conversation:${data.conversationId}`).emit('chat:message_read', {
+        conversationId: data.conversationId,
+        readBy: user.id,
+        readAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      client.emit('chat:error', { message: error.message || 'Failed to mark messages as read' });
     }
+  }
+
+  @SubscribeMessage('chat:typing')
+  handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; isTyping: boolean }
+  ) {
+    const user = client.data.user as AuthenticatedUser;
+    if (!user || !data?.conversationId) return;
+
+    client.to(`conversation:${data.conversationId}`).emit('chat:user_typing', {
+      conversationId: data.conversationId,
+      userId: user.id,
+      isTyping: data.isTyping,
+    });
+    client.to(`conversation:${data.conversationId}`).emit('user_typing', {
+      conversationId: data.conversationId,
+      userId: user.id,
+      isTyping: data.isTyping,
+    });
   }
 
   @SubscribeMessage('typing_start')
@@ -277,14 +211,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string }
   ) {
-    const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
-
-    // Broadcast typing indicator to conversation (excluding sender)
-    client.to(`conversation:${data.conversationId}`).emit('user_typing', {
-      conversationId: data.conversationId,
-      userId: user.id,
-    });
+    this.handleTyping(client, { conversationId: data.conversationId, isTyping: true });
   }
 
   @SubscribeMessage('typing_stop')
@@ -292,22 +219,45 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string }
   ) {
+    this.handleTyping(client, { conversationId: data.conversationId, isTyping: false });
+  }
+
+  @SubscribeMessage('chat:edit')
+  async handleEditMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; content: string }
+  ) {
     const user = client.data.user as AuthenticatedUser;
-    if (!user) return;
+    if (!user || !data?.messageId) return;
 
-    client.to(`conversation:${data.conversationId}`).emit('user_stopped_typing', {
-      conversationId: data.conversationId,
-      userId: user.id,
-    });
+    try {
+      const updated = await this.chatService.editMessage(data.messageId, user, data.content);
+      this.server.to(`conversation:${updated.conversationId}`).emit('chat:message_edited', updated);
+    } catch (error: any) {
+      client.emit('chat:error', { message: error.message || 'Failed to edit message' });
+    }
   }
 
-  // Helper method to send notifications to specific users
-  sendToUser(userId: string, event: string, data: any) {
-    this.server.to(`user:${userId}`).emit(event, data);
+  @SubscribeMessage('chat:delete')
+  async handleDeleteMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string }
+  ) {
+    const user = client.data.user as AuthenticatedUser;
+    if (!user || !data?.messageId) return;
+
+    try {
+      await this.chatService.deleteMessage(data.messageId, user);
+      this.server.to(`conversation:${data.conversationId}`).emit('chat:message_deleted', {
+        messageId: data.messageId,
+        conversationId: data.conversationId,
+      });
+    } catch (error: any) {
+      client.emit('chat:error', { message: error.message || 'Failed to delete message' });
+    }
   }
 
-  // Helper method to broadcast to conversation
-  sendToConversation(conversationId: string, event: string, data: any) {
-    this.server.to(`conversation:${conversationId}`).emit(event, data);
+  isUserOnline(userId: string): boolean {
+    return this.userSockets.has(userId) && (this.userSockets.get(userId)?.size || 0) > 0;
   }
 }

@@ -26,8 +26,8 @@ export const metadata = {
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
-      <body className={inter.className}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`} suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
         <Providers>
           <AppLayoutWrapper>{children}</AppLayoutWrapper>
         </Providers>

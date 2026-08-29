@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Badge, Button, Card, CardContent, Alert } from '@marketplace/ui';
 import useAuth from '../../../../hooks/useAuth';
-import { apiGet, apiPatch, apiPost } from '../../../../lib/api';
+import { apiGet, apiPatch } from '../../../../lib/api';
 import MessageThread from '../../../../components/chat/MessageThread';
 import { fetchConversationMessages } from '../../../../lib/chatApi';
 
@@ -146,7 +146,8 @@ function TypeBadge({ type }: { type: OrderType }) {
     RENTAL: { color: 'bg-purple-100 text-purple-700', icon: <IconRental />, label: 'Rental' },
     CUSTOM_TAILORING: { color: 'bg-orange-100 text-orange-700', icon: <IconCustom />, label: 'Custom Order' },
   };
-  const { color, icon, label } = config[type];
+  const item = (type && config[type]) || { color: 'bg-blue-100 text-blue-700', icon: <IconSale />, label: type || 'Sale' };
+  const { color, icon, label } = item;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${color}`}>
       {icon}
@@ -209,7 +210,7 @@ const lifecycleSteps: LifecycleStep[] = [
   { key: 'COMPLETED', label: 'Completed & Closed', description: 'Order fulfilled' },
 ];
 
-function LifecycleTracker({ status, type }: { status: OrderStatus; type: OrderType }) {
+function LifecycleTracker({ status, onStatusUpdate }: { status: OrderStatus; onStatusUpdate?: (newStatus: OrderStatus) => void }) {
   const getStatusIndex = (currentStatus: OrderStatus): number => {
     const statusOrder = ['INQUIRY_PENDING', 'QUOTE_PROPOSED', 'APPROVED_RESERVED', 'MEASUREMENTS_SUBMITTED', 
       'FABRIC_CUTTING', 'TAILORING_IN_PROGRESS', 'FITTING_READY', 'READY_FOR_HANDOVER', 'COMPLETED'];
@@ -217,7 +218,6 @@ function LifecycleTracker({ status, type }: { status: OrderStatus; type: OrderTy
   };
 
   const currentIndex = getStatusIndex(status);
-  const isCompleted = status === 'COMPLETED' || status === 'CANCELLED' || status === 'DISPUTED';
 
   return (
     <div className="bg-gradient-to-r from-brand-wine/5 to-brand-gold/5 rounded-xl p-6 mb-6">
@@ -233,7 +233,7 @@ function LifecycleTracker({ status, type }: { status: OrderStatus; type: OrderTy
           return (
             <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
               <button
-                onClick={() => handleStatusUpdate(step.key as OrderStatus)}
+                onClick={() => onStatusUpdate?.(step.key as OrderStatus)}
                 disabled={isFuture}
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
                   isPast || isCurrent 
@@ -310,7 +310,7 @@ function QuoteHistoryCard({ quotes, currency }: { quotes: any[]; currency: strin
           Quote History
         </h4>
         <div className="space-y-3">
-          {quotes.map((quote, index) => (
+          {quotes.map((quote) => (
             <div key={quote.id} className={`bg-muted/50 rounded-lg p-3 border-l-4 ${quote.isAccepted ? 'border-green-500' : 'border-muted'}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground">
@@ -388,7 +388,6 @@ export default function SellerOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [conversation, setConversation] = useState<ChatConversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Fetch order and conversation data
@@ -507,7 +506,7 @@ export default function SellerOrderDetailPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Lifecycle Tracker */}
-        <LifecycleTracker status={order.status} type={order.type} />
+        <LifecycleTracker status={order.status} onStatusUpdate={handleStatusUpdate} />
 
         {/* Dual Panel Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -639,7 +638,7 @@ export default function SellerOrderDetailPage() {
               <div className="h-full flex flex-col bg-background border rounded-xl overflow-hidden">
                 <MessageThread
                   conversation={conversation}
-                  currentUserId={user.id}
+                  currentUserId={user?.id || ''}
                   initialMessages={messages}
                 />
               </div>
