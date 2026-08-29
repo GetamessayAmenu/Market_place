@@ -820,12 +820,102 @@ export class ListingsService {
   }
 
   async getModerationHistory(id: string) {
-    const logs = await this.adminLogsService.findLogs({
-      resourceId: id,
-      resource: 'listing',
-      limit: 100,
-    });
-    return logs.data;
+    const listing = await this.listingsRepository.findByIdWithRelations(id);
+    if (!listing) {
+      throw new ListingNotFoundException();
+    }
+
+    const [logs, revisions] = await Promise.all([
+      this.adminLogsService.findLogs({
+        resourceId: id,
+        resource: 'listing',
+        limit: 100,
+      }),
+      this.listingsRepository.findRevisionsByListingId(id),
+    ]);
+
+    const itemsMap = new Map<string, any>();
+
+    for (const log of logs.data) {
+      itemsMap.set(log.id, log);
+    }
+
+    for (const rev of revisions) {
+      if (rev.reviewedAt && rev.reviewedBy) {
+        const revAction = rev.status === 'APPROVED' ? 'listing.revision_approved' : 'listing.revision_rejected';
+        const key = `rev-${rev.id}`;
+        if (!itemsMap.has(key)) {
+          itemsMap.set(key, {
+            id: key,
+            action: revAction,
+            actorId: rev.reviewedBy.id,
+            actor: {
+              id: rev.reviewedBy.id,
+              displayName: rev.reviewedBy.displayName,
+              email: rev.reviewedBy.email,
+            },
+            metadata: {
+              revisionId: rev.id,
+              reason: rev.rejectionReason,
+              changedFields: rev.changedFields,
+              riskLevel: rev.riskLevel,
+            },
+            createdAt: rev.reviewedAt,
+          });
+        }
+      }
+
+      const revCreatedKey = `rev-submitted-${rev.id}`;
+      if (!itemsMap.has(revCreatedKey)) {
+        itemsMap.set(revCreatedKey, {
+          id: revCreatedKey,
+          action: 'listing.revision_submitted',
+          actorId: listing.sellerId,
+          actor: listing.seller
+            ? {
+                id: listing.seller.id,
+                displayName: listing.seller.displayName,
+                email: listing.seller.email,
+              }
+            : null,
+          metadata: {
+            revisionId: rev.id,
+            changedFields: rev.changedFields,
+            riskLevel: rev.riskLevel,
+          },
+          createdAt: rev.createdAt,
+        });
+      }
+    }
+
+    const hasCreatedLog = Array.from(itemsMap.values()).some(
+      (item) => item.action === 'listing.created' || item.action === 'listing.submitted',
+    );
+    if (!hasCreatedLog) {
+      const creationKey = `created-${listing.id}`;
+      itemsMap.set(creationKey, {
+        id: creationKey,
+        action: listing.status === 'draft' ? 'listing.created' : 'listing.submitted',
+        actorId: listing.sellerId,
+        actor: listing.seller
+          ? {
+              id: listing.seller.id,
+              displayName: listing.seller.displayName,
+              email: listing.seller.email,
+            }
+          : { id: listing.sellerId, displayName: 'Seller', email: '' },
+        metadata: {
+          title: listing.title,
+          status: listing.status,
+          price: listing.price,
+        },
+        createdAt: listing.createdAt,
+      });
+    }
+
+    return Array.from(itemsMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   // ─── Revision Moderation Methods ──────────────────────────────────────────

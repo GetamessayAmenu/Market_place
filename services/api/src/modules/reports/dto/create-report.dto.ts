@@ -1,8 +1,8 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateReportDto {
-  @IsEnum(['listing', 'user', 'message', 'conversation'] as const)
-  targetType!: 'listing' | 'user' | 'message' | 'conversation';
+  @IsEnum(['listing', 'user', 'message', 'conversation', 'order', 'rental', 'custom_order', 'other'] as const)
+  targetType!: 'listing' | 'user' | 'message' | 'conversation' | 'order' | 'rental' | 'custom_order' | 'other';
 
   @IsNotEmpty()
   @MaxLength(100)
@@ -27,10 +27,23 @@ export class CreateReportDto {
   messageId?: string;
 
   @IsOptional()
-  @IsEnum(['low', 'medium', 'high', 'critical'] as const)
-  priority?: 'low' | 'medium' | 'high' | 'critical';
+  @IsUUID()
+  conversationId?: string;
 
   @IsOptional()
   @IsUUID()
-  conversationId?: string;
+  orderId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  rentalId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  customOrderId?: string;
+
+  @IsOptional()
+  @IsEnum(['low', 'medium', 'high', 'critical'] as const)
+  priority?: 'low' | 'medium' | 'high' | 'critical';
 }
+

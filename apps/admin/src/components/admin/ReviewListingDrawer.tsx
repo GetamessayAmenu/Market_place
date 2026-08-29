@@ -472,30 +472,138 @@ export default function ReviewListingDrawer({ listing, onClose, onActionComplete
             </div>
           ) : (
             <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-foreground">Moderation History</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-base text-foreground">Moderation History & Audit Logs</h3>
+                  <p className="text-xs text-muted-foreground">Complete chronological log of seller submissions and admin moderation actions</p>
+                </div>
+                {history && history.length > 0 && (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                    {history.length} {history.length === 1 ? 'Action Recorded' : 'Actions Recorded'}
+                  </span>
+                )}
+              </div>
+
               {historyLoading ? (
-                <div className="flex justify-center p-8"><Spinner /></div>
+                <div className="flex justify-center p-12"><Spinner /></div>
               ) : !history || history.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-12">No moderation history recorded.</p>
+                <div className="border border-dashed rounded-xl p-8 text-center bg-muted/5 space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
+                    📋
+                  </div>
+                  <p className="text-sm font-medium text-foreground">No moderation history recorded yet</p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    Actions taken on this listing (approvals, rejections, change requests, updates) will appear here automatically with full admin attribution.
+                  </p>
+                </div>
               ) : (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                  {history.map((log: any) => (
-                    <div key={log.id} className="border rounded-lg p-4 text-sm bg-muted/5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-primary capitalize">{log.action.replace('listing.', '').replace(/_/g, ' ')}</span>
-                        <span className="text-xs text-muted-foreground">{formatDateTime(log.createdAt)}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Moderator: <strong className="text-foreground">{log.actor?.displayName || log.actor?.email || 'System'}</strong>
-                      </div>
-                      {log.metadata?.reason && (
-                        <div className="mt-2 bg-muted/40 p-3 rounded text-xs border border-muted-foreground/10 text-foreground">
-                          <span className="font-semibold text-muted-foreground block mb-1">Reason:</span>
-                          {String(log.metadata.reason)}
+                <div className="relative pl-6 space-y-6 max-h-[500px] overflow-y-auto pr-2 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-border">
+                  {history.map((log: any, idx: number) => {
+                    const actionStr = (log.action || '').toLowerCase()
+                    let badgeVariant: 'success' | 'error' | 'warning' | 'info' | 'secondary' = 'secondary'
+                    let iconBg = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                    let actionLabel = log.action ? log.action.replace(/^(listing|moderation)\./, '').replace(/_/g, ' ').toUpperCase() : 'ACTION'
+
+                    if (actionStr.includes('approved')) {
+                      badgeVariant = 'success'
+                      iconBg = 'bg-emerald-500 text-white'
+                      actionLabel = actionStr.includes('revision') ? 'REVISION APPROVED' : 'LISTING APPROVED'
+                    } else if (actionStr.includes('rejected')) {
+                      badgeVariant = 'error'
+                      iconBg = 'bg-red-500 text-white'
+                      actionLabel = actionStr.includes('revision') ? 'REVISION REJECTED' : 'LISTING REJECTED'
+                    } else if (actionStr.includes('changes_requested')) {
+                      badgeVariant = 'warning'
+                      iconBg = 'bg-amber-500 text-white'
+                      actionLabel = 'CHANGES REQUESTED'
+                    } else if (actionStr.includes('featured')) {
+                      badgeVariant = 'info'
+                      iconBg = 'bg-blue-500 text-white'
+                      actionLabel = actionStr.includes('unfeatured') ? 'UNFEATURED' : 'FEATURED'
+                    } else if (actionStr.includes('submitted') || actionStr.includes('created') || actionStr.includes('updated')) {
+                      badgeVariant = 'secondary'
+                      iconBg = 'bg-indigo-500 text-white'
+                      actionLabel = actionStr.includes('revision') ? 'REVISION SUBMITTED' : actionStr.includes('created') ? 'LISTING CREATED' : 'LISTING UPDATED'
+                    }
+
+                    const actorName = log.actor?.displayName || log.actor?.email || 'System'
+                    const actorRole = log.actor?.email?.includes('admin') || (listing.seller?.id && log.actorId !== listing.seller.id) ? 'Admin / Moderator' : 'Seller'
+
+                    return (
+                      <div key={log.id || idx} className="relative flex items-start gap-4 group">
+                        {/* Timeline Circle Icon */}
+                        <div className={`absolute -left-6 top-1 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${iconBg}`}>
+                          {actionStr.includes('approved') ? '✓' : actionStr.includes('rejected') ? '✕' : actionStr.includes('changes') ? '!' : actionStr.includes('featured') ? '★' : '•'}
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Content Card */}
+                        <div className="flex-1 border rounded-xl p-4 bg-card hover:border-primary/30 transition-all space-y-2.5 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={badgeVariant} className="text-[11px] font-semibold uppercase tracking-wider">
+                                {actionLabel}
+                              </Badge>
+                              <span className="text-xs font-semibold text-foreground">
+                                {actorName}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                                {actorRole}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {formatDateTime(log.createdAt)}
+                            </span>
+                          </div>
+
+                          {/* Reason / Admin Note if provided */}
+                          {(log.metadata?.reason || log.metadata?.rejectionReason) && (
+                            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-foreground space-y-1">
+                              <span className="font-semibold text-amber-600 dark:text-amber-400 block text-[11px]">
+                                Admin Note / Reason:
+                              </span>
+                              <p className="whitespace-pre-wrap leading-relaxed">{String(log.metadata.reason || log.metadata.rejectionReason)}</p>
+                            </div>
+                          )}
+
+                          {/* Changed Fields / Metadata details */}
+                          {log.metadata?.changedFields && Array.isArray(log.metadata.changedFields) && log.metadata.changedFields.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-1">
+                              <span className="text-muted-foreground text-[11px]">Fields Changed:</span>
+                              {log.metadata.changedFields.map((field: string) => (
+                                <span key={field} className="px-2 py-0.5 rounded bg-muted text-foreground text-[11px] font-mono border">
+                                  {field}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Risk Level Badge if revision */}
+                          {log.metadata?.riskLevel && (
+                            <div className="flex items-center gap-2 text-xs pt-0.5">
+                              <span className="text-muted-foreground text-[11px]">Risk Classification:</span>
+                              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                                log.metadata.riskLevel === 'HIGH'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-200'
+                                  : log.metadata.riskLevel === 'SIGNIFICANT'
+                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300 border border-orange-200'
+                                  : 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300 border border-green-200'
+                              }`}>
+                                {log.metadata.riskLevel} RISK
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Footer with IP Address if available */}
+                          {log.ipAddress && (
+                            <div className="text-[10px] text-muted-foreground pt-1 border-t border-border/50 flex justify-between">
+                              <span>IP Address: {log.ipAddress}</span>
+                              {log.userAgent && <span className="truncate max-w-[200px]" title={log.userAgent}>{log.userAgent}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

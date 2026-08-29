@@ -18,6 +18,9 @@ export type ReportWithRelations = Prisma.ReportGetPayload<{
         listing: { select: { id: true; title: true; slug: true; status: true } };
       };
     };
+    order: { select: { id: true; orderNumber: true; status: true; agreedPrice: true } };
+    rental: { select: { id: true; orderNumber: true; status: true; totalAmount: true } };
+    customOrder: { select: { id: true; status: true; agreedPrice: true } };
   };
 }>;
 
@@ -39,6 +42,9 @@ export class ReportsRepository {
         listing: { select: { id: true, title: true, slug: true, status: true } },
       },
     },
+    order: { select: { id: true, orderNumber: true, status: true, agreedPrice: true } },
+    rental: { select: { id: true, orderNumber: true, status: true, totalAmount: true } },
+    customOrder: { select: { id: true, status: true, agreedPrice: true } },
   } as const;
 
   async findById(id: string): Promise<ReportWithRelations | null> {

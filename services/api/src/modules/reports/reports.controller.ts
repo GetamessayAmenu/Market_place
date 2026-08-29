@@ -163,4 +163,28 @@ export class ReportsController {
   ) {
     return this.reportsService.getAuditLogs(id);
   }
+
+  /** Admin/moderator: add internal moderation note */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions({ resource: 'report', action: 'moderate' })
+  @Post(':id/notes')
+  addInternalNote(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { note: string },
+  ) {
+    return this.reportsService.addInternalNote(user, id, body.note);
+  }
+
+  /** Admin/moderator: execute contextual moderation action */
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions({ resource: 'report', action: 'moderate' })
+  @Post(':id/action')
+  takeModerationAction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: { action: string; note?: string; durationDays?: number },
+  ) {
+    return this.reportsService.takeModerationAction(user, id, body);
+  }
 }

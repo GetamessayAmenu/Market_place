@@ -86,17 +86,21 @@ export default async function HomePage() {
     ])
 
     if (featuredRes.status === 'fulfilled') {
-      featuredListings = featuredRes.value.data
+      const val = featuredRes.value as any
+      featuredListings = Array.isArray(val) ? val : Array.isArray(val?.data) ? val.data : []
     }
     if (recentRes.status === 'fulfilled') {
-      recentListings = recentRes.value.data
+      const val = recentRes.value as any
+      recentListings = Array.isArray(val) ? val : Array.isArray(val?.data) ? val.data : []
     }
     if (categoriesRes.status === 'fulfilled') {
-      allCategories = categoriesRes.value
+      const val = categoriesRes.value as any
+      allCategories = Array.isArray(val) ? val : Array.isArray(val?.data) ? val.data : []
       categories = allCategories.filter((c) => !c.parentId)
     }
     if (sellersRes.status === 'fulfilled') {
-      sellers = sellersRes.value
+      const val = sellersRes.value as any
+      sellers = Array.isArray(val) ? val : Array.isArray(val?.data) ? val.data : []
     }
   } catch {
     // Graceful fallback

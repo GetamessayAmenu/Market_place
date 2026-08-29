@@ -74,17 +74,21 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Business Model Badges ───────────────────────────────────────────────────
 
-function BusinessModelBadges({ models }: { models: BusinessModel[] }) {
+function BusinessModelBadges({ models }: { models?: BusinessModel[] }) {
   const config = {
     'ready-made': { label: 'Ready-Made', className: 'bg-brand-wine/10 text-brand-wine border-brand-wine/20' },
     'rental': { label: 'Rental', className: 'bg-purple-100 text-purple-700 border-purple-200' },
     'custom': { label: 'Custom Available', className: 'bg-orange-100 text-orange-700 border-orange-200' },
   }
 
+  if (!Array.isArray(models) || models.length === 0) return null
+
   return (
     <div className="flex gap-1.5 flex-wrap">
       {models.map((model) => {
-        const { label, className } = config[model]
+        const item = config[model]
+        if (!item) return null
+        const { label, className } = item
         return (
           <Badge key={model} className={className} variant="outline">
             {label}

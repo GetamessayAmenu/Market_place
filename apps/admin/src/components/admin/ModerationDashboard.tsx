@@ -589,31 +589,82 @@ export default function ModerationDashboard({ initialData, initialStats }: Moder
                 )}
               </div>
             ) : (
-              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
                 {historyLoading ? (
                   <div className="flex justify-center p-8"><Spinner /></div>
                 ) : !history || history.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-12">No moderation history recorded for this item.</p>
+                  <div className="border border-dashed rounded-xl p-8 text-center bg-muted/5 space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
+                      📋
+                    </div>
+                    <p className="text-sm font-medium text-foreground">No moderation history recorded for this item.</p>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {history.map((log: any) => (
-                      <div key={log.id} className="border rounded-lg p-3 text-sm bg-muted/5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-primary capitalize">{log.action.replace('moderation.', '').replace(/_/g, ' ')}</span>
-                          <span className="text-xs text-muted-foreground">{formatDateTime(log.createdAt)}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex gap-4">
-                          <span>Moderator: <strong className="text-foreground">{log.actor?.displayName || log.actor?.email || 'System'}</strong></span>
-                          {log.ipAddress && <span>IP: {log.ipAddress}</span>}
-                        </div>
-                        {log.metadata?.reason && (
-                          <div className="mt-2 bg-muted/40 p-2 rounded text-xs border border-muted-foreground/10 text-foreground">
-                            <span className="font-semibold text-muted-foreground block mb-0.5">Reason:</span>
-                            {String(log.metadata.reason)}
+                  <div className="relative pl-6 space-y-5 py-2 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-border">
+                    {history.map((log: any, idx: number) => {
+                      const actionStr = (log.action || '').toLowerCase()
+                      let badgeVariant: 'success' | 'error' | 'warning' | 'info' | 'secondary' = 'secondary'
+                      let iconBg = 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                      let actionLabel = log.action ? log.action.replace(/^(moderation|review)\./, '').replace(/_/g, ' ').toUpperCase() : 'ACTION'
+
+                      if (actionStr.includes('approved')) {
+                        badgeVariant = 'success'
+                        iconBg = 'bg-emerald-500 text-white'
+                      } else if (actionStr.includes('rejected')) {
+                        badgeVariant = 'error'
+                        iconBg = 'bg-red-500 text-white'
+                      } else if (actionStr.includes('spam')) {
+                        badgeVariant = 'error'
+                        iconBg = 'bg-purple-500 text-white'
+                      } else if (actionStr.includes('delete')) {
+                        badgeVariant = 'error'
+                        iconBg = 'bg-destructive text-white'
+                      } else if (actionStr.includes('restore')) {
+                        badgeVariant = 'info'
+                        iconBg = 'bg-blue-500 text-white'
+                      }
+
+                      const actorName = log.actor?.displayName || log.actor?.email || 'System'
+
+                      return (
+                        <div key={log.id || idx} className="relative flex items-start gap-4">
+                          <div className={`absolute -left-6 top-1 h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${iconBg}`}>
+                            {actionStr.includes('approved') ? '✓' : actionStr.includes('rejected') ? '✕' : actionStr.includes('spam') ? '!' : '•'}
                           </div>
-                        )}
-                      </div>
-                    ))}
+
+                          <div className="flex-1 border rounded-xl p-3.5 bg-card space-y-2 shadow-sm text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={badgeVariant} className="text-[10px] uppercase font-semibold">
+                                  {actionLabel}
+                                </Badge>
+                                <span className="text-xs font-semibold text-foreground">
+                                  {actorName}
+                                </span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDateTime(log.createdAt)}
+                              </span>
+                            </div>
+
+                            {log.metadata?.reason && (
+                              <div className="p-2.5 rounded bg-muted/40 border text-xs text-foreground space-y-0.5">
+                                <span className="font-semibold text-muted-foreground block text-[10px]">
+                                  Reason / Note:
+                                </span>
+                                <p className="whitespace-pre-wrap">{String(log.metadata.reason)}</p>
+                              </div>
+                            )}
+
+                            {log.ipAddress && (
+                              <div className="text-[10px] text-muted-foreground pt-1 border-t flex justify-between">
+                                <span>IP: {log.ipAddress}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

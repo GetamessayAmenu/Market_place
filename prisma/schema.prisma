@@ -441,6 +441,9 @@ model Report {
   reportedUserId  String?          @map("reported_user_id") @db.Uuid
   messageId       String?          @map("message_id") @db.Uuid
   conversationId  String?          @map("conversation_id") @db.Uuid
+  orderId         String?          @map("order_id") @db.Uuid
+  rentalId        String?          @map("rental_id") @db.Uuid
+  customOrderId   String?          @map("custom_order_id") @db.Uuid
   reason          String           @db.VarChar(100)
   description     String?
   status          ReportStatus     @default(pending)
@@ -460,6 +463,9 @@ model Report {
   reportedUser    User?            @relation("ReportedUser", fields: [reportedUserId], references: [id])
   reporter        User             @relation("ReportsFiled", fields: [reporterId], references: [id])
   resolvedBy      User?            @relation("ReportsResolved", fields: [resolvedById], references: [id])
+  order           Order?           @relation(fields: [orderId], references: [id])
+  rental          RentalOrder?     @relation(fields: [rentalId], references: [id])
+  customOrder     CustomOrder?     @relation(fields: [customOrderId], references: [id])
 
   @@index([status, createdAt(sort: Desc)])
   @@index([priority, status])
@@ -468,6 +474,9 @@ model Report {
   @@index([listingId])
   @@index([reportedUserId])
   @@index([assignedAdminId])
+  @@index([orderId])
+  @@index([rentalId])
+  @@index([customOrderId])
   @@map("reports")
 }
 
@@ -557,6 +566,7 @@ model Order {
   conversations            Conversation? @relation(fields: [conversationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   product                  Listing       @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   seller                   User          @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reports                  Report[]
 
   @@index([orderNumber])
   @@index([buyerId, status], map: "orders_buyer_status_idx")
@@ -604,6 +614,7 @@ model CustomOrder {
   conversationsAsCustomOrder Conversation[]@relation("CustomOrderConversations")
   listing                   Listing       @relation(fields: [listingId], references: [id])
   seller            User              @relation("CustomOrderSeller", fields: [sellerId], references: [id])
+  reports           Report[]
 
   @@index([buyerId, status])
   @@index([sellerId, status])
@@ -950,6 +961,7 @@ model RentalOrder {
   listing               Listing              @relation(fields: [listingId], references: [id])
   renter               User                 @relation("RentalRenter", fields: [renterId], references: [id])
   seller               User                 @relation("RentalSeller", fields: [sellerId], references: [id])
+  reports              Report[]
 
   @@index([status, startDate])
   @@index([renterId])
@@ -1145,6 +1157,10 @@ enum ReportTargetType {
   user
   message
   conversation
+  order
+  rental
+  custom_order
+  other
 }
 
 enum ReportStatus {

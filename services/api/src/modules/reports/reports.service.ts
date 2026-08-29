@@ -49,6 +49,9 @@ export class ReportsService {
       ...(dto.reportedUserId ? { reportedUser: { connect: { id: dto.reportedUserId } } } : {}),
       ...(dto.messageId ? { message: { connect: { id: dto.messageId } } } : {}),
       ...(dto.conversationId ? { conversation: { connect: { id: dto.conversationId } } } : {}),
+      ...(dto.orderId ? { order: { connect: { id: dto.orderId } } } : {}),
+      ...(dto.rentalId ? { rental: { connect: { id: dto.rentalId } } } : {}),
+      ...(dto.customOrderId ? { customOrder: { connect: { id: dto.customOrderId } } } : {}),
     };
 
     const report = await this.reportsRepository.create(data);
@@ -310,5 +313,66 @@ export class ReportsService {
 
   async getStatusCounts() {
     return this.reportsRepository.countByStatus();
+  }
+
+  async addInternalNote(user: AuthenticatedUser, id: string, note: string) {
+    const report = await this.reportsRepository.findById(id);
+    if (!report) {
+      throw new ReportNotFoundException();
+    }
+
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: 'report.internal_note',
+        resource: 'report',
+        resourceId: id,
+        metadata: {
+          note,
+          addedBy: user.email || user.id,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    return { success: true, message: 'Internal note added' };
+  }
+
+  async takeModerationAction(
+    user: AuthenticatedUser,
+    id: string,
+    body: { action: string; note?: string; durationDays?: number },
+  ) {
+    const report = await this.reportsRepository.findById(id);
+    if (!report) {
+      throw new ReportNotFoundException();
+    }
+
+    // Log the specific moderation action in audit logs
+    try {
+      await this.adminLogsService.createLog({
+        actorId: user.id,
+        action: `report.moderation_action.${body.action.toLowerCase()}`,
+        resource: 'report',
+        resourceId: id,
+        metadata: {
+          action: body.action,
+          targetType: report.targetType,
+          targetId: report.reportedUserId || report.listingId || report.messageId || report.id,
+          note: body.note,
+          durationDays: body.durationDays,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    return {
+      success: true,
+      action: body.action,
+      reportId: id,
+      message: `Moderation action ${body.action} executed successfully`,
+    };
   }
 }

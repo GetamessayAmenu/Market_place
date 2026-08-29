@@ -5,7 +5,7 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class ReportQueryDto extends PaginationQueryDto {
   @IsOptional()
-  @IsEnum(['listing', 'user', 'message', 'conversation'] as const)
+  @IsEnum(['listing', 'user', 'message', 'conversation', 'order', 'rental', 'custom_order', 'other'] as const)
   targetType?: ReportTargetType;
 
   @IsOptional()
