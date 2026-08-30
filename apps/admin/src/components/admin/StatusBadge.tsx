@@ -10,6 +10,7 @@ const listingStatusMap: Record<string, StatusVariant> = {
   approved: 'success',
   pending: 'warning',
   pending_review: 'warning',
+  changes_requested: 'warning',
   under_review: 'info',
   rejected: 'error',
   archived: 'secondary',
@@ -66,21 +67,29 @@ export function StatusBadge({ status, domain, className }: { status: string; dom
 }
 
 export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
+  if (amount === undefined || amount === null || isNaN(Number(amount))) return '0.00'
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount)
 }
 
-export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+export function formatDate(dateStr?: string | Date | null): string {
+  if (!dateStr) return 'N/A'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return 'N/A'
+  return d.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   })
 }
 
-export function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleString('en-US', {
+export function formatDateTime(dateStr?: string | Date | null): string {
+  if (!dateStr) return 'N/A'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return 'N/A'
+  return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })

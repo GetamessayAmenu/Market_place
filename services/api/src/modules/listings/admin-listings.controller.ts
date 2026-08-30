@@ -52,7 +52,7 @@ export class AdminListingsController {
     @Body() dto: ModerationActionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.listingsService.moderateListing(id, 'reject', user, dto.reason);
+    return this.listingsService.moderateListing(id, 'reject', user, dto);
   }
 
   @Post(':id/request-changes')
@@ -61,7 +61,7 @@ export class AdminListingsController {
     @Body() dto: ModerationActionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.listingsService.moderateListing(id, 'request_changes', user, dto.reason);
+    return this.listingsService.moderateListing(id, 'request_changes', user, dto);
   }
 
   @Post(':id/hide')

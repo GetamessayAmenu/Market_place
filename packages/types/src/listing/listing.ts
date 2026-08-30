@@ -1,6 +1,7 @@
 export const LISTING_STATUSES = [
   'draft',
   'pending_review',
+  'changes_requested',
   'active',
   'sold',
   'expired',

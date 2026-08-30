@@ -272,7 +272,7 @@ export default function EditListingPage() {
 
       {rejectedReason && (
         <Alert variant="warning" className="mb-6">
-          <p className="font-semibold text-sm">Previous Rejection Reason:</p>
+          <p className="font-semibold text-sm">Moderator Feedback / Reason:</p>
           <p className="mt-1 text-sm">{rejectedReason}</p>
           <p className="mt-2 text-xs text-muted-foreground">
             Fixing issues and clicking "Save & Resubmit Changes" will resubmit your listing for admin review.

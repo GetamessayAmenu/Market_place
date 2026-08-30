@@ -16,7 +16,7 @@ interface Listing {
   title: string;
   price: number;
   status: 'in_stock' | 'rented_out' | 'out_of_stock';
-  moderationStatus: 'draft' | 'pending_review' | 'active' | 'rejected' | 'archived';
+  moderationStatus: 'draft' | 'pending_review' | 'changes_requested' | 'active' | 'rejected' | 'archived';
   businessModels: ('sale' | 'rental' | 'custom')[];
   primaryImageUrl?: string;
   city?: string;
@@ -74,10 +74,15 @@ function ModerationStatusBadge({ status }: { status?: string | null }) {
       label: 'Live / Approved',
       tooltip: 'Listing is approved and publicly visible',
     },
+    changes_requested: {
+      color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      label: 'Changes Requested',
+      tooltip: 'Moderators have requested changes before approval. Click to view feedback.',
+    },
     rejected: {
       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-      label: 'Rejected / Changes Requested',
-      tooltip: 'Listing was rejected or requires changes. Click to view feedback.',
+      label: 'Rejected',
+      tooltip: 'Listing was rejected. Click to view feedback.',
     },
     archived: {
       color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
@@ -235,7 +240,7 @@ function BlackoutCalendar() {
 export default function CatalogPage() {
   const user = useAuth((s) => s.user);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending_review' | 'rejected' | 'sold'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending_review' | 'changes_requested' | 'rejected' | 'sold'>('all');
   const [feedbackModal, setFeedbackModal] = useState<{ listing: Listing | null }>({ listing: null });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -397,7 +402,7 @@ export default function CatalogPage() {
                   <TableCell className="font-medium">{listing.price.toLocaleString()}</TableCell>
                   <TableCell>
                     <button
-                      onClick={() => listing.moderationStatus === 'rejected' && setFeedbackModal({ listing })}
+                      onClick={() => (listing.moderationStatus === 'rejected' || listing.moderationStatus === 'changes_requested') && setFeedbackModal({ listing })}
                       className="cursor-pointer"
                     >
                       <ModerationStatusBadge status={listing.moderationStatus} />

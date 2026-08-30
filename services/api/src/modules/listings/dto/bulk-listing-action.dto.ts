@@ -3,6 +3,7 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsOptional, IsString, IsUU
 export enum BulkListingAction {
   approve = 'approve',
   reject = 'reject',
+  request_changes = 'request_changes',
   archive = 'archive',
 }
 
@@ -18,6 +19,16 @@ export class BulkListingActionDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(1000)
   readonly reason?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  readonly reasons?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  readonly note?: string;
 }

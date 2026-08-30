@@ -18,6 +18,7 @@ import { ListingsCacheService } from './cache/listings-cache.service';
 import { LISTING_EVENTS } from './constants/listings.constants';
 import type { BulkListingActionDto } from './dto/bulk-listing-action.dto';
 import { BulkListingAction } from './dto/bulk-listing-action.dto';
+import type { ModerationActionDto } from './dto/moderation-action.dto';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { ListingQueryDto } from './dto/listing-query.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
@@ -640,23 +641,32 @@ export class ListingsService {
     const statusMap: Record<BulkListingAction, ListingStatus> = {
       [BulkListingAction.approve]: 'active',
       [BulkListingAction.reject]: 'rejected',
+      [BulkListingAction.request_changes]: 'changes_requested',
       [BulkListingAction.archive]: 'archived',
     };
     const targetStatus = statusMap[dto.action];
     const now = new Date();
+
+    const reasonsText = dto.reasons?.length ? dto.reasons.join(', ') : null;
+    const noteText = dto.note || dto.reason || null;
+    const finalReason = [reasonsText ? `Reasons: ${reasonsText}` : null, noteText ? `Note: ${noteText}` : null].filter(Boolean).join(' | ') || dto.reason || undefined;
 
     const listings = await this.listingsRepository.findByIds(dto.listingIds);
     const results: { id: string; success: boolean; error?: string }[] = [];
 
     for (const listing of listings) {
       try {
+        if (!canSetListingStatus(admin, listing.sellerId, targetStatus)) {
+          throw new InvalidListingStatusTransitionException(listing.status, targetStatus);
+        }
+
         const updateData: Prisma.ListingUpdateInput = { status: targetStatus };
         if (targetStatus === 'active') {
           updateData.publishedAt = listing.publishedAt ?? now;
           updateData.expiresAt = this.addDays(now, LISTING_DEFAULT_TTL_DAYS);
-        }
-        if (targetStatus === 'rejected' && dto.reason) {
-          updateData.rejectedReason = dto.reason;
+          updateData.rejectedReason = null;
+        } else if (targetStatus === 'rejected' || targetStatus === 'changes_requested') {
+          updateData.rejectedReason = finalReason ?? null;
         }
 
         await this.listingsRepository.updateListing(listing.id, updateData);
@@ -670,6 +680,7 @@ export class ListingsService {
         const actionMap: Record<string, string> = {
           active: 'listing.approved',
           rejected: 'listing.rejected',
+          changes_requested: 'listing.changes_requested',
           archived: 'listing.archived',
         };
         await this.adminLogsService.createLog({
@@ -677,8 +688,17 @@ export class ListingsService {
           action: actionMap[targetStatus] ?? `listing.bulk_${dto.action}`,
           resource: 'listing',
           resourceId: listing.id,
-          metadata: { newStatus: targetStatus, bulk: true, reason: dto.reason },
+          metadata: { newStatus: targetStatus, bulk: true, reason: finalReason, reasons: dto.reasons, note: dto.note },
         });
+
+        // Notifications
+        if (targetStatus === 'active') {
+          await this.notificationsService.createListingApprovedNotification(listing.sellerId, listing.id, listing.title);
+        } else if (targetStatus === 'rejected') {
+          await this.notificationsService.createListingRejectedNotification(listing.sellerId, listing.id, listing.title, finalReason);
+        } else if (targetStatus === 'changes_requested') {
+          await this.notificationsService.createListingChangesRequestedNotification(listing.sellerId, listing.id, listing.title, finalReason);
+        }
 
         results.push({ id: listing.id, success: true });
       } catch (err) {
@@ -704,12 +724,11 @@ export class ListingsService {
     };
   }
 
-
   async moderateListing(
     id: string,
     action: 'approve' | 'reject' | 'request_changes' | 'hide' | 'delete',
     user: AuthenticatedUser,
-    reason?: string,
+    reasonInput?: string | ModerationActionDto,
   ) {
     const existing = await this.listingsRepository.findByIdRaw(id);
     if (!existing || existing.deletedAt) {
@@ -723,10 +742,20 @@ export class ListingsService {
       return this.softDelete(user, id);
     }
 
+    const dto: ModerationActionDto =
+      typeof reasonInput === 'object' && reasonInput !== null
+        ? reasonInput
+        : reasonInput !== undefined
+        ? { reason: reasonInput }
+        : {};
+    const reasonsText = dto.reasons?.length ? dto.reasons.join(', ') : null;
+    const noteText = dto.note || dto.reason || null;
+    const finalReason = [reasonsText ? `Reasons: ${reasonsText}` : null, noteText ? `Note: ${noteText}` : null].filter(Boolean).join(' | ') || dto.reason || undefined;
+
     const statusMap: Record<string, ListingStatus> = {
       approve: 'active',
       reject: 'rejected',
-      request_changes: 'pending_review',
+      request_changes: 'changes_requested',
       hide: 'archived',
     };
     const targetStatus = statusMap[action];
@@ -735,8 +764,8 @@ export class ListingsService {
     }
 
     const updateData = this.applyStatusChange(targetStatus, existing);
-    if (targetStatus === 'rejected' || action === 'request_changes') {
-      updateData.rejectedReason = reason ?? null;
+    if (targetStatus === 'rejected' || targetStatus === 'changes_requested') {
+      updateData.rejectedReason = finalReason ?? null;
     } else {
       updateData.rejectedReason = null;
     }
@@ -752,7 +781,7 @@ export class ListingsService {
     const logActionMap: Record<string, string> = {
       active: 'listing.approved',
       rejected: 'listing.rejected',
-      pending_review: 'listing.changes_requested',
+      changes_requested: 'listing.changes_requested',
       archived: 'listing.archived',
     };
     await this.adminLogsService.createLog({
@@ -760,7 +789,7 @@ export class ListingsService {
       action: logActionMap[targetStatus] ?? `listing.moderated:${targetStatus}`,
       resource: 'listing',
       resourceId: listing.id,
-      metadata: { newStatus: targetStatus, reason },
+      metadata: { newStatus: targetStatus, reason: finalReason, reasons: dto.reasons, note: dto.note },
     });
 
     // Send notification to seller
@@ -775,14 +804,14 @@ export class ListingsService {
         listing.sellerId,
         listing.id,
         listing.title,
-        reason,
+        finalReason,
       );
-    } else if (action === 'request_changes') {
+    } else if (targetStatus === 'changes_requested') {
       await this.notificationsService.createListingChangesRequestedNotification(
         listing.sellerId,
         listing.id,
         listing.title,
-        reason,
+        finalReason,
       );
     }
 

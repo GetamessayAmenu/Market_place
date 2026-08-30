@@ -7,7 +7,7 @@ export type ListingWithRelations = Listing & {
   readonly category: Pick<Category, 'id' | 'name' | 'slug' | 'parentId'>;
   readonly seller: Pick<
     User,
-    'id' | 'displayName' | 'avatarUrl' | 'email' | 'emailVerifiedAt' | 'phoneVerifiedAt' | 'phone' | 'location' | 'createdAt'
+    'id' | 'displayName' | 'avatarUrl' | 'email' | 'emailVerifiedAt' | 'phoneVerifiedAt' | 'phone' | 'location' | 'createdAt' | 'status'
   >;
   readonly _count?: { readonly favorites: number };
 };

@@ -22,6 +22,7 @@ const listingInclude = {
       phone: true,
       location: true,
       createdAt: true,
+      status: true,
     },
   },
   _count: { select: { favorites: true } },

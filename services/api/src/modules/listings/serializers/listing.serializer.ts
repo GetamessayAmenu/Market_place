@@ -15,6 +15,10 @@ export interface SerializedListingSeller {
   readonly id: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
+  readonly email?: string;
+  readonly location?: string | null;
+  readonly status?: string | null;
+  readonly createdAt?: string | null;
   readonly isEmailVerified: boolean;
   readonly isPhoneVerified: boolean;
 }
@@ -125,6 +129,10 @@ export function serializeListing(
       id: listing.seller.id,
       displayName: listing.seller.displayName,
       avatarUrl: listing.seller.avatarUrl,
+      email: listing.seller.email,
+      location: listing.seller.location,
+      status: listing.seller.status,
+      createdAt: listing.seller.createdAt ? listing.seller.createdAt.toISOString() : null,
       isEmailVerified: listing.seller.emailVerifiedAt !== null,
       isPhoneVerified: listing.seller.phoneVerifiedAt !== null,
     },

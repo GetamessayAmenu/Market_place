@@ -4,12 +4,14 @@ import type { AuthenticatedUser } from '../../../common/interfaces/authenticated
 const SELLER_OWNED_STATUSES: readonly ListingStatus[] = [
   'draft',
   'pending_review',
+  'changes_requested',
   'sold',
   'archived',
 ];
 
 const MODERATOR_STATUSES: readonly ListingStatus[] = [
   'pending_review',
+  'changes_requested',
   'active',
   'rejected',
   'archived',
