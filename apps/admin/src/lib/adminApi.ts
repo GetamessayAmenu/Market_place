@@ -881,6 +881,342 @@ export async function fetchVerificationHistory(id: string): Promise<Verification
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
+export interface KpiMetric {
+  current: number
+  previous: number
+  pctChange: number
+  absoluteChange: number
+  trend: 'up' | 'down' | 'neutral'
+}
+
+export interface ActivityTimeSeriesPoint {
+  date: string
+  users: number
+  buyers: number
+  sellers: number
+  listings: number
+  views: number
+  contacts: number
+  orders: number
+  gmv: number
+}
+
+export interface AnalyticsOverviewResponse {
+  range: string
+  dateFrom: string
+  dateTo: string
+  kpis: {
+    totalUsers: KpiMetric
+    activeBuyers: KpiMetric
+    activeSellers: KpiMetric
+    totalListings: KpiMetric
+    activeListings: KpiMetric
+    listingViews: KpiMetric
+    sellerContacts: KpiMetric
+    orders: KpiMetric
+    gmv: KpiMetric
+  }
+  charts: ActivityTimeSeriesPoint[]
+}
+
+export interface BuyerAnalyticsResponse {
+  acquisition: {
+    totalBuyers: number
+    newBuyers: number
+    activeBuyers: number
+    returningBuyers: number
+    returningRatePct: number
+  }
+  engagement: {
+    listingViews: number
+    searches: number
+    favorites: number
+    sellerContacts: number
+    chatStarts: number
+    whatsappClicks: number
+    phoneClicks: number
+  }
+  funnel: Array<{
+    step: string
+    count: number
+    conversionPct: number
+    dropoffPct: number
+  }>
+  retention: {
+    sevenDayRetentionPct: number
+    thirtyDayRetentionPct: number
+    returningUserRatePct: number
+  }
+}
+
+export interface TopSellerRow {
+  id: string
+  name: string
+  email: string
+  sellerType: string | null
+  isVerified: boolean
+  status: string
+  listings: number
+  views: number
+  favorites: number
+  contacts: number
+  orders: number
+  gmv: number
+  conversionPct: number
+  responseRate: number
+}
+
+export interface SellerAnalyticsResponse {
+  metrics: {
+    totalSellers: number
+    newSellers: number
+    activeSellers: number
+    verifiedSellers: number
+    suspendedSellers: number
+    avgListingsPerSeller: number
+  }
+  healthIndicators: {
+    growingSellers: number
+    inactiveSellers: number
+    highViewLowContactSellers: number
+    highContactLowOrderSellers: number
+    decliningSellers: number
+  }
+  topSellers: TopSellerRow[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
+export interface TopListingRow {
+  id: string
+  title: string
+  slug: string
+  price: number
+  currency: string
+  status: string
+  categoryName: string
+  sellerName: string
+  views: number
+  favorites: number
+  contacts: number
+  orders: number
+  conversionPct: number
+}
+
+export interface LowPerformingListingRow {
+  id: string
+  title: string
+  price: number
+  views: number
+  favorites: number
+  orders: number
+  issue: string
+}
+
+export interface CategoryBreakdownRow {
+  id: string
+  name: string
+  slug: string
+  listings: number
+  views: number
+  avgPrice: number
+}
+
+export interface ListingAnalyticsResponse {
+  metrics: {
+    totalListings: number
+    activeListings: number
+    pendingListings: number
+    rejectedListings: number
+    newListings: number
+    draftListings: number
+    expiredListings: number
+    soldListings: number
+  }
+  topListings: TopListingRow[]
+  lowPerformingListings: LowPerformingListingRow[]
+  categoryBreakdown: CategoryBreakdownRow[]
+  meta: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
+export interface MarketplaceHealthResponse {
+  supply: {
+    activeSellers: number
+    activeListings: number
+    newListings: number
+    listingsPerSeller: number
+  }
+  demand: {
+    activeBuyers: number
+    searches: number
+    listingViews: number
+    sellerContacts: number
+    orders: number
+  }
+  healthMetrics: {
+    engagementRatePct: number
+    viewToContactRatePct: number
+    contactToOrderRatePct: number
+    pctListingsReceivingContacts: number
+    pctListingsReceivingOrders: number
+    sellerResponseRatePct: number
+    avgTimeToSellerResponseMinutes: number
+    avgTimeToFirstContactHours: number
+    avgOrderCompletionDays: number
+  }
+  funnel: Array<{
+    step: string
+    count: number
+  }>
+}
+
+export interface SearchAnalyticsResponse {
+  searchVolume: number
+  searchesWithResultsCount: number
+  searchesWithNoResultsCount: number
+  searchToViewRatePct: number
+  searchToContactRatePct: number
+  popularSearches: Array<{ query: string; count: number; resultCount: number }>
+  noResultSearches: Array<{ query: string; count: number; resultCount: number }>
+}
+
+export interface CommunicationAnalyticsResponse {
+  chatConversationsStarted: number
+  sellerContacts: number
+  whatsappClicks: number
+  phoneClicks: number
+  chatResponseRatePct: number
+  avgResponseTimeMinutes: number
+  conversationsResultingInOrder: number
+}
+
+export interface OrderAnalyticsResponse {
+  sales: {
+    totalOrders: number
+    completedOrders: number
+    cancelledOrders: number
+    totalValue: number
+    avgOrderValue: number
+  }
+  rentals: {
+    rentalRequests: number
+    activeRentals: number
+    completedRentals: number
+    cancelledRentals: number
+    totalValue: number
+    conversionPct: number
+  }
+  customOrders: {
+    customRequests: number
+    acceptedRequests: number
+    completedCustomOrders: number
+    cancelledRequests: number
+    totalValue: number
+    conversionPct: number
+  }
+}
+
+export interface ReportResponse {
+  type: string
+  columns: string[]
+  rows: Record<string, any>[]
+  meta: {
+    page: number
+    limit: number
+    total: number
+  }
+}
+
+// Client API Helper functions
+export async function fetchAnalyticsOverview(params?: Record<string, string | number | boolean | undefined>): Promise<AnalyticsOverviewResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/overview' + qs)
+  return (res?.data !== undefined ? res.data : res) as AnalyticsOverviewResponse
+}
+
+export async function fetchBuyerAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<BuyerAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/buyers' + qs)
+  return (res?.data !== undefined ? res.data : res) as BuyerAnalyticsResponse
+}
+
+export async function fetchSellerAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<SellerAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/sellers' + qs)
+  return (res?.data !== undefined ? res.data : res) as SellerAnalyticsResponse
+}
+
+export async function fetchListingAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<ListingAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/listings' + qs)
+  return (res?.data !== undefined ? res.data : res) as ListingAnalyticsResponse
+}
+
+export async function fetchMarketplaceHealth(params?: Record<string, string | number | boolean | undefined>): Promise<MarketplaceHealthResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/marketplace' + qs)
+  return (res?.data !== undefined ? res.data : res) as MarketplaceHealthResponse
+}
+
+export async function fetchSearchAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<SearchAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/search' + qs)
+  return (res?.data !== undefined ? res.data : res) as SearchAnalyticsResponse
+}
+
+export async function fetchCommunicationAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<CommunicationAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/communication' + qs)
+  return (res?.data !== undefined ? res.data : res) as CommunicationAnalyticsResponse
+}
+
+export async function fetchOrderAnalytics(params?: Record<string, string | number | boolean | undefined>): Promise<OrderAnalyticsResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/orders' + qs)
+  return (res?.data !== undefined ? res.data : res) as OrderAnalyticsResponse
+}
+
+export async function fetchAnalyticsReport(params?: Record<string, string | number | boolean | undefined>): Promise<ReportResponse> {
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  const res = await clientGet<any>('/admin/analytics/reports' + qs)
+  return (res?.data !== undefined ? res.data : res) as ReportResponse
+}
+
+export function getAnalyticsReportExportUrl(params?: Record<string, string | number | boolean | undefined>): string {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+  const qs = params ? '?' + new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+  ).toString() : ''
+  return `${apiBase}/admin/analytics/reports/export${qs}`
+}
+
 export interface DashboardStats {
   users: { total: number; newInRange: number }
   listings: { total: number; active: number; pending: number; newInRange: number }

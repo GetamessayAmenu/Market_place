@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SEARCH_SUGGESTIONS_MAX_LIMIT } from '@marketplace/config';
 
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
@@ -19,7 +20,10 @@ import {
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly meilisearch: MeilisearchService) {}
+  constructor(
+    private readonly meilisearch: MeilisearchService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async searchListings(dto: SearchListingsDto) {
     this.meilisearch.assertAvailable();
@@ -37,6 +41,13 @@ export class SearchService {
       page,
       limit,
     });
+
+    if (q) {
+      this.eventEmitter.emit('search.performed', {
+        query: q,
+        totalResults: result.total,
+      });
+    }
 
     const hits: SearchListingHit[] = result.hits.map(documentToSearchHit);
 

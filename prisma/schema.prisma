@@ -1665,3 +1665,22 @@ enum MessageDeliveryStatus {
   DELIVERED
   READ
 }
+
+model AnalyticsEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(100)
+  userId      String?  @map("user_id") @db.Uuid
+  sellerId    String?  @map("seller_id") @db.Uuid
+  listingId   String?  @map("listing_id") @db.Uuid
+  categoryId  String?  @map("category_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([eventType, createdAt(sort: Desc)])
+  @@index([listingId, eventType])
+  @@index([sellerId, eventType])
+  @@index([userId, eventType])
+  @@index([createdAt(sort: Desc)])
+  @@map("analytics_events")
+}
+

@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
-
 import { RolesGuard } from '../../common/guards/roles.guard';
-
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
+import { AnalyticsRepository } from './analytics.repository';
+import { AnalyticsEventListener } from './listeners/analytics-event.listener';
 
 @Module({
   controllers: [AnalyticsController],
-  providers: [AnalyticsService, RolesGuard],
-  exports: [AnalyticsService],
+  providers: [AnalyticsService, AnalyticsRepository, AnalyticsEventListener, RolesGuard],
+  exports: [AnalyticsService, AnalyticsRepository],
 })
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AnalyticsModule {}
