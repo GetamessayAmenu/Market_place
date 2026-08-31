@@ -1,515 +1,441 @@
 "use client"
-import { Button, RadioGroup, Tag, cn, type RadioOption } from '@marketplace/ui';
-import React, { useCallback, useState } from 'react';
 
-import SearchBar from './SearchBar';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type ListingTypeFilter = 'buy' | 'rent' | 'custom';
+import { cn } from '@marketplace/ui'
+import React, { useState } from 'react'
 
 export interface FilterValues {
-  query?: string;
-  listingTypes?: ListingTypeFilter[];
-  category?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  sizes?: string[];
-  colors?: string[];
-  designer?: string;
-  condition?: string;
-  city?: string;
-  sortBy?: string;
-  // Unified custom design filters
-  capabilityFilter?: 'ready-made' | 'custom-design' | 'both';
+  query?: string | undefined
+  category?: string | undefined
+  condition?: string | undefined
+  minPrice?: string | undefined
+  maxPrice?: string | undefined
+  listingTypes?: ('buy' | 'rent' | 'custom')[] | undefined
+  city?: string | undefined
+  size?: string[] | undefined
+  color?: string[] | undefined
 }
 
 export interface FilterPanelProps {
-  categories?: { value: string; label: string; children?: { value: string; label: string }[] }[];
-  conditions?: { value: string; label: string }[];
-  cities?: { value: string; label: string }[];
-  designers?: { value: string; label: string }[];
-  sizes?: string[];
-  colors?: { value: string; label: string; hex?: string }[];
-  initialValues?: FilterValues;
-  onApply: (values: FilterValues) => void;
-  onReset?: () => void;
-  className?: string;
+  categoryOptions: { value: string; label: string; children?: { value: string; label: string }[] }[]
+  conditionOptions?: { value: string; label: string }[]
+  initialValues?: FilterValues
+  counts?: { buy?: number; rent?: number; custom?: number }
+  onApplyFilters: (values: FilterValues) => void
+  onResetFilters: () => void
+  className?: string
 }
 
-const LISTING_TYPE_OPTIONS: { value: ListingTypeFilter; label: string; variant: 'buy' | 'rent' | 'custom' }[] = [
-  { value: 'buy', label: 'Buy', variant: 'buy' },
-  { value: 'rent', label: 'Rent', variant: 'rent' },
-  { value: 'custom', label: 'Custom', variant: 'custom' },
-];
+const PRESET_PRICE_RANGES = [
+  { label: 'Under 2,000', min: '', max: '2000' },
+  { label: '2,000 – 5,000', min: '2000', max: '5000' },
+  { label: '5,000 – 10,000', min: '5000', max: '10000' },
+  { label: '10,000+', min: '10000', max: '' },
+]
 
-const SORT_OPTIONS: RadioOption[] = [
-  { value: 'relevance', label: 'Relevance' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'price-asc', label: 'Price: Low → High' },
-  { value: 'price-desc', label: 'Price: High → Low' },
-  { value: 'rating', label: 'Top Rated' },
-];
+const COLOR_SWATCHES = [
+  { name: 'Black', color: '#000000' },
+  { name: 'Red', color: '#EF4444' },
+  { name: 'Orange', color: '#F97316' },
+  { name: 'Green', color: '#10B981' },
+  { name: 'Blue', color: '#3B82F6' },
+  { name: 'Purple', color: '#8B5CF6' },
+]
 
-// ─── Collapsible section ──────────────────────────────────────────────────────
+const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL']
 
-function FilterSection({
-  title,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border-b border-border/50 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => { setOpen(!open); }}
-        className="flex w-full items-center justify-between py-3 text-sm font-semibold text-foreground transition-colors hover:text-brand-gold"
-        aria-expanded={open}
-      >
-        {title}
-        <svg
-          className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', open && 'rotate-180')}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      <div
-        className={cn(
-          'overflow-hidden transition-all duration-200',
-          open ? 'max-h-[500px] pb-4 opacity-100' : 'max-h-0 opacity-0'
-        )}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
+const CITIES = ['Addis Ababa', 'Hawassa', 'Bahir Dar', 'Dire Dawa', 'Gondar']
 
 export default function FilterPanel({
-  categories = [],
-  conditions = [],
-  cities = [],
-  designers = [],
-  sizes = [],
-  colors = [],
-  initialValues = {},
-  onApply,
-  onReset,
+  categoryOptions,
+  conditionOptions = [
+    { value: 'new', label: 'New' },
+    { value: 'like_new', label: 'Like New' },
+    { value: 'good', label: 'Good' },
+    { value: 'fair', label: 'Fair' },
+  ],
+  initialValues,
+  counts,
+  onApplyFilters,
+  onResetFilters,
   className,
 }: FilterPanelProps) {
-  const [values, setValues] = useState<FilterValues>(initialValues);
+  const [selectedCategory, setSelectedCategory] = useState(initialValues?.category ?? '')
+  const [selectedCondition, setSelectedCondition] = useState(initialValues?.condition ?? '')
+  const [minPrice, setMinPrice] = useState(initialValues?.minPrice ?? '')
+  const [maxPrice, setMaxPrice] = useState(initialValues?.maxPrice ?? '')
+  const [selectedTypes, setSelectedTypes] = useState<('buy' | 'rent' | 'custom')[]>(initialValues?.listingTypes ?? [])
+  const [city, setCity] = useState(initialValues?.city ?? 'Addis Ababa')
+  const [allEthiopia, setAllEthiopia] = useState(!initialValues?.city)
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(initialValues?.size ?? [])
+  const [selectedColors, setSelectedColors] = useState<string[]>(initialValues?.color ?? [])
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
 
-  const activeFilterCount = [
-    values.query,
-    values.category,
-    values.minPrice,
-    values.maxPrice,
-    values.condition,
-    values.city,
-    values.designer,
-    ...(values.listingTypes ?? []),
-    ...(values.sizes ?? []),
-    ...(values.colors ?? []),
-  ].filter(Boolean).length;
-
-  const updateValue = useCallback(<K extends keyof FilterValues>(key: K, val: FilterValues[K]) => {
-    setValues((prev) => ({ ...prev, [key]: val }));
-  }, []);
-
-  const toggleArrayValue = useCallback((key: 'listingTypes' | 'sizes' | 'colors', val: string) => {
-    setValues((prev) => {
-      const arr = prev[key] ?? [];
-      const next = arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
-      return { ...prev, [key]: next };
-    });
-  }, []);
-
-  const handleReset = () => {
-    setValues({});
-    onReset?.();
-  };
-
-  return (
-    <div
-      className={cn('space-y-0 rounded-xl border bg-card', className)}
-      aria-label="Filters"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-display text-base font-semibold text-card-foreground">Filters</h3>
-          {activeFilterCount > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-gold px-1.5 text-[10px] font-bold text-brand-gold-foreground">
-              {String(activeFilterCount)}
-            </span>
-          )}
-        </div>
-        {activeFilterCount > 0 && (
-          <button
-            type="button"
-            onClick={handleReset}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear all
-          </button>
-        )}
-      </div>
-
-      <div className="px-4">
-        {/* Product Type - Jiji Style (For Sale, Rent, Custom Order) */}
-        <FilterSection title="Product Type" defaultOpen={true}>
-          <div className="flex flex-col gap-2">
-            {LISTING_TYPE_OPTIONS.map((opt) => {
-              const isActive = (values.listingTypes ?? []).includes(opt.value);
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => { 
-                    // Clear other types and select this one (single selection like Jiji)
-                    setValues(prev => ({ ...prev, listingTypes: [opt.value] }));
-                  }}
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-3 rounded-lg border transition-all',
-                    isActive
-                      ? 'border-brand-gold bg-brand-gold/10 text-brand-gold font-medium'
-                      : 'border-border bg-background text-foreground hover:border-brand-gold/50 hover:bg-muted/50'
-                  )}
-                >
-                  <div className={cn(
-                    'h-4 w-4 rounded-full border-2 flex items-center justify-center',
-                    isActive ? 'border-brand-gold' : 'border-border'
-                  )}>
-                    {isActive && (
-                      <div className="h-2 w-2 rounded-full bg-brand-gold" />
-                    )}
-                  </div>
-                  <span>{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </FilterSection>
-
-        {/* Search */}
-        <FilterSection title="Search">
-          <SearchBar
-            variant="filter"
-            defaultValue={values.query ?? ''}
-            placeholder="Search fashions..."
-            onSearch={(q) => { updateValue('query', q || undefined); }}
-          />
-        </FilterSection>
-
-
-        {/* Category - Jiji Style with Parent Categories */}
-        {categories.length > 0 && (
-          <FilterSection title="Category" defaultOpen={true}>
-            {/* Parent Categories */}
-            <div className="space-y-3 mb-4">
-              {categories
-                .filter(c => ['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label))
-                .map((parentCat) => (
-                  <div key={parentCat.value} className="border border-border rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => { updateValue('category', parentCat.value); }}
-                      className={cn(
-                        'w-full flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors',
-                        values.category === parentCat.value
-                          ? 'bg-brand-gold/10 text-brand-gold'
-                          : 'bg-background text-foreground hover:bg-muted'
-                      )}
-                    >
-                      <span>{parentCat.label}</span>
-                      {values.category === parentCat.value && (
-                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </button>
-                    {/* Subcategories dropdown */}
-                    {values.category === parentCat.value && parentCat.children && parentCat.children.length > 0 && (
-                      <div className="border-t border-border bg-muted/30">
-                        <select
-                          value={values.category === parentCat.value ? '' : values.category}
-                          onChange={(e) => { updateValue('category', e.target.value || parentCat.value); }}
-                          className="w-full px-3 py-2 text-sm bg-transparent focus-visible:outline-none"
-                        >
-                          <option value="">All {parentCat.label}</option>
-                          {parentCat.children.map((child) => (
-                            <option key={child.value} value={child.value} className="pl-4">
-                              {child.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-            </div>
-            
-            {/* Other Categories */}
-            <div className="pt-3 border-t border-border">
-              <select
-                value={categories.some(c => ['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label) && values.category === c.value) 
-                  ? '' 
-                  : values.category ?? ''}
-                onChange={(e) => { updateValue('category', e.target.value || undefined); }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-              >
-                <option value="">Other categories</option>
-                {categories
-                  .filter(c => !['Women\'s Fashion', 'Men\'s Fashion', 'Baby & Kids Fashion'].includes(c.label))
-                  .map((c) => (
-                    <React.Fragment key={c.value}>
-                      <option value={c.value}>{c.label}</option>
-                      {c.children && c.children.length > 0 && c.children.map((child) => (
-                        <option key={child.value} value={child.value} className="pl-6">
-                          &nbsp;&nbsp;{child.label}
-                        </option>
-                      ))}
-                    </React.Fragment>
-                  ))}
-              </select>
-            </div>
-          </FilterSection>
-        )}
-
-        {/* Price range */}
-        <FilterSection title="Price Range">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="filter-min-price" className="mb-1 block text-xs text-muted-foreground">Min (ETB)</label>
-              <input
-                id="filter-min-price"
-                type="number"
-                min="0"
-                placeholder="0"
-                value={values.minPrice ?? ''}
-                onChange={(e) => { updateValue('minPrice', e.target.value || undefined); }}
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-              />
-            </div>
-            <div>
-              <label htmlFor="filter-max-price" className="mb-1 block text-xs text-muted-foreground">Max (ETB)</label>
-              <input
-                id="filter-max-price"
-                type="number"
-                min="0"
-                placeholder="Any"
-                value={values.maxPrice ?? ''}
-                onChange={(e) => { updateValue('maxPrice', e.target.value || undefined); }}
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-              />
-            </div>
-          </div>
-        </FilterSection>
-
-        {/* Sizes */}
-        {sizes.length > 0 && (
-          <FilterSection title="Size" defaultOpen={false}>
-            <div className="flex flex-wrap gap-2">
-              {sizes.map((size) => {
-                const isActive = (values.sizes ?? []).includes(size);
-                return (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => { toggleArrayValue('sizes', size); }}
-                    className={cn(
-                      'rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-                      isActive
-                        ? 'border-brand-gold bg-brand-gold/10 text-brand-gold'
-                        : 'border-input bg-background text-muted-foreground hover:border-foreground/30'
-                    )}
-                  >
-                    {size}
-                  </button>
-                );
-              })}
-            </div>
-          </FilterSection>
-        )}
-
-        {/* Colors */}
-        {colors.length > 0 && (
-          <FilterSection title="Color" defaultOpen={false}>
-            <div className="flex flex-wrap gap-2">
-              {colors.map((color) => {
-                const isActive = (values.colors ?? []).includes(color.value);
-                return (
-                  <button
-                    key={color.value}
-                    type="button"
-                    onClick={() => { toggleArrayValue('colors', color.value); }}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                      isActive
-                        ? 'border-brand-gold bg-brand-gold/5'
-                        : 'border-transparent bg-muted/50 hover:bg-muted'
-                    )}
-                  >
-                    {color.hex && (
-                      <span
-                        className="h-3 w-3 rounded-full ring-1 ring-inset ring-border"
-                        style={{ backgroundColor: color.hex }}
-                        aria-hidden="true"
-                      />
-                    )}
-                    {color.label}
-                  </button>
-                );
-              })}
-            </div>
-          </FilterSection>
-        )}
-
-        {/* Designer */}
-        {designers.length > 0 && (
-          <FilterSection title="Designer" defaultOpen={false}>
-            <select
-              value={values.designer ?? ''}
-              onChange={(e) => { updateValue('designer', e.target.value || undefined); }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-            >
-              <option value="">All designers</option>
-              {designers.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}</option>
-              ))}
-            </select>
-          </FilterSection>
-        )}
-
-        {/* Condition */}
-        {conditions.length > 0 && (
-          <FilterSection title="Condition" defaultOpen={false}>
-            <select
-              value={values.condition ?? ''}
-              onChange={(e) => { updateValue('condition', e.target.value || undefined); }}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-            >
-              <option value="">Any condition</option>
-              {conditions.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </FilterSection>
-        )}
-
-        {/* City/Location */}
-        <FilterSection title="Location" defaultOpen={true}>
-          <select
-            value={values.city ?? ''}
-            onChange={(e) => { updateValue('city', e.target.value || undefined); }}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/50"
-          >
-            <option value="">All locations</option>
-            {cities.length > 0 ? (
-              cities.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))
-            ) : (
-              // Default Ethiopian cities if none provided
-              <>
-                <option value="Addis Ababa">Addis Ababa</option>
-                <option value="Bahir Dar">Bahir Dar</option>
-                <option value="Hawassa">Hawassa</option>
-                <option value="Mekelle">Mekelle</option>
-                <option value="Dire Dawa">Dire Dawa</option>
-                <option value="Adama">Adama</option>
-                <option value="Gondar">Gondar</option>
-                <option value="Jimma">Jimma</option>
-              </>
-            )}
-          </select>
-        </FilterSection>
-
-        {/* Sort */}
-        <FilterSection title="Sort By">
-          <RadioGroup
-            name="filter-sort"
-            options={SORT_OPTIONS}
-            value={values.sortBy ?? 'relevance'}
-            onChange={(val) => { updateValue('sortBy', val); }}
-            orientation="vertical"
-          />
-        </FilterSection>
-      </div>
-
-      {/* Apply button */}
-      <div className="flex gap-2 border-t border-border/50 px-4 py-3">
-        <Button onClick={() => { onApply(values); }} className="flex-1">
-          Apply Filters
-        </Button>
-        <Button variant="outline" onClick={handleReset}>
-          Reset
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Active Filter Pills ──────────────────────────────────────────────────────
-
-export function ActiveFilterPills({
-  values,
-  onRemove,
-  onClearAll,
-}: {
-  values: FilterValues;
-  onRemove: (key: keyof FilterValues, value?: string) => void;
-  onClearAll: () => void;
-}) {
-  const pills: { key: keyof FilterValues; label: string; value?: string }[] = [];
-
-  if (values.query) pills.push({ key: 'query', label: '"' + values.query + '"' });
-  if (values.category) pills.push({ key: 'category', label: values.category });
-  (values.listingTypes ?? []).forEach((t) => { pills.push({ key: 'listingTypes', label: t.charAt(0).toUpperCase() + t.slice(1), value: t }); });
-  (values.sizes ?? []).forEach((s) => { pills.push({ key: 'sizes', label: 'Size: ' + s, value: s }); });
-  (values.colors ?? []).forEach((c) => { pills.push({ key: 'colors', label: c, value: c }); });
-  if (values.minPrice || values.maxPrice) {
-    const label = values.minPrice && values.maxPrice
-      ? values.minPrice + ' – ' + values.maxPrice + ' ETB'
-      : values.minPrice ? 'From ' + values.minPrice + ' ETB'
-      : 'Up to ' + (values.maxPrice ?? '') + ' ETB';
-    pills.push({ key: 'minPrice', label });
+  const handleTypeToggle = (type: 'buy' | 'rent' | 'custom') => {
+    const next = selectedTypes.includes(type)
+      ? selectedTypes.filter((t) => t !== type)
+      : [type]
+    setSelectedTypes(next)
+    onApplyFilters({
+      category: selectedCategory,
+      condition: selectedCondition,
+      minPrice,
+      maxPrice,
+      listingTypes: next,
+      city: allEthiopia ? undefined : city,
+      size: selectedSizes,
+      color: selectedColors,
+    })
   }
 
-  if (pills.length === 0) return null;
+  const handleCategorySelect = (catId: string) => {
+    const nextCat = selectedCategory === catId ? '' : catId
+    setSelectedCategory(nextCat)
+    onApplyFilters({
+      category: nextCat,
+      condition: selectedCondition,
+      minPrice,
+      maxPrice,
+      listingTypes: selectedTypes,
+      city: allEthiopia ? undefined : city,
+      size: selectedSizes,
+      color: selectedColors,
+    })
+  }
+
+  const toggleExpand = (catId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setExpandedCats((prev) => ({ ...prev, [catId]: !prev[catId] }))
+  }
+
+  const handlePricePreset = (presetMin: string, presetMax: string) => {
+    setMinPrice(presetMin)
+    setMaxPrice(presetMax)
+    onApplyFilters({
+      category: selectedCategory,
+      condition: selectedCondition,
+      minPrice: presetMin,
+      maxPrice: presetMax,
+      listingTypes: selectedTypes,
+      city: allEthiopia ? undefined : city,
+      size: selectedSizes,
+      color: selectedColors,
+    })
+  }
+
+  const handleReset = () => {
+    setSelectedCategory('')
+    setSelectedCondition('')
+    setMinPrice('')
+    setMaxPrice('')
+    setSelectedTypes([])
+    setCity('Addis Ababa')
+    setAllEthiopia(true)
+    setSelectedSizes([])
+    setSelectedColors([])
+    onResetFilters()
+  }
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="list" aria-label="Active filters">
-      {pills.map((pill, i) => (
-        <Tag
-          key={String(i)}
-          size="sm"
-          onRemove={() => { onRemove(pill.key, pill.value); }}
-        >
-          {pill.label}
-        </Tag>
-      ))}
-      {pills.length > 1 && (
+    <aside className={cn('w-full space-y-6 rounded-xl border bg-card p-5 text-card-foreground shadow-xs', className)}>
+      {/* Sidebar Header */}
+      <div className="flex items-center justify-between border-b pb-3">
+        <h2 className="font-bold text-foreground text-base">Filters</h2>
         <button
           type="button"
-          onClick={onClearAll}
-          className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          onClick={handleReset}
+          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
         >
           Clear all
         </button>
-      )}
-    </div>
-  );
+      </div>
+
+      {/* Product Type Section */}
+      <div className="space-y-2.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Product Type</h3>
+        <div className="space-y-1.5">
+          <label className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/40 cursor-pointer transition-colors">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={selectedTypes.includes('buy')}
+                onChange={() => handleTypeToggle('buy')}
+                className="h-4 w-4 rounded border-emerald-600 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Buy</span>
+            </div>
+            <span className="text-xs text-muted-foreground font-semibold">
+              {counts?.buy !== undefined ? counts.buy : 18}
+            </span>
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/40 cursor-pointer transition-colors">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={selectedTypes.includes('rent')}
+                onChange={() => handleTypeToggle('rent')}
+                className="h-4 w-4 rounded border-emerald-600 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Rent</span>
+            </div>
+            <span className="text-xs text-muted-foreground font-semibold">
+              {counts?.rent !== undefined ? counts.rent : 8}
+            </span>
+          </label>
+
+          <label className="flex items-center justify-between rounded-lg border p-2.5 hover:bg-muted/40 cursor-pointer transition-colors">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={selectedTypes.includes('custom')}
+                onChange={() => handleTypeToggle('custom')}
+                className="h-4 w-4 rounded border-emerald-600 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Custom Order</span>
+            </div>
+            <span className="text-xs text-muted-foreground font-semibold">
+              {counts?.custom !== undefined ? counts.custom : 11}
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Category Section with Expandable Tree */}
+      <div className="space-y-2 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</h3>
+        <div className="space-y-1">
+          {categoryOptions.map((cat) => {
+            const isSelected = selectedCategory === cat.value
+            const hasChildren = Boolean(cat.children && cat.children.length > 0)
+            const isExpanded = expandedCats[cat.value] ?? isSelected
+
+            return (
+              <div key={cat.value} className="space-y-1">
+                <div
+                  onClick={() => handleCategorySelect(cat.value)}
+                  className={cn(
+                    'w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-xs sm:text-sm font-medium cursor-pointer transition-colors',
+                    isSelected
+                      ? 'bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200'
+                      : 'hover:bg-muted text-foreground/80'
+                  )}
+                >
+                  <span className="truncate">{cat.label}</span>
+
+                  {hasChildren && (
+                    <button
+                      type="button"
+                      onClick={(e) => toggleExpand(cat.value, e)}
+                      className="p-1 text-muted-foreground/70 hover:text-emerald-700 transition-transform"
+                    >
+                      <svg
+                        className={cn('h-4 w-4 transition-transform duration-200', isExpanded ? 'rotate-90' : '')}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Subcategories Child Tree */}
+                {hasChildren && isExpanded && (
+                  <div className="pl-4 space-y-1 border-l-2 border-emerald-100 my-1 ml-2">
+                    {cat.children!.map((child) => {
+                      const isChildSelected = selectedCategory === child.value
+                      return (
+                        <button
+                          key={child.value}
+                          type="button"
+                          onClick={() => handleCategorySelect(child.value)}
+                          className={cn(
+                            'w-full flex items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition-colors',
+                            isChildSelected
+                              ? 'bg-emerald-600 text-white font-bold shadow-2xs'
+                              : 'hover:bg-muted/70 text-foreground/70'
+                          )}
+                        >
+                          <span className="truncate">{child.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Price Range (ETB) Section */}
+      <div className="space-y-3 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Price Range (ETB)</h3>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="number"
+            placeholder="Min"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          />
+          <input
+            type="number"
+            placeholder="Max"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          />
+        </div>
+
+        {/* Quick Range Presets */}
+        <div className="grid grid-cols-2 gap-1.5">
+          {PRESET_PRICE_RANGES.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => handlePricePreset(p.min, p.max)}
+              className="rounded-lg border bg-muted/30 px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Location Section */}
+      <div className="space-y-2 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Location</h3>
+        <select
+          value={city}
+          disabled={allEthiopia}
+          onChange={(e) => {
+            setCity(e.target.value)
+            onApplyFilters({
+              category: selectedCategory,
+              condition: selectedCondition,
+              minPrice,
+              maxPrice,
+              listingTypes: selectedTypes,
+              city: e.target.value,
+              size: selectedSizes,
+              color: selectedColors,
+            })
+          }}
+          className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600"
+        >
+          {CITIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer pt-1">
+          <input
+            type="checkbox"
+            checked={allEthiopia}
+            onChange={(e) => {
+              setAllEthiopia(e.target.checked)
+              onApplyFilters({
+                category: selectedCategory,
+                condition: selectedCondition,
+                minPrice,
+                maxPrice,
+                listingTypes: selectedTypes,
+                city: e.target.checked ? undefined : city,
+                size: selectedSizes,
+                color: selectedColors,
+              })
+            }}
+            className="h-3.5 w-3.5 rounded border-emerald-600 text-emerald-600 focus:ring-emerald-500"
+          />
+          <span>All Ethiopia</span>
+        </label>
+      </div>
+
+      {/* Size Section */}
+      <div className="space-y-2 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Size</h3>
+        <div className="flex flex-wrap gap-1.5">
+          {SIZE_OPTIONS.map((sz) => {
+            const isSelected = selectedSizes.includes(sz)
+            return (
+              <button
+                key={sz}
+                type="button"
+                onClick={() => {
+                  const next = isSelected ? selectedSizes.filter((s) => s !== sz) : [...selectedSizes, sz]
+                  setSelectedSizes(next)
+                }}
+                className={cn(
+                  'h-8 w-9 rounded-lg border text-xs font-bold transition-colors',
+                  isSelected
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-background hover:bg-muted text-foreground'
+                )}
+              >
+                {sz}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Color Section */}
+      <div className="space-y-2 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Color</h3>
+        <div className="flex items-center gap-2">
+          {COLOR_SWATCHES.map((sw) => (
+            <button
+              key={sw.name}
+              type="button"
+              onClick={() => {
+                const isSel = selectedColors.includes(sw.name)
+                const next = isSel ? selectedColors.filter((c) => c !== sw.name) : [...selectedColors, sw.name]
+                setSelectedColors(next)
+              }}
+              title={sw.name}
+              className={cn(
+                'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
+                selectedColors.includes(sw.name) ? 'ring-2 ring-emerald-600 ring-offset-2' : 'border-white shadow-xs'
+              )}
+              style={{ backgroundColor: sw.color }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Condition Section */}
+      <div className="space-y-2 border-t pt-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Condition</h3>
+        <div className="space-y-1">
+          {conditionOptions.map((c) => (
+            <label key={c.value} className="flex items-center gap-2 text-xs font-medium text-foreground cursor-pointer py-1">
+              <input
+                type="radio"
+                name="condition"
+                checked={selectedCondition === c.value}
+                onChange={() => {
+                  setSelectedCondition(c.value)
+                  onApplyFilters({
+                    category: selectedCategory,
+                    condition: c.value,
+                    minPrice,
+                    maxPrice,
+                    listingTypes: selectedTypes,
+                    city: allEthiopia ? undefined : city,
+                    size: selectedSizes,
+                    color: selectedColors,
+                  })
+                }}
+                className="h-3.5 w-3.5 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </aside>
+  )
 }

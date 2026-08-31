@@ -198,8 +198,11 @@ export class ListingsService {
     });
   }
 
-  async findOne(id: string, viewer?: AuthenticatedUser) {
-    const listing = await this.listingsRepository.findByIdWithRelations(id);
+  async findOne(idOrSlug: string, viewer?: AuthenticatedUser) {
+    let listing = await this.listingsRepository.findByIdWithRelations(idOrSlug);
+    if (!listing) {
+      listing = await this.listingsRepository.findBySlug(idOrSlug);
+    }
     if (!listing || listing.deletedAt) {
       throw new ListingNotFoundException();
     }
@@ -211,15 +214,15 @@ export class ListingsService {
     }
 
     if (isPublicListingStatus(listing.status)) {
-      await this.listingsRepository.incrementViewCount(id);
+      await this.listingsRepository.incrementViewCount(listing.id);
       this.eventEmitter.emit(
         LISTING_EVENTS.VIEWED,
-        new ListingViewedEvent(id, viewer?.id),
+        new ListingViewedEvent(listing.id, viewer?.id),
       );
     }
 
     if (viewer) {
-      const isFavorited = await this.favoritesService.isFavorited(viewer.id, id);
+      const isFavorited = await this.favoritesService.isFavorited(viewer.id, listing.id);
       return serializeListing(listing, { isFavorited });
     }
 
@@ -1322,8 +1325,11 @@ export class ListingsService {
     };
   }
 
-  async getRelatedListings(listingId: string, viewer?: AuthenticatedUser) {
-    const listing = await this.listingsRepository.findByIdWithRelations(listingId);
+  async getRelatedListings(listingIdOrSlug: string, viewer?: AuthenticatedUser) {
+    let listing = await this.listingsRepository.findByIdWithRelations(listingIdOrSlug);
+    if (!listing) {
+      listing = await this.listingsRepository.findBySlug(listingIdOrSlug);
+    }
     if (!listing || listing.deletedAt) {
       throw new ListingNotFoundException();
     }
@@ -1338,7 +1344,7 @@ export class ListingsService {
     const sellerListings = await this.listingsRepository.findManyWithRelations({
       where: {
         sellerId: listing.sellerId,
-        id: { not: listingId },
+        id: { not: listing.id },
         status: 'active',
         deletedAt: null,
       },
@@ -1363,7 +1369,7 @@ export class ListingsService {
 
     const relatedListings = await this.listingsRepository.findManyWithRelations({
       where: {
-        id: { not: listingId },
+        id: { not: listing.id },
         sellerId: { not: listing.sellerId },
         status: 'active',
         deletedAt: null,

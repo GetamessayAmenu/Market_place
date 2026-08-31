@@ -8,6 +8,7 @@ import ListingCard from '../components/marketplace/ListingCard'
 import NewsletterForm from '../components/marketplace/NewsletterForm'
 import ProductCarousel from '../components/marketplace/ProductCarousel'
 import SellerCard from '../components/marketplace/SellerCard'
+import RecentlyViewedSection from '../components/marketplace/RecentlyViewedSection'
 import { serverGet } from '../lib/serverApi'
 
 interface ListingData {
@@ -123,40 +124,73 @@ export default async function HomePage() {
         if (categories.length === 0) return null
 
         return (
-          <section key={section.id} className="py-12">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
-                {section.subtitle && <p className="text-sm text-muted-foreground mt-1">{section.subtitle}</p>}
+          <React.Fragment key={section.id}>
+            {/* Shop by Category */}
+            <section className="py-10">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
+                  {section.subtitle && <p className="text-sm text-muted-foreground mt-1">{section.subtitle}</p>}
+                </div>
+                <Link
+                  href="/search"
+                  className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                >
+                  Browse all &rarr;
+                </Link>
               </div>
-              <Link
-                href="/search"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-              >
-                Browse all &rarr;
-              </Link>
-            </div>
-            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-              {categories.map((cat) => (
-                <CategoryCard
-                  key={cat.id}
-                  slug={cat.slug}
-                  name={cat.name}
-                  {...(cat.imageUrl ? { imageUrl: cat.imageUrl } : {})}
-                  {...(cat._count?.listings !== undefined ? { listingCount: cat._count.listings } : {})}
-                />
-              ))}
-            </div>
-          </section>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                {categories.map((cat) => (
+                  <CategoryCard
+                    key={cat.id}
+                    slug={cat.slug}
+                    name={cat.name}
+                    {...(cat.imageUrl ? { imageUrl: cat.imageUrl } : {})}
+                    {...(cat._count?.listings !== undefined ? { listingCount: cat._count.listings } : {})}
+                  />
+                ))}
+              </div>
+            </section>
+
+            {/* Shop by Occasion */}
+            <section className="py-10 border-t">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-display text-2xl font-bold text-foreground">Shop by Occasion</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Find the perfect outfit tailored for your special moments</p>
+                </div>
+              </div>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                {[
+                  { name: 'Wedding', icon: '💍', query: 'wedding', desc: 'Bridal & Groom' },
+                  { name: 'Bridal', icon: '👑', query: 'bridal', desc: 'Luxury Kemis' },
+                  { name: 'Cultural Ceremony', icon: '✨', query: 'cultural', desc: 'Holidays & Feasts' },
+                  { name: 'Graduation', icon: '🎓', query: 'graduation', desc: 'Formal Suits & Gowns' },
+                  { name: 'Photoshoot', icon: '📸', query: 'photoshoot', desc: 'Statement Couture' },
+                  { name: 'Everyday', icon: '☀️', query: 'everyday', desc: 'Casual Kemis' },
+                ].map((occ) => (
+                  <Link
+                    key={occ.name}
+                    href={`/search?q=${occ.query}`}
+                    className="group rounded-xl border bg-card p-4 text-center transition-all duration-300 hover:border-brand-gold/50 hover:shadow-md hover:-translate-y-1"
+                  >
+                    <span className="text-3xl block mb-2 transition-transform group-hover:scale-110">{occ.icon}</span>
+                    <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{occ.name}</h3>
+                    <p className="text-[11px] text-muted-foreground mt-1 truncate">{occ.desc}</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </React.Fragment>
         )
       }
 
       case 'featured_listings': {
-        const listings: ListingData[] = section.items || []
+        const listings: any[] = section.items || []
         if (listings.length === 0) return null
 
         return (
-          <section key={section.id} className="py-12">
+          <section key={section.id} className="py-12 border-t">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
@@ -164,7 +198,7 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/search?featured=true"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 View all &rarr;
               </Link>
@@ -175,9 +209,17 @@ export default async function HomePage() {
                   key={listing.id}
                   id={listing.id}
                   title={listing.title}
-                  price={listing.price}
+                  price={Number(listing.price)}
+                  location={listing.city || listing.location}
+                  designerName={listing.seller?.displayName}
+                  designerAvatar={listing.seller?.avatarUrl}
+                  verifiedSeller={Boolean(listing.seller?.emailVerifiedAt || listing.seller?.phoneVerifiedAt)}
+                  availableForRent={Boolean(listing.availableForRent)}
+                  rentalPricePerDay={listing.rentalPricePerDay ? Number(listing.rentalPricePerDay) : null}
+                  supportsCustomDesign={Boolean(listing.supportsCustomDesign || listing.customOrderAvailable)}
                   {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
                   {...(listing.listingType ? { listingType: listing.listingType } : {})}
+                  status="featured"
                 />
               ))}
             </div>
@@ -186,10 +228,10 @@ export default async function HomePage() {
       }
 
       case 'new_arrivals': {
-        const listings: ListingData[] = section.items || []
+        const listings: any[] = section.items || []
 
         return (
-          <section key={section.id} className="py-12">
+          <section key={section.id} className="py-12 border-t">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
@@ -197,30 +239,38 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/search?sortBy=newest"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 View all &rarr;
               </Link>
             </div>
             {listings.length > 0 ? (
-              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                 {listings.map((listing) => (
                   <ListingCard
                     key={listing.id}
                     id={listing.id}
                     title={listing.title}
-                    price={listing.price}
+                    price={Number(listing.price)}
+                    location={listing.city}
+                    designerName={listing.seller?.displayName}
+                    designerAvatar={listing.seller?.avatarUrl}
+                    verifiedSeller={Boolean(listing.seller?.emailVerifiedAt || listing.seller?.phoneVerifiedAt)}
+                    availableForRent={Boolean(listing.availableForRent)}
+                    rentalPricePerDay={listing.rentalPricePerDay ? Number(listing.rentalPricePerDay) : null}
+                    supportsCustomDesign={Boolean(listing.supportsCustomDesign || listing.customOrderAvailable)}
                     {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
                     {...(listing.listingType ? { listingType: listing.listingType } : {})}
+                    status="new-arrival"
                   />
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border bg-card p-12 text-center">
+              <div className="rounded-xl border bg-card p-12 text-center">
                 <p className="text-muted-foreground">No listings available yet.</p>
                 <Link
                   href="/search"
-                  className="mt-4 inline-block text-sm font-medium text-primary hover:text-primary/80"
+                  className="mt-4 inline-block text-sm font-semibold text-primary hover:text-primary/80"
                 >
                   Browse all listings
                 </Link>
@@ -236,7 +286,7 @@ export default async function HomePage() {
         if (sellers.length === 0) return null
 
         return (
-          <section key={section.id} className="py-12">
+          <section key={section.id} className="py-12 border-t">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
@@ -244,7 +294,7 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/search"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 View all &rarr;
               </Link>
@@ -266,11 +316,11 @@ export default async function HomePage() {
       }
 
       case 'rental_highlights': {
-        const listings: ListingData[] = section.items || []
+        const listings: any[] = section.items || []
         if (listings.length === 0) return null
 
         return (
-          <section key={section.id} className="py-12">
+          <section key={section.id} className="py-12 border-t">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
@@ -278,7 +328,7 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/search?type=rent"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 Explore Rentals &rarr;
               </Link>
@@ -289,7 +339,13 @@ export default async function HomePage() {
                   key={listing.id}
                   id={listing.id}
                   title={listing.title}
-                  price={listing.price}
+                  price={Number(listing.price)}
+                  rentalPricePerDay={listing.rentalPricePerDay ? Number(listing.rentalPricePerDay) : Number(listing.price)}
+                  availableForRent
+                  location={listing.city}
+                  designerName={listing.seller?.displayName}
+                  designerAvatar={listing.seller?.avatarUrl}
+                  verifiedSeller={Boolean(listing.seller?.emailVerifiedAt || listing.seller?.phoneVerifiedAt)}
                   listingType="rent"
                   {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
                 />
@@ -300,11 +356,11 @@ export default async function HomePage() {
       }
 
       case 'custom_design': {
-        const listings: ListingData[] = section.items || []
+        const listings: any[] = section.items || []
         if (listings.length === 0) return null
 
         return (
-          <section key={section.id} className="py-12">
+          <section key={section.id} className="py-12 border-t">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground">{section.title}</h2>
@@ -312,7 +368,7 @@ export default async function HomePage() {
               </div>
               <Link
                 href="/search?type=custom"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
               >
                 Custom Orders &rarr;
               </Link>
@@ -323,7 +379,13 @@ export default async function HomePage() {
                   key={listing.id}
                   id={listing.id}
                   title={listing.title}
-                  price={listing.price}
+                  price={Number(listing.price)}
+                  location={listing.city}
+                  designerName={listing.seller?.displayName}
+                  designerAvatar={listing.seller?.avatarUrl}
+                  verifiedSeller={Boolean(listing.seller?.emailVerifiedAt || listing.seller?.phoneVerifiedAt)}
+                  supportsCustomDesign
+                  customOrderAvailable
                   listingType="custom"
                   {...(listingImageUrl(listing) ? { imageUrl: listingImageUrl(listing) } : {})}
                 />
@@ -467,6 +529,9 @@ export default async function HomePage() {
             Welcome to Ethiopian Fashion Marketplace.
           </div>
         )}
+
+        {/* Recently Viewed Section (Client local storage) */}
+        <RecentlyViewedSection />
 
         {/* Static CTA Banner */}
         <section className="py-12">

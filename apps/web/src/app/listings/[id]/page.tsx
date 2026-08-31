@@ -83,22 +83,25 @@ interface ListingData {
 }
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }> | { id: string }
 }
 
 export async function generateMetadata({ params }: Props) {
   try {
-    const res = await serverGet<ListingData>(`/listings/${params.id}`, {
+    const { id } = await Promise.resolve(params)
+    if (!id) return { title: 'Listing — Marketplace' }
+    const res = await serverGet<ListingData>(`/listings/${id}`, {
       revalidate: 60,
     })
     const listing = res
+    if (!listing?.title) return { title: 'Listing — Marketplace' }
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
-      title: `${listing.title} — Marketplace`,
-      description: listing.description.slice(0, 160),
+      title: `${listing.title} — Habesha Market`,
+      description: (listing.description || '').slice(0, 160),
       openGraph: {
-        title: `${listing.title} — Marketplace`,
-        description: listing.description.slice(0, 160),
+        title: `${listing.title} — Habesha Market`,
+        description: (listing.description || '').slice(0, 160),
         url: `${siteUrl}/listings/${listing.id}`,
         ...(listing.primaryImageUrl ? { images: [listing.primaryImageUrl] } : {}),
         type: 'website',
@@ -108,12 +111,12 @@ export async function generateMetadata({ params }: Props) {
       },
     }
   } catch {
-    return { title: `Listing — Marketplace` }
+    return { title: `Listing — Habesha Market` }
   }
 }
 
 export default async function ListingPage({ params }: Props) {
-  const { id } = params
+  const { id } = await Promise.resolve(params)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   let listing: ListingData | null = null
@@ -127,13 +130,15 @@ export default async function ListingPage({ params }: Props) {
     }
   } | null = null
 
-  try {
-    const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
-      revalidate: 60,
-    })
-    listing = listingRes
-  } catch {
-    listing = null
+  if (id) {
+    try {
+      const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
+        revalidate: 60,
+      })
+      listing = listingRes || null
+    } catch {
+      listing = null
+    }
   }
 
   if (listing) {

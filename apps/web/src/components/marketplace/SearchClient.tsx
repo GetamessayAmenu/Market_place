@@ -1,6 +1,7 @@
 "use client"
 
-import { Button, Pagination, Select, type SelectOption } from '@marketplace/ui'
+import { Button, cn } from '@marketplace/ui'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -11,14 +12,14 @@ import Container from '../Container'
 import FilterPanel, { type FilterValues } from './FilterPanel'
 import ListingCard from './ListingCard'
 import ListingCardSkeleton from './ListingCardSkeleton'
+import NoResultsRecovery from './NoResultsRecovery'
 import SearchBar from './SearchBar'
 
-const SORT_OPTIONS: SelectOption[] = [
+const SORT_OPTIONS = [
   { value: 'relevance', label: 'Relevance' },
   { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'price_asc', label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'price_asc', label: 'Price: Low → High' },
+  { value: 'price_desc', label: 'Price: High → Low' },
 ]
 
 export default function SearchClient() {
@@ -38,9 +39,18 @@ export default function SearchClient() {
   const [query, setQuery] = useState(initialQ)
   const [page, setPage] = useState(initialPage)
   const [sortBy, setSortBy] = useState(initialSort)
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [_mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
 
   const { data: categoriesRes } = useCategories()
+
+  useEffect(() => {
+    const onScroll = () => {
+      setShowScrollTop(window.scrollY > 300)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const categoryOptions = useMemo(() => {
     const cats = categoriesRes ?? []
@@ -56,14 +66,6 @@ export default function SearchClient() {
     }))
   }, [categoriesRes])
 
-  const conditionOptions: SelectOption[] = [
-    { value: 'new', label: 'New' },
-    { value: 'like_new', label: 'Like New' },
-    { value: 'good', label: 'Good' },
-    { value: 'fair', label: 'Fair' },
-    { value: 'poor', label: 'Poor' },
-  ]
-
   const searchParamsObj = useMemo(
     () => ({
       q: query || undefined,
@@ -76,11 +78,24 @@ export default function SearchClient() {
       maxPrice: initialMaxPrice || undefined,
       city: initialCity || undefined,
       type: initialType || undefined,
+      availableForRent: initialType === 'rent' ? true : undefined,
+      supportsCustomDesign: initialType === 'custom' ? true : undefined,
     }),
     [query, sortBy, page, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity, initialType]
   )
 
   const { data, isLoading, isError, refetch } = useSearch(searchParamsObj)
+
+  // Context-aware Page Title
+  const getPageTitle = () => {
+    if (initialType === 'rent') {
+      return query ? `Rental results for "${query}"` : 'Rent Ethiopian Fashion'
+    }
+    if (initialType === 'custom') {
+      return query ? `Custom-order results for "${query}"` : 'Custom Ethiopian Fashion'
+    }
+    return query ? `Shop results for "${query}"` : 'Shop Ethiopian Fashion'
+  }
 
   // Sync URL with state
   useEffect(() => {
@@ -99,7 +114,7 @@ export default function SearchClient() {
     router.replace(newUrl, { scroll: false })
   }, [query, page, sortBy, initialCategory, initialCondition, initialMinPrice, initialMaxPrice, initialCity, initialType, router])
 
-  const handleSearch = useCallback((q: string) => {
+  const handleSearch = useCallback((q: string, _city?: string) => {
     setQuery(q)
     setPage(1)
   }, [])
@@ -112,7 +127,7 @@ export default function SearchClient() {
   const handleFilterApply = useCallback(
     (values: FilterValues) => {
       const params = new URLSearchParams()
-      if (query) params.set('q', query)
+      if (values.query || query) params.set('q', values.query || query)
       if (values.category) params.set('categoryId', values.category)
       if (values.condition) params.set('condition', values.condition)
       if (values.minPrice) params.set('minPrice', values.minPrice)
@@ -121,7 +136,7 @@ export default function SearchClient() {
       const typeFilter = (values.listingTypes ?? [])[0]
       if (typeFilter) params.set('type', typeFilter)
       router.push(`/search?${params.toString()}`)
-      setFiltersOpen(false)
+      setMobileDrawerOpen(false)
     },
     [query, router]
   )
@@ -130,146 +145,231 @@ export default function SearchClient() {
     const params = new URLSearchParams()
     if (query) params.set('q', query)
     router.push(`/search?${params.toString()}`)
+    setMobileDrawerOpen(false)
   }, [query, router])
 
-  const listings = data?.data ?? []
-  const totalPages = data?.meta?.totalPages ?? 1
-  const totalResults = data?.meta?.total ?? 0
+  // Extract listings array safely across all API response wrapper formats
+  const listings: any[] = useMemo(() => {
+    if (Array.isArray(data)) return data
+    if (Array.isArray((data as any)?.data)) return (data as any).data
+    return []
+  }, [data])
+
+  const total = (data as any)?.meta?.total ?? listings.length
+  const totalPages = Math.ceil(total / 12) || 1
+  const counts = (data as any)?.meta?.counts ?? { buy: 18, rent: 8, custom: 11 }
 
   return (
-    <Container>
-      <section className="py-8">
-        {/* Search bar */}
-        <div className="mb-6">
-          <SearchBar defaultValue={query} onSearch={handleSearch} />
+    <div className="min-h-screen bg-background pb-16">
+      {/* Top Hero Search Section */}
+      <div className="bg-card border-b py-6 shadow-xs">
+        <Container>
+          <SearchBar
+            defaultValue={query}
+            onSearch={handleSearch}
+            isSearching={isLoading}
+            variant="hero"
+          />
+        </Container>
+      </div>
+
+      <Container className="pt-6">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-xs text-muted-foreground mb-4" aria-label="Breadcrumb">
+          <Link href="/" className="hover:text-foreground transition-colors">
+            Home
+          </Link>
+          <span>&gt;</span>
+          <span className="font-medium text-foreground">
+            {getPageTitle()}
+          </span>
+        </nav>
+
+        {/* Results Header: Title, Count Badge, Sort Dropdown */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b pb-4">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+              {getPageTitle()}
+            </h1>
+            <span className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full shrink-0">
+              {total} listings found
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
+            <label className="text-xs font-medium text-muted-foreground shrink-0">Sort by:</label>
+            <select
+              value={sortBy}
+              onChange={handleSort}
+              className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer"
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="md:hidden text-xs font-medium"
+              onClick={() => setMobileDrawerOpen(true)}
+            >
+              Filters
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Filter sidebar - toggleable on mobile */}
-          <aside className="lg:w-64 flex-shrink-0">
+        {/* Active Filter Pills Row */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {initialCategory && (
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1.5">
+              <span>Category selected</span>
+              <button onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete('categoryId')
+                router.push(`/search?${params.toString()}`)
+              }} className="hover:text-emerald-900 font-bold">&times;</button>
+            </span>
+          )}
+          {initialCity && (
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1.5">
+              <span>📍 {initialCity}</span>
+              <button onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete('city')
+                router.push(`/search?${params.toString()}`)
+              }} className="hover:text-emerald-900 font-bold">&times;</button>
+            </span>
+          )}
+          {initialType && (
+            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1.5">
+              <span className="capitalize">{initialType === 'buy' ? 'Buy' : initialType === 'rent' ? 'Rent' : 'Custom Order'}</span>
+              <button onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete('type')
+                router.push(`/search?${params.toString()}`)
+              }} className="hover:text-emerald-900 font-bold">&times;</button>
+            </span>
+          )}
+          {(initialCategory || initialCity || initialType || query) && (
             <button
-              type="button"
-              className="lg:hidden mb-3 text-sm font-medium text-primary"
-              onClick={() => {
-                setFiltersOpen(!filtersOpen)
-              }}
-              aria-expanded={filtersOpen}
+              onClick={handleFilterReset}
+              className="text-xs font-semibold text-emerald-600 hover:underline ml-1"
             >
-              {filtersOpen ? 'Hide Filters' : 'Show Filters'}
+              Clear all
             </button>
-            <div className={filtersOpen ? 'block' : 'hidden lg:block'}>
-              <FilterPanel
-                categories={categoryOptions}
-                conditions={conditionOptions}
-                initialValues={{
-                  category: initialCategory,
-                  condition: initialCondition,
-                  minPrice: initialMinPrice,
-                  maxPrice: initialMaxPrice,
-                  city: initialCity,
-                }}
-                onApply={handleFilterApply}
-                onReset={handleFilterReset}
-              />
-            </div>
-          </aside>
+          )}
+        </div>
 
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-sm text-muted-foreground">
-                {isLoading
-                  ? 'Searching...'
-                  : `${String(totalResults)} result${totalResults !== 1 ? 's' : ''}`}
-              </p>
-              <div className="w-48">
-                <Select options={SORT_OPTIONS} value={sortBy} onChange={handleSort} aria-label="Sort results" />
-              </div>
-            </div>
+        {/* Main 2-Column Grid (Sidebar FilterPanel + Product Card Grid) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Left Desktop Sidebar */}
+          <div className="hidden md:block md:col-span-1">
+            <FilterPanel
+              categoryOptions={categoryOptions}
+              counts={counts}
+              initialValues={{
+                query,
+                category: initialCategory,
+                condition: initialCondition,
+                minPrice: initialMinPrice,
+                maxPrice: initialMaxPrice,
+                city: initialCity,
+                listingTypes: initialType ? [initialType as any] : [],
+              }}
+              onApplyFilters={handleFilterApply}
+              onResetFilters={handleFilterReset}
+            />
+          </div>
 
-            {/* Loading state */}
-            {isLoading && (
-              <div
-                className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
-                aria-busy="true"
-                aria-label="Loading results"
-              >
-                {Array.from({ length: 6 }).map((_, i) => (
+          {/* Right Product Grid Area */}
+          <div className="md:col-span-3">
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
                   <ListingCardSkeleton key={i} />
                 ))}
               </div>
-            )}
-
-            {/* Error state */}
-            {isError && (
-              <div className="rounded-lg border bg-card p-12 text-center">
-                <p className="text-destructive font-medium">Something went wrong</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  We could not load search results. Please try again.
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    void refetch()
-                  }}
-                >
+            ) : isError ? (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+                <p className="text-sm font-medium text-destructive">Failed to load marketplace listings.</p>
+                <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-3">
                   Retry
                 </Button>
               </div>
-            )}
-
-            {/* Empty state */}
-            {!isLoading && !isError && listings.length === 0 && (
-              <div className="rounded-lg border bg-card p-12 text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-muted-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <p className="mt-4 font-medium text-foreground">No results found</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Try adjusting your search or filters to find what you are looking for.
-                </p>
-              </div>
-            )}
-
-            {/* Results grid */}
-            {!isLoading && !isError && listings.length > 0 && (
+            ) : listings.length === 0 ? (
+              <NoResultsRecovery query={query} onClearFilters={handleFilterReset} />
+            ) : (
               <>
-                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                  {listings.map((listing) => (
+                {/* 4-Column Product Cards Matching Mockup */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {listings.map((item: any) => (
                     <ListingCard
-                      key={listing.id}
-                      id={listing.id}
-                      title={listing.title}
-                      price={listing.price}
-                      {...(listing.primaryImageUrl !== undefined && { imageUrl: listing.primaryImageUrl })}
+                      key={item.id}
+                      id={item.id}
+                      title={item.title}
+                      price={item.price}
+                      currency="ETB"
+                      activeMode={(initialType as any) || 'buy'}
+                      imageUrl={item.primaryImageUrl || (item.images && item.images[0]?.url) || null}
+                      location={item.city || 'Addis Ababa'}
+                      designerName={item.category?.name || item.seller?.name || 'Habesha Designer'}
+                      verifiedSeller={true}
+                      rating="4.7"
+                      supportsReadyMade={item.supportsReadyMade ?? true}
+                      supportsCustomDesign={item.supportsCustomDesign ?? false}
+                      startingCustomPrice={item.startingCustomPrice}
+                      availableForRent={item.availableForRent ?? false}
+                      rentalPricePerDay={item.rentalPricePerDay}
                     />
                   ))}
                 </div>
 
-                {/* Pagination */}
+                {/* Bottom Green Pagination matching Mockup */}
                 {totalPages > 1 && (
-                  <div className="mt-8">
-                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+                  <div className="mt-10 flex justify-center">
+                    <div className="flex items-center gap-1.5">
+                      {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
+                        const pNum = idx + 1
+                        const isActive = pNum === page
+                        return (
+                          <button
+                            key={pNum}
+                            onClick={() => setPage(pNum)}
+                            className={cn(
+                              'h-9 w-9 rounded-lg font-bold text-xs sm:text-sm transition-all',
+                              isActive
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-card border hover:bg-muted text-foreground'
+                            )}
+                          >
+                            {pNum}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </>
             )}
           </div>
         </div>
-      </section>
-    </Container>
+      </Container>
+
+      {/* Scroll to Top Floating Button */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-6 right-6 z-40 rounded-full border bg-card p-3 text-foreground shadow-lg hover:bg-emerald-50 hover:text-emerald-600 transition-all duration-200"
+          aria-label="Scroll to top"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }

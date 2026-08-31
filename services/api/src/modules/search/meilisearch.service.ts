@@ -33,6 +33,9 @@ const FILTERABLE_ATTRIBUTES = [
   'verified',
   'featured',
   'status',
+  'availableForRent',
+  'supportsCustomDesign',
+  'supportsReadyMade',
 ] as const;
 
 const SORTABLE_ATTRIBUTES = ['createdAt', 'price', 'featured'] as const;
@@ -99,6 +102,7 @@ export class MeilisearchService implements OnModuleInit {
     if (!documents.length) {
       return;
     }
+
     await this.index!.addDocuments([...documents]);
   }
 
@@ -113,17 +117,20 @@ export class MeilisearchService implements OnModuleInit {
     this.assertAvailable();
 
     const searchParams: SearchParams = {
-      hitsPerPage: params.limit,
-      page: params.page,
+      offset: (params.page - 1) * params.limit,
+      limit: params.limit,
+      matchingStrategy: 'last',
     };
 
     if (params.filter) {
       searchParams.filter = params.filter;
     }
-    if (params.sort?.length) {
+
+    if (params.sort && params.sort.length) {
       searchParams.sort = [...params.sort];
     }
-    if (params.attributesToRetrieve?.length) {
+
+    if (params.attributesToRetrieve && params.attributesToRetrieve.length) {
       searchParams.attributesToRetrieve = [...params.attributesToRetrieve];
     }
 

@@ -96,22 +96,25 @@ interface ListingData {
 }
 
 interface Props {
-  params: { id: string }
+  params: Promise<{ id: string }> | { id: string }
 }
 
 export async function generateMetadata({ params }: Props) {
   try {
-    const res = await serverGet<ListingData>(`/listings/${params.id}`, {
+    const { id } = await Promise.resolve(params)
+    if (!id) return { title: 'Product — Habesha Market' }
+    const res = await serverGet<ListingData>(`/listings/${id}`, {
       revalidate: 60,
     })
     const listing = res
+    if (!listing?.title) return { title: 'Product — Habesha Market' }
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
       title: `${listing.title} — Ethiopian Fashion Marketplace`,
-      description: listing.description.slice(0, 160),
+      description: (listing.description || '').slice(0, 160),
       openGraph: {
         title: `${listing.title} — Ethiopian Fashion Marketplace`,
-        description: listing.description.slice(0, 160),
+        description: (listing.description || '').slice(0, 160),
         url: `${siteUrl}/products/${listing.id}`,
         ...(listing.primaryImageUrl ? { images: [listing.primaryImageUrl] } : {}),
         type: 'website',
@@ -126,7 +129,7 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const { id } = params
+  const { id } = await Promise.resolve(params)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   let cookieHeader: string | undefined
@@ -141,14 +144,16 @@ export default async function ProductPage({ params }: Props) {
   let relatedListings: { id: string; title: string; price: number; condition: string; city: string; primaryImageUrl?: string | null }[] = []
   let sellerListings: { id: string; title: string; price: number; condition: string; city: string; primaryImageUrl?: string | null }[] = []
 
-  try {
-    const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
-      ...(cookieHeader ? { cookieHeader } : {}),
-      revalidate: 60,
-    })
-    listing = listingRes
-  } catch {
-    listing = null
+  if (id) {
+    try {
+      const listingRes = await serverGet<ListingData>(`/listings/${id}`, {
+        ...(cookieHeader ? { cookieHeader } : {}),
+        revalidate: 60,
+      })
+      listing = listingRes || null
+    } catch {
+      listing = null
+    }
   }
 
   if (listing?.category?.id) {

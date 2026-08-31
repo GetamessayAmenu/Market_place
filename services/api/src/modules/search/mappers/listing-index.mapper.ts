@@ -94,5 +94,9 @@ export function documentToSearchHit(
     supportsReadyMade: doc.supportsReadyMade,
     supportsCustomDesign: doc.supportsCustomDesign,
     startingCustomPrice: doc.startingCustomPrice,
+    availableForRent: doc.availableForRent,
+    rentalPricePerDay: doc.rentalPricePerDay,
+    verifiedDesigner: doc.verifiedDesigner,
   };
 }
+

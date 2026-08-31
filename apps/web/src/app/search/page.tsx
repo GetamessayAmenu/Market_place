@@ -2,10 +2,30 @@ import React, { Suspense } from 'react'
 
 import SearchClient from '../../components/marketplace/SearchClient'
 
-export function generateMetadata() {
+export function generateMetadata({ searchParams }: { searchParams?: { q?: string; categoryId?: string; type?: string } }) {
+  const query = searchParams?.q
+  const type = searchParams?.type
+
+  let title = 'Discover Ethiopian Fashion — Search Habesha Market'
+  if (query) {
+    title = `Search "${query}" — Habesha Market`
+  } else if (type === 'rent') {
+    title = 'Rent Ethiopian Fashion & Dresses — Habesha Market'
+  } else if (type === 'custom') {
+    title = 'Custom Ethiopian Clothing & Designers — Habesha Market'
+  }
+
+  const description = 'Search Habesha Kemis, bridal dresses, rental suits, and custom fashion. Connect directly with top Ethiopian designers and sellers.'
+
   return {
-    title: 'Search Listings — Marketplace',
-    description: 'Search and browse marketplace listings. Filter by category, price, condition, and location.',
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: 'Habesha Market',
+      type: 'website',
+    },
   }
 }
 

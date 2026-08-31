@@ -18,13 +18,17 @@ import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class SearchFilterDto extends PaginationQueryDto {
   @IsOptional()
-  @IsUUID()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(120)
   categorySlug?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsString()
@@ -113,9 +117,8 @@ export class SearchFilterDto extends PaginationQueryDto {
   @IsString({ each: true })
   occasionTypes?: string[];
 
-  // Verified Designer Filter (separate from general verified)
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
-  @IsBoolean()
-  verifiedDesignerOnly?: boolean;
+  @IsArray()
+  @IsString({ each: true })
+  culturalRegions?: string[];
 }
