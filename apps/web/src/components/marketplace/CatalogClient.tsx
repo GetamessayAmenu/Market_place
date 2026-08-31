@@ -213,8 +213,8 @@ export default function CatalogClient() {
   }, [query, router])
 
   const listings = data?.data ?? []
-  const totalPages = data?.meta.totalPages ?? 1
-  const totalResults = data?.meta.total ?? 0
+  const totalPages = data?.meta?.totalPages ?? 1
+  const totalResults = data?.meta?.total ?? 0
 
   return (
     <Container>

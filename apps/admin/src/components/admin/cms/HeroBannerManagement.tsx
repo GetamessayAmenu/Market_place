@@ -40,7 +40,10 @@ export default function HeroBannerManagement() {
     try {
       setLoading(true)
       const res = await getHeroBanners({ limit: 50 })
-      setBanners(res.data?.items || [])
+      const items = Array.isArray(res.data)
+        ? res.data
+        : (res.data as any)?.items || (res as any)?.items || []
+      setBanners(items)
     } catch (err) {
       console.error('Failed to load hero banners:', err)
       addToast({
@@ -378,9 +381,30 @@ export default function HeroBannerManagement() {
                 type="text"
                 value={formData.linkUrl}
                 onChange={(e) => setFormData((prev) => ({ ...prev, linkUrl: e.target.value }))}
-                placeholder="/search?category=habesha-kemis"
+                placeholder="/catalog or /search?type=buy or https://..."
                 className="w-full rounded-lg border bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
               />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Enter an internal page path (e.g., <code>/catalog</code>) or full external URL. Click a preset to auto-fill:
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { label: 'All Catalog', url: '/catalog' },
+                  { label: 'Buy Fashion', url: '/search?type=buy' },
+                  { label: 'Rentals', url: '/search?type=rent' },
+                  { label: 'Custom Orders', url: '/search?type=custom' },
+                  { label: 'Designers', url: '/designers' },
+                ].map((preset) => (
+                  <button
+                    key={preset.url}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, linkUrl: preset.url }))}
+                    className="rounded-md border bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    + {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

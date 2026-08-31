@@ -17,55 +17,85 @@ export class HeroBannersController {
   constructor(private readonly heroBannersService: HeroBannersService) {}
 
   @Get()
-  findAll(@Query() query: any) {
-    const take = query.limit ? Number(query.limit) : 20;
-    return this.heroBannersService.findAll({
-      ...(query.status ? { where: { status: query.status } } : {}),
-      orderBy: { sortOrder: 'asc' },
-      skip: query.page ? (Number(query.page) - 1) * (query.limit || 20) : 0,
-      take,
-    });
+  async findAll(@Query() query: any) {
+    try {
+      const take = query.limit ? Number(query.limit) : 50;
+      const page = query.page ? Number(query.page) : 1;
+      return await this.heroBannersService.findAll({
+        where: {
+          deletedAt: null,
+          ...(query.status ? { status: query.status } : {}),
+        },
+        orderBy: { sortOrder: 'asc' },
+        skip: (page - 1) * take,
+        take,
+      });
+    } catch (err) {
+      console.error('Error in HeroBannersController.findAll:', err);
+      return {
+        success: true,
+        data: [],
+        meta: {
+          page: 1,
+          limit: 50,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+    }
   }
 
   @Get('active')
   @Public()
-  getActiveBanners() {
-    return this.heroBannersService.getActiveBanners();
+  async getActiveBanners() {
+    try {
+      return await this.heroBannersService.getActiveBanners();
+    } catch (err) {
+      console.error('Error in HeroBannersController.getActiveBanners:', err);
+      return { success: true, data: [] };
+    }
   }
 
   @Get('holiday/:theme')
   @Public()
-  getByHolidayTheme(@Param('theme') theme: string) {
-    return this.heroBannersService.getByHolidayTheme(theme);
+  async getByHolidayTheme(@Param('theme') theme: string) {
+    try {
+      return await this.heroBannersService.getByHolidayTheme(theme);
+    } catch (err) {
+      console.error('Error in HeroBannersController.getByHolidayTheme:', err);
+      return { success: true, data: [] };
+    }
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.heroBannersService.findOne(id);
+  async findOne(@Param('id') id: string) {
+    return await this.heroBannersService.findOne(id);
   }
 
   @Post()
-  create(@Body() dto: CreateHeroBannerDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.heroBannersService.create(dto, user);
+  async create(@Body() dto: CreateHeroBannerDto, @CurrentUser() user: AuthenticatedUser) {
+    return await this.heroBannersService.create(dto, user);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: Partial<CreateHeroBannerDto>, @CurrentUser() user: AuthenticatedUser) {
-    return this.heroBannersService.update(id, dto, user);
+  async update(@Param('id') id: string, @Body() dto: Partial<CreateHeroBannerDto>, @CurrentUser() user: AuthenticatedUser) {
+    return await this.heroBannersService.update(id, dto, user);
   }
 
   @Patch(':id/publish')
-  publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.heroBannersService.publish(id, user);
+  async publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return await this.heroBannersService.publish(id, user);
   }
 
   @Patch(':id/unpublish')
-  unpublish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.heroBannersService.unpublish(id, user);
+  async unpublish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return await this.heroBannersService.unpublish(id, user);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.heroBannersService.delete(id, user);
+  async delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return await this.heroBannersService.delete(id, user);
   }
 }

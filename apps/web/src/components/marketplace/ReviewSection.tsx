@@ -95,8 +95,8 @@ export default function ReviewSection({ listingId, sellerId, className }: Review
       ])
       if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value)
       if (reviewsRes.status === 'fulfilled') {
-        setReviews(reviewsRes.value.data)
-        setTotalPages(reviewsRes.value.meta.totalPages)
+        setReviews(reviewsRes.value?.data ?? [])
+        setTotalPages(reviewsRes.value?.meta?.totalPages ?? 1)
       }
     } catch {
       // Graceful fallback

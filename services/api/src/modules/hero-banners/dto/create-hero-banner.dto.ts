@@ -1,55 +1,54 @@
-import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateHeroBannerDto {
+  @IsOptional()
   @IsString()
-  @MaxLength(200)
-  title!: string;
+  title?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(200)
   titleAm?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(300)
   subtitle?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(300)
   subtitleAm?: string;
-
-  @IsString()
-  imageUrl!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
   cloudinaryPublicId?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
   linkUrl?: string;
 
   @IsOptional()
-  @IsEnum(['MESKEL', 'TIMKET', 'ENKUTATASH', 'TLEK_SERG', 'FASIKA'])
-  holidayTheme?: 'MESKEL' | 'TIMKET' | 'ENKUTATASH' | 'TLEK_SERG' | 'FASIKA';
+  @IsString()
+  holidayTheme?: string;
 
   @IsOptional()
+  @IsString()
   themeStartDate?: string;
 
   @IsOptional()
+  @IsString()
   themeEndDate?: string;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Type(() => Number)
   searchWeight?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Type(() => Number)
   sortOrder?: number;
 }

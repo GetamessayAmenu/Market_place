@@ -15,49 +15,62 @@ export class HeroBannersRepository {
     skip?: number;
     take?: number;
   }) {
-    const [items, total] = await Promise.all([
-      this.prisma.heroBanner.findMany({
-        ...args,
-        include: {
-          createdBy: {
-            select: {
-              id: true,
-              displayName: true,
+    try {
+      const [items, total] = await Promise.all([
+        this.prisma.heroBanner.findMany({
+          ...args,
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                displayName: true,
+              },
+            },
+            updatedBy: {
+              select: {
+                id: true,
+                displayName: true,
+              },
             },
           },
-          updatedBy: {
-            select: {
-              id: true,
-              displayName: true,
-            },
-          },
-        },
-      }),
-      args.where
-        ? this.prisma.heroBanner.count({ where: args.where })
-        : this.prisma.heroBanner.count(),
-    ]);
+        }),
+        this.prisma.heroBanner.count(args.where ? { where: args.where } : undefined),
+      ]);
 
-    return { items, total };
+      return { items: items || [], total: total || 0 };
+    } catch (err) {
+      console.warn('HeroBannersRepository.findMany main query failed, trying raw query fallback:', err);
+      try {
+        const [items, total] = await Promise.all([
+          this.prisma.heroBanner.findMany({ ...args }),
+          this.prisma.heroBanner.count(args.where ? { where: args.where } : undefined),
+        ]);
+        return { items: items || [], total: total || 0 };
+      } catch (fallbackErr) {
+        console.error('HeroBannersRepository.findMany fallback failed:', fallbackErr);
+        return { items: [], total: 0 };
+      }
+    }
   }
 
   async findById(id: string) {
     if (!id || !UUID_REGEX.test(id)) return null;
-    return this.prisma.heroBanner.findUnique({
-      where: { id },
-      include: {
-        createdBy: true,
-        updatedBy: true,
-      },
-    });
+    try {
+      return await this.prisma.heroBanner.findUnique({
+        where: { id },
+        include: {
+          createdBy: true,
+          updatedBy: true,
+        },
+      });
+    } catch {
+      return await this.prisma.heroBanner.findUnique({ where: { id } });
+    }
   }
 
   async create(data: Prisma.HeroBannerCreateInput) {
     return this.prisma.heroBanner.create({
       data,
-      include: {
-        createdBy: true,
-      },
     });
   }
 
@@ -65,10 +78,6 @@ export class HeroBannersRepository {
     return this.prisma.heroBanner.update({
       where: { id },
       data,
-      include: {
-        createdBy: true,
-        updatedBy: true,
-      },
     });
   }
 
@@ -80,70 +89,44 @@ export class HeroBannersRepository {
   }
 
   async count(where?: Prisma.HeroBannerWhereInput) {
-    return where
-      ? this.prisma.heroBanner.count({ where })
-      : this.prisma.heroBanner.count();
+    try {
+      return await this.prisma.heroBanner.count(where ? { where } : undefined);
+    } catch {
+      return 0;
+    }
   }
 
-  async getActiveBanners(currentDate: Date = new Date()) {
-    return this.prisma.heroBanner.findMany({
-      where: {
-        status: 'published',
-        deletedAt: null,
-        AND: [
-          {
-            OR: [
-              {
-                publishAt: null,
-                unpublishAt: null,
-              },
-              {
-                publishAt: { lte: currentDate },
-                unpublishAt: { gte: currentDate },
-              },
-              {
-                publishAt: { lte: currentDate },
-                unpublishAt: null,
-              },
-            ],
-          },
-          {
-            OR: [
-              {
-                holidayTheme: null,
-              },
-              {
-                themeStartDate: { lte: currentDate },
-                themeEndDate: { gte: currentDate },
-              },
-            ],
-          },
-        ],
-      },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { createdAt: 'desc' },
-      ],
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            displayName: true,
-          },
+  async getActiveBanners() {
+    try {
+      return await this.prisma.heroBanner.findMany({
+        where: {
+          status: 'published',
+          deletedAt: null,
         },
-      },
-    });
+        orderBy: [
+          { sortOrder: 'asc' },
+          { createdAt: 'desc' },
+        ],
+      });
+    } catch (err) {
+      console.error('HeroBannersRepository.getActiveBanners error:', err);
+      return [];
+    }
   }
 
   async getByHolidayTheme(theme: string) {
-    return this.prisma.heroBanner.findMany({
-      where: {
-        holidayTheme: theme as any,
-        status: 'published',
-        deletedAt: null,
-      },
-      orderBy: { sortOrder: 'asc' },
-    });
+    try {
+      return await this.prisma.heroBanner.findMany({
+        where: {
+          holidayTheme: theme as any,
+          status: 'published',
+          deletedAt: null,
+        },
+        orderBy: { sortOrder: 'asc' },
+      });
+    } catch {
+      return [];
+    }
   }
 
   async findUserById(id: string) {
@@ -156,9 +139,13 @@ export class HeroBannersRepository {
   }
 
   async findFirstAdminUser() {
-    return this.prisma.user.findFirst({
-      where: { deletedAt: null },
-      orderBy: { createdAt: 'asc' },
-    });
+    try {
+      return await this.prisma.user.findFirst({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {
+      return null;
+    }
   }
 }

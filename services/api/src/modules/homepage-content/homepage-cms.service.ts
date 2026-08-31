@@ -472,12 +472,12 @@ export class HomepageCmsService {
               });
 
               if (explicitFeatured.length > 0) {
-                items = explicitFeatured.map((ef) => ef.listing);
+                items = explicitFeatured.map((ef) => ef.listing).filter(Boolean);
               } else {
                 items = await this.prisma.listing.findMany({
-                  where: { isFeatured: true, status: 'active', deletedAt: null },
+                  where: { status: 'active', deletedAt: null },
                   take: sec.itemCount,
-                  orderBy: { createdAt: 'desc' },
+                  orderBy: { isFeatured: 'desc' },
                   include: {
                     images: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
                     category: { select: { id: true, name: true, slug: true } },
@@ -492,7 +492,7 @@ export class HomepageCmsService {
               items = await this.prisma.listing.findMany({
                 where: { status: 'active', deletedAt: null },
                 take: sec.itemCount,
-                orderBy: { publishedAt: 'desc' },
+                orderBy: { createdAt: 'desc' },
                 include: {
                   images: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
                   category: { select: { id: true, name: true, slug: true } },
@@ -522,10 +522,10 @@ export class HomepageCmsService {
               });
 
               if (explicitSellers.length > 0) {
-                items = explicitSellers.map((es) => es.seller);
+                items = explicitSellers.map((es) => es.seller).filter(Boolean);
               } else {
                 items = await this.prisma.user.findMany({
-                  where: { status: 'active', deletedAt: null, sellerType: { not: null } },
+                  where: { status: 'active', deletedAt: null },
                   take: sec.itemCount,
                   orderBy: { createdAt: 'desc' },
                   select: {

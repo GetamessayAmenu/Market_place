@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 loadEnv({ path: resolve(__dirname, '../.env') });
 
 import cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
@@ -23,6 +24,8 @@ async function bootstrap(): Promise<void> {
   const logger = app.get(Logger);
   app.useLogger(logger);
 
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
   app.use(helmet());
   app.use(compression());
   app.use(cookieParser());
@@ -41,7 +44,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),

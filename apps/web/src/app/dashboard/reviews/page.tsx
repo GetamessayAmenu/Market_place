@@ -20,8 +20,8 @@ export default function ReviewsPage() {
     setError(null)
     try {
       const res = await getSellerReviews(user.id, { page, limit: 10 })
-      setReviews(res.data)
-      setTotalPages(res.meta.totalPages)
+      setReviews(res?.data ?? [])
+      setTotalPages(res?.meta?.totalPages ?? 1)
     } catch {
       setError('Failed to load reviews')
     } finally {

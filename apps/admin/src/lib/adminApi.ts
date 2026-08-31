@@ -1693,12 +1693,12 @@ export async function getHeroBanners(query?: {
   page?: number
   limit?: number
   status?: string
-}): Promise<ApiResponse<{ items: HeroBanner[]; total: number }>> {
+}): Promise<PaginatedResponse<HeroBanner>> {
   const params = new URLSearchParams()
   if (query?.page) params.append('page', query.page.toString())
   if (query?.limit) params.append('limit', query.limit.toString())
   if (query?.status) params.append('status', query.status)
-  return clientGet<ApiResponse<{ items: HeroBanner[]; total: number }>>('/admin/hero-banners?' + params.toString())
+  return clientGet<PaginatedResponse<HeroBanner>>('/admin/hero-banners?' + params.toString())
 }
 
 export async function getActiveHeroBanners(): Promise<ApiResponse<HeroBanner[]>> {

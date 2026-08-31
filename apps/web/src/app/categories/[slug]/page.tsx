@@ -90,8 +90,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       category = categoryRes.value
     }
     if (listingsRes.status === 'fulfilled') {
-      listings = listingsRes.value.data
-      totalPages = listingsRes.value.meta.totalPages
+      listings = listingsRes.value?.data ?? []
+      totalPages = listingsRes.value?.meta?.totalPages ?? 1
     }
   } catch {
     // Graceful fallback
