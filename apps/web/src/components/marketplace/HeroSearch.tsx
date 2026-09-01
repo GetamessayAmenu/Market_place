@@ -28,15 +28,15 @@ const POPULAR_SEARCH_TAGS = [
 
 export default function HeroSearch({ banners = [] }: HeroSearchProps) {
   const router = useRouter()
-  const [activeMode, setActiveMode] = useState<'buy' | 'rent' | 'custom'>('buy')
-  const [activeBannerIdx, setActiveBannerIdx] = useState(0)
+  const [activeMode, setActiveMode] = useState<'' | 'buy' | 'rent' | 'custom'>('')
+  const [activeBannerIdx] = useState(0)
   const currentBanner = banners[activeBannerIdx]
 
   const handleSearch = useCallback(
     (query: string) => {
       const params = new URLSearchParams()
       if (query) params.set('q', query)
-      if (activeMode !== 'buy') params.set('type', activeMode)
+      if (activeMode) params.set('type', activeMode)
       router.push(`/search?${params.toString()}`)
     },
     [router, activeMode]
@@ -45,7 +45,7 @@ export default function HeroSearch({ banners = [] }: HeroSearchProps) {
   const handleTagClick = (tag: string) => {
     const params = new URLSearchParams()
     params.set('q', tag)
-    if (activeMode !== 'buy') params.set('type', activeMode)
+    if (activeMode) params.set('type', activeMode)
     router.push(`/search?${params.toString()}`)
   }
 
@@ -78,10 +78,21 @@ export default function HeroSearch({ banners = [] }: HeroSearchProps) {
         <div className="mt-8 inline-flex items-center rounded-xl bg-background/80 backdrop-blur-md p-1 border shadow-xs">
           <button
             type="button"
+            onClick={() => setActiveMode('')}
+            className={`rounded-lg px-5 py-2 text-xs sm:text-sm font-semibold transition-all ${
+              activeMode === ''
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveMode('buy')}
             className={`rounded-lg px-5 py-2 text-xs sm:text-sm font-semibold transition-all ${
               activeMode === 'buy'
-                ? 'bg-primary text-primary-foreground shadow-xs'
+                ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -114,45 +125,26 @@ export default function HeroSearch({ banners = [] }: HeroSearchProps) {
         {/* Large prominent search bar */}
         <div className="mt-6 max-w-2xl mx-auto shadow-lg rounded-xl">
           <SearchBar
-            variant="hero"
-            placeholder="Search Habesha Kemis, bridal wear, Netela..."
             onSearch={handleSearch}
+            placeholder="Search Habesha Kemis, bridal wear, Netela..."
           />
         </div>
 
-        {/* Popular Searches below search bar */}
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
-          <span className="font-semibold text-muted-foreground/80">Popular:</span>
+        {/* Popular Tags */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground/70">Popular:</span>
           {POPULAR_SEARCH_TAGS.map((tag) => (
             <button
               key={tag}
               type="button"
               onClick={() => handleTagClick(tag)}
-              className="rounded-full bg-card hover:bg-muted border px-3 py-1 text-muted-foreground hover:text-foreground transition-all duration-200"
+              className="rounded-full bg-background/60 hover:bg-background px-3 py-1 text-xs border transition-colors shadow-2xs hover:text-brand-gold font-medium cursor-pointer"
             >
               {tag}
             </button>
           ))}
         </div>
-
-        {/* Banner carousel indicator if multiple */}
-        {banners.length > 1 && (
-          <div className="flex justify-center gap-2 mt-8">
-            {banners.map((b, i) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => setActiveBannerIdx(i)}
-                className={`h-2 rounded-full transition-all ${
-                  i === activeBannerIdx ? 'w-8 bg-brand-gold' : 'w-2 bg-muted-foreground/40'
-                }`}
-                aria-label={`Go to slide ${i + 1}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </section>
   )
 }
-

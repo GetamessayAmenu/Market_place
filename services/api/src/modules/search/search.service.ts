@@ -77,11 +77,59 @@ export class SearchService {
 
     let filter = baseFilter;
     let meiliQ = q;
-    let matchedCatId: string | null = null;
-    let matchedCatSlug: string | null = null;
+    let targetCatIDs: string[] = [];
+    let targetCatSlugs: string[] = [];
+    let targetCatObj: any = null;
+
+    // Resolve Category Hierarchy if categoryId or categorySlug is provided
+    const catQuery = dto.categoryId || dto.categorySlug;
+    if (catQuery) {
+      try {
+        const catInDb = await this.prisma.category.findFirst({
+          where: {
+            isActive: true,
+            deletedAt: null,
+            OR: [
+              { id: catQuery },
+              { slug: catQuery },
+            ],
+          },
+          include: {
+            children: {
+              where: { isActive: true, deletedAt: null },
+              select: { id: true, slug: true },
+            },
+          },
+        });
+
+        if (catInDb) {
+          targetCatObj = catInDb;
+          targetCatIDs = [catInDb.id, ...catInDb.children.map((c) => c.id)];
+          targetCatSlugs = [catInDb.slug, ...catInDb.children.map((c) => c.slug)];
+
+          const catClauses: string[] = [];
+          targetCatIDs.forEach((id) => {
+            const escaped = id.replace(/'/g, "\\'");
+            catClauses.push(`categoryId = '${escaped}'`);
+            catClauses.push(`subcategoryId = '${escaped}'`);
+          });
+          targetCatSlugs.forEach((s) => {
+            const escaped = s.replace(/'/g, "\\'");
+            catClauses.push(`categorySlug = '${escaped}'`);
+            catClauses.push(`subcategorySlug = '${escaped}'`);
+          });
+
+          if (catClauses.length > 0) {
+            filter = `${baseFilter} AND (${catClauses.join(' OR ')})`;
+          }
+        }
+      } catch {
+        // Ignore resolution error
+      }
+    }
 
     // Infer category intent if query matches a known category in DB
-    if (q && !dto.categoryId && !dto.categorySlug) {
+    if (q && !catQuery) {
       try {
         const catMatch = await this.prisma.category.findFirst({
           where: {
@@ -94,12 +142,27 @@ export class SearchService {
               { slug: { equals: q.toLowerCase().replace(/[^\w]/g, '-'), mode: 'insensitive' } },
             ],
           },
-          select: { id: true, slug: true, name: true },
+          include: {
+            children: {
+              where: { isActive: true, deletedAt: null },
+              select: { id: true, slug: true },
+            },
+          },
         });
         if (catMatch) {
-          matchedCatId = catMatch.id;
-          matchedCatSlug = catMatch.slug;
-          filter = `${baseFilter} AND (categoryId = '${catMatch.id}' OR categorySlug = '${catMatch.slug}')`;
+          targetCatObj = catMatch;
+          targetCatIDs = [catMatch.id, ...catMatch.children.map((c) => c.id)];
+          targetCatSlugs = [catMatch.slug, ...catMatch.children.map((c) => c.slug)];
+
+          const catClauses: string[] = [];
+          targetCatIDs.forEach((id) => {
+            const escaped = id.replace(/'/g, "\\'");
+            catClauses.push(`categoryId = '${escaped}'`);
+            catClauses.push(`subcategoryId = '${escaped}'`);
+          });
+          if (catClauses.length > 0) {
+            filter = `${baseFilter} AND (${catClauses.join(' OR ')})`;
+          }
           const keywords = q.replace(/Cultural\s*Dresses/gi, '').replace(/[()]/g, '').trim();
           meiliQ = keywords.length >= 2 ? keywords : '';
         }
@@ -130,7 +193,7 @@ export class SearchService {
     }
 
     // Tier 2: If category filter produced 0 hits, retry Meilisearch with empty query inside that category
-    if (result.hits.length === 0 && matchedCatId) {
+    if (result.hits.length === 0 && (targetCatIDs.length > 0 || catQuery)) {
       try {
         const catOnlyResult = await this.meilisearch.searchDocuments<ListingSearchDocument>({
           q: '',
@@ -188,18 +251,22 @@ export class SearchService {
         if (dto.city) {
           whereClause.city = { contains: dto.city, mode: 'insensitive' };
         }
-        if (dto.categoryId) {
-          whereClause.OR = [{ categoryId: dto.categoryId }, { category: { slug: dto.categoryId } }];
+
+        if (targetCatIDs.length > 0) {
+          whereClause.OR = [
+            { categoryId: { in: targetCatIDs } },
+            ...(targetCatObj ? [{ category: { parentId: targetCatObj.id } }] : []),
+            { category: { slug: { in: targetCatSlugs } } },
+          ];
+        } else if (dto.categoryId) {
+          whereClause.OR = [
+            { categoryId: dto.categoryId },
+            { category: { parentId: dto.categoryId } },
+            { category: { slug: dto.categoryId } },
+          ];
         }
 
         const textConditions: any[] = [];
-
-        if (matchedCatId) {
-          textConditions.push({ categoryId: matchedCatId });
-        }
-        if (matchedCatSlug) {
-          textConditions.push({ category: { slug: matchedCatSlug } });
-        }
 
         if (cleanQ) {
           textConditions.push(
@@ -238,19 +305,20 @@ export class SearchService {
             slug: l.slug,
             description: l.description,
             price: Number(l.price),
-            condition: l.condition,
+            condition: l.condition ?? 'new',
             status: l.status,
-            city: l.city,
+            city: l.city ?? null,
             location: l.city,
-            categoryId: l.category?.id ?? l.categoryId,
-            categorySlug: l.category?.slug ?? '',
-            categoryName: l.category?.name ?? '',
-            subcategorySlug: null,
-            subcategoryName: null,
+            primaryImageUrl: (l.images || []).find((i: any) => i.isPrimary)?.url || (l.images || [])[0]?.url || null,
+            categoryId: l.category?.parentId ?? l.categoryId,
+            categoryName: l.category?.name ?? 'Fashion',
+            categorySlug: l.category?.slug ?? 'fashion',
+            subcategoryId: l.category?.parentId ? l.categoryId : null,
+            subcategoryName: l.category?.parentId ? l.category.name : null,
+            subcategorySlug: l.category?.parentId ? l.category.slug : null,
             verified: Boolean(l.seller?.emailVerifiedAt || l.seller?.phoneVerifiedAt),
             featured: l.isFeatured ?? false,
             createdAt: new Date(l.createdAt).getTime(),
-            primaryImageUrl: (l.images || []).find((i: any) => i.isPrimary)?.url || (l.images || [])[0]?.url || null,
             supportsReadyMade: l.supportsReadyMade ?? true,
             supportsCustomDesign: l.supportsCustomDesign ?? false,
             startingCustomPrice: l.startingCustomPrice ? Number(l.startingCustomPrice) : null,
@@ -278,8 +346,8 @@ export class SearchService {
       });
     }
 
-    // Compute real database mode counts
-    const [buyCount, rentCount, customCount] = await Promise.all([
+    // Compute real database mode counts and real category counts
+    const [buyCount, rentCount, customCount, activeListingsWithCat] = await Promise.all([
       this.prisma.listing.count({
         where: { status: 'active', deletedAt: null, OR: [{ availableForPurchase: true }, { supportsReadyMade: true }] },
       }).catch(() => 18),
@@ -289,7 +357,21 @@ export class SearchService {
       this.prisma.listing.count({
         where: { status: 'active', deletedAt: null, OR: [{ customOrderAvailable: true }, { supportsCustomDesign: true }] },
       }).catch(() => 11),
+      this.prisma.listing.findMany({
+        where: { status: 'active', deletedAt: null },
+        select: { categoryId: true, category: { select: { id: true, parentId: true } } },
+      }).catch(() => []),
     ]);
+
+    const categoryCounts: Record<string, number> = {};
+    for (const item of activeListingsWithCat) {
+      if (item.categoryId) {
+        categoryCounts[item.categoryId] = (categoryCounts[item.categoryId] || 0) + 1;
+      }
+      if (item.category?.parentId) {
+        categoryCounts[item.category.parentId] = (categoryCounts[item.category.parentId] || 0) + 1;
+      }
+    }
 
     const hits: SearchListingHit[] = result.hits.map(documentToSearchHit);
 
@@ -310,6 +392,7 @@ export class SearchService {
           rent: rentCount,
           custom: customCount,
         },
+        categoryCounts,
       },
     };
   }

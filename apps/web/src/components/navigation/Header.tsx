@@ -20,7 +20,7 @@ function HeaderNavLinks() {
     {
       href: '/search?type=buy',
       label: 'Shop',
-      isActive: isSearchPage && (!currentType || currentType === 'buy'),
+      isActive: isSearchPage && currentType === 'buy',
     },
     {
       href: '/search?type=rent',

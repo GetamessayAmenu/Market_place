@@ -81,7 +81,9 @@ export function buildMeilisearchFilter(dto: SearchListingsDto): string {
   const inferred = parsed.inferredFilters;
 
   if (dto.categoryId) {
-    parts.push(`categoryId = '${escapeFilterValue(dto.categoryId)}'`);
+    parts.push(
+      `(categoryId = '${escapeFilterValue(dto.categoryId)}' OR subcategoryId = '${escapeFilterValue(dto.categoryId)}')`,
+    );
   }
 
   if (dto.categorySlug) {

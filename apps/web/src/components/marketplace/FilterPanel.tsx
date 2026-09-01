@@ -20,6 +20,7 @@ export interface FilterPanelProps {
   conditionOptions?: { value: string; label: string }[]
   initialValues?: FilterValues
   counts?: { buy?: number; rent?: number; custom?: number }
+  categoryCounts?: Record<string, number>
   onApplyFilters: (values: FilterValues) => void
   onResetFilters: () => void
   className?: string
@@ -55,6 +56,7 @@ export default function FilterPanel({
   ],
   initialValues,
   counts,
+  categoryCounts,
   onApplyFilters,
   onResetFilters,
   className,
@@ -69,6 +71,19 @@ export default function FilterPanel({
   const [selectedSizes, setSelectedSizes] = useState<string[]>(initialValues?.size ?? [])
   const [selectedColors, setSelectedColors] = useState<string[]>(initialValues?.color ?? [])
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
+
+  // Keep local state in sync when initialValues prop changes
+  React.useEffect(() => {
+    if (initialValues?.category !== undefined) setSelectedCategory(initialValues.category)
+    if (initialValues?.condition !== undefined) setSelectedCondition(initialValues.condition)
+    if (initialValues?.minPrice !== undefined) setMinPrice(initialValues.minPrice)
+    if (initialValues?.maxPrice !== undefined) setMaxPrice(initialValues.maxPrice)
+    if (initialValues?.listingTypes !== undefined) setSelectedTypes(initialValues.listingTypes)
+    if (initialValues?.city !== undefined) {
+      setCity(initialValues.city || 'Addis Ababa')
+      setAllEthiopia(!initialValues.city)
+    }
+  }, [initialValues])
 
   const handleTypeToggle = (type: 'buy' | 'rent' | 'custom') => {
     const next = selectedTypes.includes(type)
@@ -104,6 +119,7 @@ export default function FilterPanel({
 
   const toggleExpand = (catId: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    e.preventDefault()
     setExpandedCats((prev) => ({ ...prev, [catId]: !prev[catId] }))
   }
 
@@ -207,7 +223,9 @@ export default function FilterPanel({
           {categoryOptions.map((cat) => {
             const isSelected = selectedCategory === cat.value
             const hasChildren = Boolean(cat.children && cat.children.length > 0)
-            const isExpanded = expandedCats[cat.value] ?? isSelected
+            const isChildSelected = Boolean(cat.children?.some((child) => child.value === selectedCategory))
+            const isExpanded = expandedCats[cat.value] ?? (isSelected || isChildSelected)
+            const parentCount = categoryCounts?.[cat.value]
 
             return (
               <div key={cat.value} className="space-y-1">
@@ -216,17 +234,27 @@ export default function FilterPanel({
                   className={cn(
                     'w-full flex items-center justify-between rounded-lg px-3 py-2 text-left text-xs sm:text-sm font-medium cursor-pointer transition-colors',
                     isSelected
-                      ? 'bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200'
+                      ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-300 shadow-2xs'
+                      : isChildSelected
+                      ? 'text-emerald-700 font-semibold bg-emerald-50/40'
                       : 'hover:bg-muted text-foreground/80'
                   )}
                 >
-                  <span className="truncate">{cat.label}</span>
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="truncate">{cat.label}</span>
+                    {parentCount !== undefined && parentCount > 0 && (
+                      <span className="text-[11px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full font-bold">
+                        {parentCount}
+                      </span>
+                    )}
+                  </div>
 
                   {hasChildren && (
                     <button
                       type="button"
                       onClick={(e) => toggleExpand(cat.value, e)}
                       className="p-1 text-muted-foreground/70 hover:text-emerald-700 transition-transform"
+                      aria-label={`Toggle subcategories for ${cat.label}`}
                     >
                       <svg
                         className={cn('h-4 w-4 transition-transform duration-200', isExpanded ? 'rotate-90' : '')}
@@ -242,9 +270,11 @@ export default function FilterPanel({
 
                 {/* Subcategories Child Tree */}
                 {hasChildren && isExpanded && (
-                  <div className="pl-4 space-y-1 border-l-2 border-emerald-100 my-1 ml-2">
+                  <div className="pl-3 space-y-1 border-l-2 border-emerald-200 my-1 ml-3">
                     {cat.children!.map((child) => {
-                      const isChildSelected = selectedCategory === child.value
+                      const isSubSelected = selectedCategory === child.value
+                      const subCount = categoryCounts?.[child.value]
+
                       return (
                         <button
                           key={child.value}
@@ -252,12 +282,17 @@ export default function FilterPanel({
                           onClick={() => handleCategorySelect(child.value)}
                           className={cn(
                             'w-full flex items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition-colors',
-                            isChildSelected
+                            isSubSelected
                               ? 'bg-emerald-600 text-white font-bold shadow-2xs'
                               : 'hover:bg-muted/70 text-foreground/70'
                           )}
                         >
                           <span className="truncate">{child.label}</span>
+                          {subCount !== undefined && subCount > 0 && (
+                            <span className={cn('text-[10px] px-1.5 rounded-full font-bold', isSubSelected ? 'bg-white/20 text-white' : 'text-emerald-700 bg-emerald-50')}>
+                              {subCount}
+                            </span>
+                          )}
                         </button>
                       )
                     })}
