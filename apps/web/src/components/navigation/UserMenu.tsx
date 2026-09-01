@@ -41,14 +41,14 @@ const guestItems = [
 
 const routeMap: Record<string, string> = {
   dashboard: '/dashboard',
-  profile: '/dashboard/profile',
+  profile: '/seller/settings',
   orders: '/dashboard/orders',
   rentals: '/dashboard/rentals',
   'custom-orders': '/dashboard/custom-orders',
   saved: '/dashboard/saved',
   following: '/account/following',
   messages: '/dashboard/messages',
-  account: '/dashboard/settings/account',
+  account: '/seller/settings',
   notifications: '/dashboard/settings/notifications',
   seller: '/dashboard/seller',
   'my-listings': '/seller/catalog',

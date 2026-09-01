@@ -73,7 +73,7 @@ export async function generateMetadata() {
   let ogImage: string | undefined = undefined
 
   try {
-    const seoRes = await serverGet<{ data: CmsSeoData }>('/homepage/seo', { revalidate: 120 })
+    const seoRes = await serverGet<{ data: CmsSeoData }>('/homepage/seo', { revalidate: 0 })
     if (seoRes?.data) {
       if (seoRes.data.title) seoTitle = seoRes.data.title
       if (seoRes.data.description) seoDesc = seoRes.data.description
@@ -105,7 +105,7 @@ export default async function HomePage() {
   let cmsLayout: CmsLayoutData | null = null
 
   try {
-    const layoutRes = await serverGet<any>('/homepage/layout', { revalidate: 60 })
+    const layoutRes = await serverGet<any>('/homepage/layout', { revalidate: 0 })
     if (layoutRes) {
       cmsLayout = layoutRes.data ? layoutRes.data : layoutRes
     }

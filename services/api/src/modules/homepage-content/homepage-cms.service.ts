@@ -371,21 +371,16 @@ export class HomepageCmsService {
   // ─── Public Layout Aggregator ───────────────────────────────────────────────
 
   async getPublicLayout() {
-    const now = new Date();
-
-    // 1. Fetch Active Hero Banners
+    // 1. Fetch Active Hero Banners (all published & non-deleted)
     const heroBanners = await this.prisma.heroBanner.findMany({
       where: {
         status: 'published',
         deletedAt: null,
-        OR: [
-          { publishAt: null, unpublishAt: null },
-          { publishAt: { lte: now }, unpublishAt: null },
-          { publishAt: null, unpublishAt: { gte: now } },
-          { publishAt: { lte: now }, unpublishAt: { gte: now } },
-        ],
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     // 2. Fetch Ordered Active Sections

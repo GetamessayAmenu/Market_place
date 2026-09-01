@@ -59,9 +59,7 @@ const accountItems: SidebarItem[] = [
   { label: 'Saved Items', href: '/dashboard/saved', icon: <IconStore />, section: 'Account' },
   { label: 'Following', href: '/account/following', icon: <IconStore />, section: 'Account' },
   { label: 'Notifications', href: '/dashboard/notifications', icon: <IconMessages />, section: 'Account' },
-  { label: 'Profile', href: '/dashboard/profile', icon: <IconStore />, section: 'Account' },
-  { label: 'Settings', href: '/dashboard/settings/account', icon: <IconDashboard />, section: 'Account' },
-  { label: 'Security', href: '/dashboard/settings/security', icon: <IconDashboard />, section: 'Account' },
+  { label: 'Settings', href: '/seller/settings', icon: <IconDashboard />, section: 'Account' },
 ];
 
 /* ── Badge ─────────────────────────────────────────────────────────────────── */

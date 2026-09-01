@@ -9,6 +9,7 @@ interface ContactSellerButtonProps {
   listingId: string;
   isOwner?: boolean;
   className?: string;
+  customStarterMessage?: string;
 }
 
 export default function ContactSellerButton({
@@ -16,6 +17,7 @@ export default function ContactSellerButton({
   listingId,
   isOwner,
   className,
+  customStarterMessage,
 }: ContactSellerButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,8 @@ export default function ContactSellerButton({
         throw new Error('Conversation could not be initialized');
       }
 
-      const starterMsg = encodeURIComponent('Hi, is this item still available?');
+      const starterText = customStarterMessage || "Hi, I'm interested in this item. Is it still available?";
+      const starterMsg = encodeURIComponent(starterText);
       router.push(`/dashboard/messages?conversation=${convId}&starter=${starterMsg}`);
     } catch (err: any) {
       const status = err?.response?.status;
@@ -64,7 +67,7 @@ export default function ContactSellerButton({
       type="button"
       onClick={handleClick}
       disabled={loading}
-      className={className || "flex items-center justify-center gap-2 w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"}
+      className={className || "flex items-center justify-center gap-2 w-full rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] shadow-sm"}
     >
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

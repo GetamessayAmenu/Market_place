@@ -55,11 +55,7 @@ const IconBell = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
   </svg>
 );
-const IconUser = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-  </svg>
-);
+
 const IconCog = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -94,9 +90,7 @@ const defaultItems: SidebarItem[] = [
   { label: 'Saved Items', href: '/dashboard/saved', icon: <IconHeart />, section: 'Account' },
   { label: 'Following', href: '/account/following', icon: <IconUsers />, section: 'Account' },
   { label: 'Notifications', href: '/dashboard/notifications', icon: <IconBell />, section: 'Account' },
-  { label: 'Profile', href: '/dashboard/profile', icon: <IconUser />, section: 'Account' },
-  { label: 'Settings', href: '/dashboard/settings/account', icon: <IconCog />, section: 'Account' },
-  { label: 'Security', href: '/dashboard/settings/security', icon: <IconShield />, section: 'Account' },
+  { label: 'Settings', href: '/dashboard/settings', icon: <IconCog />, section: 'Account' },
 ];
 
 /* ── Badge ─────────────────────────────────────────────────────────────────── */

@@ -1,17 +1,14 @@
 import React from 'react'
 
 import SellerSidebar from '../../components/seller/SellerSidebar'
-import SellerHeader from '../../components/seller/SellerHeader'
 import SellerBottomNav from '../../components/seller/SellerBottomNav'
 
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
-      <SellerHeader />
-
       {/* Sidebar + Main Content */}
       <div className="flex flex-1 overflow-hidden">
+
         {/* Sidebar (Desktop) */}
         <SellerSidebar />
 

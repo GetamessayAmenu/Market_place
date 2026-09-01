@@ -41,7 +41,13 @@ export interface ChatListing {
   currency?: string;
   status?: string;
   images?: { url: string; cloudinaryPublicId?: string }[];
+  availableForRent?: boolean;
+  customOrderAvailable?: boolean;
+  rentalPricePerDay?: number | string;
+  supportsCustomDesign?: boolean;
+  startingCustomPrice?: number | string;
 }
+
 
 export interface ChatOrder {
   id: string;

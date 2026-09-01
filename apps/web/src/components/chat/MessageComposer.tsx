@@ -16,22 +16,30 @@ interface MessageComposerProps {
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
+  initialText?: string;
 }
 
-const COMMON_EMOJIS = ['😊', '🙏', '✨', '👗', '📏', '👍', '❤️', '🚚', '📦', '💯'];
+const COMMON_EMOJIS = ['😊', '🙏', '✨', '👗', '📏', '👍', '❤️', '🚚', '📦', '💯', '💵', '🤝'];
 
 export default function MessageComposer({
   onSend,
   onTyping,
   disabled,
   placeholder = 'Type a message...',
+  initialText = '',
 }: MessageComposerProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showEmoji, setShowEmoji] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
+
+  useEffect(() => {
+    if (initialText) {
+      setText(initialText);
+    }
+  }, [initialText]);
 
   const emitTyping = useCallback(
     (typing: boolean) => {
@@ -106,7 +114,7 @@ export default function MessageComposer({
           )
         );
       } catch (err) {
-        // Fallback to local Object URL preview so photo attachment never fails
+        // Fallback to local Object URL preview so attachment sending never fails
         const objectUrl = URL.createObjectURL(file);
         setAttachments((prev) =>
           prev.map((att) =>
@@ -162,10 +170,10 @@ export default function MessageComposer({
 
   return (
     <div className="border-t bg-background p-3 relative">
-      <div className="max-w-2xl mx-auto w-full">
+      <div className="w-full">
         {/* Emoji Picker Popup */}
         {showEmoji && (
-          <div className="absolute bottom-16 left-4 z-20 flex gap-2 rounded-lg border bg-popover p-2 shadow-lg">
+          <div className="absolute bottom-16 left-4 z-20 flex flex-wrap gap-2 max-w-xs rounded-xl border bg-popover p-2.5 shadow-xl backdrop-blur">
             {COMMON_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
@@ -184,15 +192,10 @@ export default function MessageComposer({
           <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
             {attachments.map((att, idx) => (
               <div key={idx} className="relative group shrink-0">
-                <img src={att.url} alt={att.name} className="h-14 w-14 rounded-md object-cover border" />
+                <img src={att.url} alt={att.name} className="h-14 w-14 rounded-lg object-cover border" />
                 {att.uploading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                )}
-                {att.error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/80 rounded-md text-[10px] text-white font-bold">
-                    Failed
                   </div>
                 )}
                 <button
@@ -207,9 +210,8 @@ export default function MessageComposer({
           </div>
         )}
 
-        {/* Main Composer Controls */}
+        {/* Composer Controls */}
         <div className="flex items-end gap-2">
-          {/* Hidden File Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -219,30 +221,28 @@ export default function MessageComposer({
             className="hidden"
           />
 
-          {/* Action Buttons: Attachment & Emoji */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors shrink-0"
+            className="p-2 text-muted-foreground hover:text-primary rounded-xl hover:bg-muted transition-colors shrink-0"
             title="Attach Image"
             disabled={disabled}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94a3 3 0 114.243 4.243L8.587 18.292a1.5 1.5 0 01-2.122-2.122l8.74-8.74" />
             </svg>
           </button>
 
           <button
             type="button"
             onClick={() => setShowEmoji((v) => !v)}
-            className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors shrink-0"
+            className="p-2 text-muted-foreground hover:text-primary rounded-xl hover:bg-muted transition-colors shrink-0"
             title="Insert Emoji"
             disabled={disabled}
           >
             <span className="text-base leading-none">😊</span>
           </button>
 
-          {/* Text Input */}
           <div className="flex-1">
             <textarea
               value={text}
@@ -251,21 +251,21 @@ export default function MessageComposer({
               placeholder={placeholder}
               rows={1}
               maxLength={4000}
-              className="w-full resize-none rounded-xl border bg-muted/40 px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary min-h-[38px] max-h-[120px]"
+              className="w-full resize-none rounded-xl border bg-muted/30 px-3.5 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary min-h-[38px] max-h-[120px]"
               disabled={disabled}
             />
           </div>
 
-          {/* Send Button */}
           <Button
             size="sm"
             onClick={handleSend}
             disabled={!canSend}
-            className="shrink-0 rounded-xl h-[38px] px-3.5"
+            className="shrink-0 rounded-xl h-[38px] px-4 font-bold"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
             </svg>
+            Send
           </Button>
         </div>
       </div>

@@ -9,6 +9,7 @@ export interface AuthUser {
   avatarUrl: string | null
   emailVerified: boolean
   phoneVerified: boolean
+  phone?: string
 }
 
 interface AuthState {

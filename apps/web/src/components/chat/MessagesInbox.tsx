@@ -1,6 +1,6 @@
 "use client"
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import React from 'react';
 
 import type { ChatConversation } from '../../lib/chatApi';
 import ConversationList from '../chat/ConversationList';
@@ -21,9 +21,9 @@ export default function MessagesInbox({
   selectedId,
 }: MessagesInboxProps) {
   const router = useRouter();
-  const [typingUserIds] = useState<Set<string>>(new Set());
 
   const handleSelect = (conv: ChatConversation) => {
+
     router.push(`/dashboard/messages/${conv.id}`);
   };
 
@@ -33,7 +33,7 @@ export default function MessagesInbox({
       currentUserId={currentUserId}
       {...(selectedId !== undefined ? { selectedId } : {})}
       onSelect={handleSelect}
-      typingUserIds={typingUserIds}
     />
+
   );
 }
