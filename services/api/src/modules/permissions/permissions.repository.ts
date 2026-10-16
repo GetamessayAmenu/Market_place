@@ -14,4 +14,10 @@ export class PermissionsRepository {
     });
     return rows.map((row) => row.permission);
   }
+
+  async findAll(): Promise<Permission[]> {
+    return this.prisma.permission.findMany({
+      orderBy: [{ resource: 'asc' }, { action: 'asc' }],
+    });
+  }
 }

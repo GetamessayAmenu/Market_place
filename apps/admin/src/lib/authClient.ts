@@ -31,7 +31,19 @@ export async function me(): Promise<AuthUser> {
 }
 
 export async function logout(): Promise<LogoutResponse> {
-  return clientPost<LogoutResponse>('/auth/logout')
+  try {
+    const response = await clientPost<LogoutResponse>('/auth/logout')
+    return response
+  } catch (err) {
+    console.warn('Backend logout call completed with warning:', err)
+    return { success: true }
+  } finally {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('admin_access_token')
+      document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      document.cookie = 'refresh_token=; path=/api/v1/auth; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    }
+  }
 }
 
 export default { login, me, logout }

@@ -3,6 +3,8 @@ import Link from 'next/link'
 import React, { useState } from 'react'
 
 import { Dropdown, Input } from '@marketplace/ui'
+import { logout } from '../lib/authClient'
+import { usePermissions } from '../hooks/usePermissions'
 
 interface AdminHeaderProps {
   onMobileMenuToggle: () => void
@@ -16,13 +18,15 @@ const notifications = [
 ]
 
 const profileActions = [
-  { label: 'My profile', value: 'profile' },
-  { label: 'Account settings', value: 'settings' },
+  { label: 'Admin Management', value: 'profile' },
+  { label: 'Settings & Flags', value: 'settings' },
   { label: 'Sign out', value: 'signout', destructive: true },
 ]
 
 export default function AdminHeader({ onMobileMenuToggle }: AdminHeaderProps) {
   const [search, setSearch] = useState('')
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { isSuperAdmin, user } = usePermissions()
 
   const handleNotificationSelect = (value: string) => {
     if (value === 'view-all') {
@@ -30,9 +34,25 @@ export default function AdminHeader({ onMobileMenuToggle }: AdminHeaderProps) {
     }
   }
 
-  const handleProfileSelect = (value: string) => {
-    if (value === 'signout') {
-      window.location.href = '/'
+  const handleProfileSelect = async (value: string) => {
+    if (value === 'profile') {
+      window.location.href = '/admin/admin-management'
+    } else if (value === 'settings') {
+      window.location.href = '/admin/settings'
+    } else if (value === 'signout') {
+      setIsLoggingOut(true)
+      try {
+        await logout()
+      } catch (err) {
+        console.warn('Sign out error:', err)
+      } finally {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('admin_access_token')
+          document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+          document.cookie = 'refresh_token=; path=/api/v1/auth; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+          window.location.href = '/login'
+        }
+      }
     }
   }
 
@@ -106,11 +126,16 @@ export default function AdminHeader({ onMobileMenuToggle }: AdminHeaderProps) {
                 type="button"
                 className="inline-flex items-center gap-2 rounded-2xl border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:border-border hover:bg-muted"
                 aria-label="Open profile menu"
+                disabled={isLoggingOut}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <span className="text-sm font-semibold">A</span>
+                  <span className="text-xs font-bold tracking-tight">
+                    {isSuperAdmin ? 'SA' : (user?.displayName?.charAt(0) || 'A')}
+                  </span>
                 </span>
-                <span className="hidden sm:inline">Admin</span>
+                <span className="hidden sm:inline font-medium">
+                  {isLoggingOut ? 'Signing out...' : isSuperAdmin ? 'Super Admin' : (user?.displayName || 'Admin')}
+                </span>
               </button>
             }
             items={profileActions}

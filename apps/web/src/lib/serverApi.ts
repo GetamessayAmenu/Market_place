@@ -1,4 +1,12 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1'
+function getApiBase(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+  const trimmed = envUrl.replace(/\/+$/, '')
+  if (trimmed.endsWith('/api/v1')) return trimmed
+  if (trimmed.endsWith('/api')) return `${trimmed}/v1`
+  return `${trimmed}/api/v1`
+}
+
+const API_BASE = getApiBase()
 
 interface ServerGetOptions {
   revalidate?: number

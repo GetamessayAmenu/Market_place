@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { UserStatus } from '@prisma/client';
 
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import type { UserWithRole } from '../users/users.repository';
+import { USER_WITH_ROLE_INCLUDE, type UserWithRole } from '../users/users.repository';
 
 @Injectable()
 export class AuthRepository {
@@ -39,7 +39,7 @@ export class AuthRepository {
         ...(params.phone !== undefined ? { phone: params.phone } : {}),
         status: params.status ?? 'pending_verification',
       },
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 

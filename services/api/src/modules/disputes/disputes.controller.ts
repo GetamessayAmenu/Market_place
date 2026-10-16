@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { CreateDisputeCommentDto } from './dto/create-dispute-comment.dto';
@@ -21,6 +23,8 @@ import { AssignDisputeDto, EscalateDisputeDto, ReopenDisputeDto, RequestInfoDisp
 import { UpdateDisputeDto } from './dto/update-dispute.dto';
 import { TakeDisputeActionDto } from './dto/dispute-action.dto';
 import { DisputesService } from './disputes.service';
+
+const DISPUTE_ADMIN_ROLES = ['super_admin', 'platform_admin', 'admin', 'moderator', 'support'] as const;
 
 @Controller('disputes')
 export class DisputesController {
@@ -41,16 +45,18 @@ export class DisputesController {
   }
 
   /** Admin list disputes with full filters and search */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.view')
   @Get('admin/list')
   findAllAdmin(@Query() query: DisputeQueryDto) {
     return this.disputesService.findAll(query);
   }
 
   /** Admin stats overview */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.view')
   @Get('admin/stats')
   getDashboardStats() {
     return this.disputesService.getDashboardStats();
@@ -82,16 +88,18 @@ export class DisputesController {
   }
 
   /** Update dispute details */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id')
   update(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateDisputeDto) {
     return this.disputesService.update(user, id, dto);
   }
 
   /** Assign/reassign dispute to admin */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/assign')
   assignAdmin(
     @CurrentUser() user: AuthenticatedUser,
@@ -102,16 +110,18 @@ export class DisputesController {
   }
 
   /** Update dispute status */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/status')
   updateStatus(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body('status') status: string) {
     return this.disputesService.updateStatus(user, id, status);
   }
 
   /** Request information from reporter/respondent */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Post(':id/request-info')
   requestInformation(
     @CurrentUser() user: AuthenticatedUser,
@@ -122,32 +132,36 @@ export class DisputesController {
   }
 
   /** Resolve dispute with outcome and reason */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/resolve')
   resolve(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: ResolveDisputeDto) {
     return this.disputesService.resolve(user, id, dto);
   }
 
   /** Escalate dispute */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/escalate')
   escalate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: EscalateDisputeDto) {
     return this.disputesService.escalate(user, id, dto);
   }
 
   /** Close dispute */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/close')
   close(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.disputesService.close(user, id);
   }
 
   /** Reopen dispute */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Patch(':id/reopen')
   reopen(
     @CurrentUser() user: AuthenticatedUser,
@@ -158,8 +172,9 @@ export class DisputesController {
   }
 
   /** Take administrative moderation action on user/listing from dispute */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('super_admin', 'admin', 'moderator')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles(...DISPUTE_ADMIN_ROLES)
+  @RequirePermission('disputes.manage')
   @Post(':id/action')
   takeAction(
     @CurrentUser() user: AuthenticatedUser,

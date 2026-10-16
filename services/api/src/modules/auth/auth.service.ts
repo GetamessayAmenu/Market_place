@@ -42,6 +42,11 @@ import { hashPassword, verifyPassword } from './utils/password.util';
 import { parseDurationToMs } from './utils/token.util';
 import { VerificationService } from './verification/verification.service';
 
+import { UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { SecurityEventsService } from '../security-events/security-events.service';
+import { MfaService } from './mfa/mfa.service';
+
 export interface RequestContext {
   readonly ipAddress?: string;
   readonly userAgent?: string;
@@ -59,6 +64,9 @@ export class AuthService {
     private readonly verificationService: VerificationService,
     private readonly config: ApiConfigService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
+    private readonly mfaService: MfaService,
+    private readonly securityEventsService: SecurityEventsService,
   ) {}
 
   async register(dto: RegisterDto, ctx: RequestContext, res: Response): Promise<AuthResponseDto> {
@@ -90,6 +98,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ctx: RequestContext, res: Response): Promise<AuthResponseDto> {
+    if (dto.mfaTicket) {
+      return this.verifyMfaLogin(dto.mfaTicket, dto.mfaCode || '', ctx, res);
+    }
+
     const user = await this.usersRepository.findByEmail(dto.email);
     if (!user) {
       throw new InvalidCredentialsException();
@@ -97,13 +109,179 @@ export class AuthService {
 
     this.assertAccountActive(user.status);
 
+    const isAdmin =
+      user.role.slug === 'super_admin' ||
+      user.role.slug === 'platform_admin' ||
+      user.role.slug === 'admin' ||
+      user.role.slug === 'moderator' ||
+      user.role.slug === 'content_manager' ||
+      (user.userRoles && user.userRoles.length > 0);
+
+    // Check account lockout
+    if (user.adminProfile?.lockedUntil && new Date(user.adminProfile.lockedUntil) > new Date()) {
+      await this.securityEventsService.recordEvent({
+        eventType: 'SUSPICIOUS_LOGIN_BLOCKED',
+        severity: 'WARNING',
+        actorId: user.id,
+        targetUserId: user.id,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+        details: { reason: 'Account temporarily locked', lockedUntil: user.adminProfile.lockedUntil },
+        status: 'FAILURE',
+      });
+      throw new UnauthorizedException('Account is temporarily locked due to multiple failed login attempts. Please try again later.');
+    }
+
     const valid = await verifyPassword(dto.password, user.passwordHash);
     if (!valid) {
+      if (isAdmin) {
+        const attempts = (user.adminProfile?.failedLoginAttempts ?? 0) + 1;
+        const isLockout = attempts >= 5;
+        const lockedUntil = isLockout ? new Date(Date.now() + 15 * 60 * 1000) : null;
+
+        await this.prisma.adminProfile.upsert({
+          where: { userId: user.id },
+          update: {
+            failedLoginAttempts: { increment: 1 },
+            ...(isLockout ? { lockedUntil } : {}),
+          },
+          create: {
+            userId: user.id,
+            failedLoginAttempts: 1,
+            ...(isLockout ? { lockedUntil } : {}),
+          },
+        });
+
+        await this.securityEventsService.recordEvent({
+          eventType: isLockout ? 'ACCOUNT_LOCKED' : 'ADMIN_LOGIN_FAILED',
+          severity: isLockout ? 'CRITICAL' : 'WARNING',
+          actorId: user.id,
+          targetUserId: user.id,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+          details: { attempt: attempts, isLockout },
+          status: 'FAILURE',
+        });
+      }
       throw new InvalidCredentialsException();
     }
 
-    await this.usersRepository.updateLastLogin(user.id);
+    // Password valid; clear failed login attempts if any
+    if (user.adminProfile?.failedLoginAttempts && user.adminProfile.failedLoginAttempts > 0) {
+      await this.prisma.adminProfile.update({
+        where: { userId: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+    }
 
+    const mfaSetting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'mfa_enforced_for_admins' },
+    });
+    const systemMfaEnforced =
+      mfaSetting?.value &&
+      typeof mfaSetting.value === 'object' &&
+      (mfaSetting.value as { enabled?: boolean }).enabled === true;
+
+    const mfaRequired =
+      user.adminProfile?.mfaEnabled === true ||
+      (systemMfaEnforced && user.adminProfile?.mfaEnforced === true);
+
+    if (mfaRequired) {
+      if (dto.mfaCode) {
+        const isValidMfa = await this.mfaService.verifyMfa(
+          user.id,
+          dto.mfaCode,
+          ctx.ipAddress,
+          ctx.userAgent,
+        );
+        if (!isValidMfa) {
+          throw new UnauthorizedException('Invalid two-factor authentication code or recovery code.');
+        }
+
+        await this.securityEventsService.recordEvent({
+          eventType: 'ADMIN_LOGIN_SUCCESS',
+          severity: 'INFO',
+          actorId: user.id,
+          targetUserId: user.id,
+          ipAddress: ctx.ipAddress,
+          userAgent: ctx.userAgent,
+          details: { method: 'password+mfa' },
+          status: 'SUCCESS',
+        });
+
+        await this.usersRepository.updateLastLogin(user.id);
+        return this.issueAuthResponse(user, ctx, res);
+      }
+
+      // MFA required but no code provided: issue challenge ticket
+      const mfaTicket = randomBytes(32).toString('hex');
+      await this.redis.setex(`auth:mfa:ticket:${mfaTicket}`, 300, JSON.stringify({ userId: user.id }));
+
+      return {
+        mfaRequired: true,
+        mfaTicket,
+      };
+    }
+
+    if (isAdmin) {
+      await this.securityEventsService.recordEvent({
+        eventType: 'ADMIN_LOGIN_SUCCESS',
+        severity: 'INFO',
+        actorId: user.id,
+        targetUserId: user.id,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+        details: { method: 'password' },
+        status: 'SUCCESS',
+      });
+    }
+
+    await this.usersRepository.updateLastLogin(user.id);
+    return this.issueAuthResponse(user, ctx, res);
+  }
+
+  async verifyMfaLogin(
+    ticket: string,
+    code: string,
+    ctx: RequestContext,
+    res: Response,
+  ): Promise<AuthResponseDto> {
+    if (!ticket || !code) {
+      throw new UnauthorizedException('MFA ticket and code are required.');
+    }
+
+    const key = `auth:mfa:ticket:${ticket}`;
+    const raw = await this.redis.get(key);
+    if (!raw) {
+      throw new UnauthorizedException('Two-factor authentication session expired. Please sign in again.');
+    }
+
+    const { userId } = JSON.parse(raw) as { userId: string };
+    const isValid = await this.mfaService.verifyMfa(userId, code, ctx.ipAddress, ctx.userAgent);
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid two-factor authentication code or recovery code.');
+    }
+
+    await this.redis.del(key);
+
+    const user = await this.usersRepository.findActiveById(userId);
+    if (!user) {
+      throw new InvalidCredentialsException();
+    }
+    this.assertAccountActive(user.status);
+
+    await this.securityEventsService.recordEvent({
+      eventType: 'ADMIN_LOGIN_SUCCESS',
+      severity: 'INFO',
+      actorId: user.id,
+      targetUserId: user.id,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      details: { method: 'mfa_ticket' },
+      status: 'SUCCESS',
+    });
+
+    await this.usersRepository.updateLastLogin(user.id);
     return this.issueAuthResponse(user, ctx, res);
   }
 
@@ -140,8 +318,10 @@ export class AuthService {
 
     this.setAuthCookies(res, signed.accessToken, rotated.refreshToken);
 
+    const permissions = await this.usersService.getUserPermissionStrings(user);
+
     return {
-      user: this.usersService.toAuthUser(user),
+      user: this.usersService.toAuthUser(user, permissions),
       tokens: {
         accessToken: signed.accessToken,
         expiresIn: signed.expiresIn,
@@ -150,12 +330,18 @@ export class AuthService {
   }
 
   async logout(
-    user: AuthenticatedUser,
+    user: AuthenticatedUser | undefined,
     res: Response,
     accessToken?: string,
   ): Promise<{ readonly success: true }> {
-    const session = await this.sessionsService.assertSessionActive(user.sessionId);
-    await this.sessionsService.invalidateSession(session);
+    if (user?.sessionId) {
+      try {
+        const session = await this.sessionsService.assertSessionActive(user.sessionId);
+        await this.sessionsService.invalidateSession(session);
+      } catch {
+        // Session may already be expired or deleted, proceed with cleanup
+      }
+    }
 
     if (accessToken) {
       try {
@@ -175,7 +361,8 @@ export class AuthService {
     if (!user) {
       throw new InvalidCredentialsException('User not found');
     }
-    return this.usersService.toAuthUser(user);
+    const permissions = await this.usersService.getUserPermissionStrings(user);
+    return this.usersService.toAuthUser(user, permissions);
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ readonly success: true }> {
@@ -260,8 +447,10 @@ export class AuthService {
 
     this.setAuthCookies(res, signed.accessToken, session.refreshToken);
 
+    const permissions = await this.usersService.getUserPermissionStrings(user);
+
     const base: AuthResponseDto = {
-      user: this.usersService.toAuthUser(user),
+      user: this.usersService.toAuthUser(user, permissions),
       tokens: {
         accessToken: signed.accessToken,
         expiresIn: signed.expiresIn,

@@ -49,21 +49,67 @@ export class UsersService {
   }
 
   async toAuthenticatedUser(user: UserWithRole): Promise<AuthenticatedUserPayload> {
-    const permissions = await this.permissionsService.getPermissionsForRole(user.roleId);
+    const roleIds = [user.roleId, ...(user.userRoles?.map((ur) => ur.roleId) ?? [])];
+    const uniqueRoleIds = Array.from(new Set(roleIds));
+
+    const permissionLists = await Promise.all(
+      uniqueRoleIds.map((rId) => this.permissionsService.getPermissionsForRole(rId)),
+    );
+    const allPermissions = permissionLists.flat();
+    const seen = new Set<string>();
+    const permissions = allPermissions.filter((p) => {
+      const key = `${p.resource}.${p.action}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const roles = Array.from(
+      new Set([user.role.slug, ...(user.userRoles?.map((ur) => ur.role.slug) ?? [])]),
+    ) as UserRole[];
+
+    const isSuperAdmin = roles.includes('super_admin');
+
     return {
       id: user.id,
       email: user.email,
       role: user.role.slug as UserRole,
+      roles,
       permissions,
       status: user.status,
+      isSuperAdmin,
+      mfaEnabled: user.adminProfile?.mfaEnabled ?? false,
+      displayName: user.displayName,
     };
   }
 
-  toAuthUser(user: UserWithRole): AuthUser {
+  async getUserPermissionStrings(user: UserWithRole): Promise<string[]> {
+    const roleIds = [user.roleId, ...(user.userRoles?.map((ur) => ur.roleId) ?? [])];
+    const uniqueRoleIds = Array.from(new Set(roleIds));
+    const permissionLists = await Promise.all(
+      uniqueRoleIds.map((rId) => this.permissionsService.getPermissionsForRole(rId)),
+    );
+    const seen = new Set<string>();
+    permissionLists.flat().forEach((p) => {
+      seen.add(`${p.resource}.${p.action}`);
+      seen.add(`${p.resource}:${p.action}`);
+    });
+    return Array.from(seen);
+  }
+
+  toAuthUser(user: UserWithRole, permissionsList?: string[]): AuthUser {
+    const roles = Array.from(
+      new Set([user.role.slug, ...(user.userRoles?.map((ur) => ur.role.slug) ?? [])]),
+    ) as UserRole[];
+
     return {
       id: user.id,
       email: user.email,
       role: user.role.slug as AuthUser['role'],
+      roles,
+      ...(permissionsList !== undefined ? { permissions: permissionsList } : {}),
+      isSuperAdmin: roles.includes('super_admin'),
+      mfaEnabled: user.adminProfile?.mfaEnabled ?? false,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       emailVerified: user.emailVerifiedAt !== null,

@@ -5,7 +5,7 @@ export function useSocket() {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3001'
+    const url = process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3002'
     const token = typeof window !== 'undefined' ? localStorage.getItem('admin_access_token') : null
 
     const socket = io(url, { 

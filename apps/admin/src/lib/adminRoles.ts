@@ -1,4 +1,11 @@
-export const ADMIN_ROLES = ['admin', 'super_admin', 'moderator', 'support'] as const;
+export const ADMIN_ROLES = [
+  'super_admin',
+  'platform_admin',
+  'admin',
+  'moderator',
+  'content_manager',
+  'support',
+] as const;
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
@@ -8,6 +15,9 @@ export interface AdminUser {
   displayName?: string;
   role: string;
   roles?: string[];
+  permissions?: string[];
+  isSuperAdmin?: boolean;
+  mfaEnabled?: boolean;
 }
 
 export function isAdminRole(role: string | undefined): role is AdminRole {

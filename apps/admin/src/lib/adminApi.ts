@@ -2168,3 +2168,255 @@ export async function fetchAdminDashboardRecentActivity(limit = 10): Promise<Aud
   return []
 }
 
+// ─── Admin Management, Roles, Permissions, Security Events, System Settings ──
+
+export interface AdminUserDetail {
+  id: string
+  email: string
+  displayName: string
+  avatarUrl: string | null
+  status: string
+  role: string
+  roles: string[]
+  isSuperAdmin: boolean
+  mfaEnabled: boolean
+  mfaEnforced: boolean
+  failedLoginAttempts: number
+  lockedUntil: string | null
+  lastLoginAt: string | null
+  createdAt: string
+  activeSessionsCount?: number
+  sessions?: {
+    sessionId: string
+    device?: string
+    createdAt: string
+    lastActiveAt: string
+  }[]
+}
+
+export interface RoleDetail {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  isSystem: boolean
+  createdAt: string
+  updatedAt: string
+  permissions?: {
+    id: string
+    resource: string
+    action: string
+    description: string | null
+  }[]
+  usersCount?: number
+}
+
+export interface PermissionGroup {
+  resource: string
+  permissions: {
+    id: string
+    resource: string
+    action: string
+    description: string | null
+  }[]
+}
+
+export interface SecurityEventItem {
+  id: string
+  eventType: string
+  severity: 'INFO' | 'WARNING' | 'CRITICAL'
+  actorId?: string | null
+  targetUserId?: string | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  details?: Record<string, unknown> | null
+  status: string
+  createdAt: string
+  actor?: {
+    id: string
+    displayName: string
+    email: string
+    role?: { slug: string; name: string }
+  } | null
+  targetUser?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+}
+
+export interface SystemSettingItem {
+  id: string
+  key: string
+  value: any
+  group: string
+  description: string | null
+  isPublic: boolean
+  updatedAt: string
+  updatedBy?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+}
+
+export interface FeatureFlagItem {
+  id: string
+  key: string
+  name: string
+  enabled: boolean
+  group?: string
+  description: string | null
+  updatedAt: string
+  updatedBy?: {
+    id: string
+    displayName: string
+    email: string
+  } | null
+}
+
+export async function fetchAdminAccounts(query?: {
+  page?: number | undefined
+  limit?: number | undefined
+  search?: string | undefined
+  role?: string | undefined
+  status?: string | undefined
+}): Promise<PaginatedResponse<AdminUserDetail>> {
+  const qs = query ? buildQuery(query) : ''
+  return clientGet<PaginatedResponse<AdminUserDetail>>('/admin/admins' + qs)
+}
+
+export async function fetchAdminAccountDetail(id: string): Promise<AdminUserDetail> {
+  const res = await clientGet<{ success: boolean; data: AdminUserDetail } | AdminUserDetail>(`/admin/admins/${id}`)
+  return 'data' in res && res.data ? res.data : (res as AdminUserDetail)
+}
+
+export async function createAdminUser(payload: {
+  email: string
+  password: string
+  displayName: string
+  roleSlug: string
+  additionalRoleSlugs?: string[] | undefined
+  enforceMfa?: boolean | undefined
+}): Promise<AdminUserDetail> {
+  const res = await clientPost<{ success: boolean; data: AdminUserDetail } | AdminUserDetail>('/admin/admins', payload)
+  return 'data' in res && res.data ? res.data : (res as AdminUserDetail)
+}
+
+export async function updateAdminUserRoles(id: string, payload: {
+  roleSlug: string
+  additionalRoleSlugs?: string[] | undefined
+}): Promise<AdminUserDetail> {
+  const res = await clientPatch<{ success: boolean; data: AdminUserDetail } | AdminUserDetail>(`/admin/admins/${id}/roles`, payload)
+  return 'data' in res && res.data ? res.data : (res as AdminUserDetail)
+}
+
+export async function suspendAdminUser(id: string, payload: { reason: string }): Promise<{ success: boolean; message: string }> {
+  return clientPost<{ success: boolean; message: string }>(`/admin/admins/${id}/suspend`, payload)
+}
+
+export async function reactivateAdminUser(id: string): Promise<{ success: boolean; message: string }> {
+  return clientPost<{ success: boolean; message: string }>(`/admin/admins/${id}/reactivate`, {})
+}
+
+export async function revokeAdminUserSessions(id: string): Promise<{ success: boolean; message: string }> {
+  return clientPost<{ success: boolean; message: string }>(`/admin/admins/${id}/revoke-sessions`, {})
+}
+
+export async function resetAdminUserMfa(id: string, payload?: { reason?: string | undefined }): Promise<{
+  success: boolean
+  message: string
+  temporaryRecoveryCodes?: string[]
+}> {
+  return clientPost<{
+    success: boolean
+    message: string
+    temporaryRecoveryCodes?: string[]
+  }>(`/admin/admins/${id}/reset-mfa`, payload ?? {})
+}
+
+export async function fetchAdminSecurityHistory(id: string, query?: { page?: number | undefined; limit?: number | undefined }): Promise<PaginatedResponse<SecurityEventItem>> {
+  const qs = query ? buildQuery(query) : ''
+  return clientGet<PaginatedResponse<SecurityEventItem>>(`/admin/admins/${id}/security-history` + qs)
+}
+
+export async function fetchSecurityEvents(query?: {
+  page?: number | undefined
+  limit?: number | undefined
+  search?: string | undefined
+  eventType?: string | undefined
+  severity?: 'INFO' | 'WARNING' | 'CRITICAL' | undefined
+  status?: string | undefined
+}): Promise<PaginatedResponse<SecurityEventItem>> {
+  const qs = query ? buildQuery(query) : ''
+  return clientGet<PaginatedResponse<SecurityEventItem>>('/admin/security-events' + qs)
+}
+
+export async function fetchRoles(): Promise<RoleDetail[]> {
+  const res = await clientGet<{ success: boolean; data: RoleDetail[] } | RoleDetail[]>('/admin/roles')
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
+export async function fetchRole(id: string): Promise<RoleDetail> {
+  const res = await clientGet<{ success: boolean; data: RoleDetail } | RoleDetail>(`/admin/roles/${id}`)
+  return 'data' in res && res.data ? res.data : (res as RoleDetail)
+}
+
+export async function createRole(payload: {
+  name: string
+  slug: string
+  description?: string
+  permissionIds?: string[]
+}): Promise<RoleDetail> {
+  const res = await clientPost<{ success: boolean; data: RoleDetail } | RoleDetail>('/admin/roles', payload)
+  return 'data' in res && res.data ? res.data : (res as RoleDetail)
+}
+
+export async function updateRole(id: string, payload: {
+  name?: string
+  description?: string
+}): Promise<RoleDetail> {
+  const res = await clientPatch<{ success: boolean; data: RoleDetail } | RoleDetail>(`/admin/roles/${id}`, payload)
+  return 'data' in res && res.data ? res.data : (res as RoleDetail)
+}
+
+export async function syncRolePermissions(id: string, permissionIds: string[]): Promise<RoleDetail> {
+  const res = await clientPut<{ success: boolean; data: RoleDetail } | RoleDetail>(`/admin/roles/${id}/permissions`, { permissionIds })
+  return 'data' in res && res.data ? res.data : (res as RoleDetail)
+}
+
+export async function fetchAllPermissions(): Promise<PermissionGroup[]> {
+  const res = await clientGet<{ success: boolean; data: PermissionGroup[] } | PermissionGroup[]>('/admin/permissions?group=true')
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
+export async function fetchSystemSettings(group?: string): Promise<SystemSettingItem[]> {
+  const qs = group ? `?group=${encodeURIComponent(group)}` : ''
+  const res = await clientGet<{ success: boolean; data: SystemSettingItem[] } | SystemSettingItem[]>('/admin/settings' + qs)
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
+export async function updateSystemSetting(key: string, value: any): Promise<SystemSettingItem> {
+  const res = await clientPatch<{ success: boolean; data: SystemSettingItem } | SystemSettingItem>(`/admin/settings/${encodeURIComponent(key)}`, { value })
+  return 'data' in res && res.data ? res.data : (res as SystemSettingItem)
+}
+
+export async function fetchFeatureFlags(): Promise<FeatureFlagItem[]> {
+  const res = await clientGet<{ success: boolean; data: FeatureFlagItem[] } | FeatureFlagItem[]>('/admin/feature-flags')
+  if (Array.isArray(res)) return res
+  if ('data' in res && Array.isArray(res.data)) return res.data
+  return []
+}
+
+export async function updateFeatureFlag(key: string, enabled: boolean): Promise<FeatureFlagItem> {
+  const res = await clientPatch<{ success: boolean; data: FeatureFlagItem } | FeatureFlagItem>(`/admin/feature-flags/${encodeURIComponent(key)}`, { enabled })
+  return 'data' in res && res.data ? res.data : (res as FeatureFlagItem)
+}
+
+

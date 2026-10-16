@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
+import { Permissions, RequirePermission } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -48,24 +48,27 @@ export class ReportsController {
   }
 
   /** Admin/moderator: list all reports with filters */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles('admin', 'super_admin', 'platform_admin', 'moderator', 'support')
+  @RequirePermission('reports.view')
   @Get()
   findAll(@Query() query: ReportQueryDto) {
     return this.reportsService.findAll(query);
   }
 
   /** Admin/moderator: report status counts */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles('admin', 'super_admin', 'platform_admin', 'moderator', 'support')
+  @RequirePermission('reports.view')
   @Get('stats')
   getStats() {
     return this.reportsService.getStatusCounts();
   }
 
   /** Admin/moderator: view single report */
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'super_admin', 'moderator', 'support')
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+  @Roles('admin', 'super_admin', 'platform_admin', 'moderator', 'support')
+  @RequirePermission('reports.view')
   @Get(':id')
   findOne(
     @CurrentUser() user: AuthenticatedUser,

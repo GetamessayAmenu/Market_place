@@ -2,7 +2,6 @@ function getApiBase(): string {
   if (typeof window !== 'undefined') return '/api/v1'
   return (process.env.BACKEND_API_URL || 'http://localhost:3001') + '/api/v1'
 }
-let isAuthenticating = false
 
 async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = getApiBase() + path
@@ -20,45 +19,15 @@ async function clientFetch<T>(path: string, options?: RequestInit): Promise<T> {
     headers,
   })
 
-  // If unauthorized and not already authenticating/calling auth, try auto-login as seeded admin
-  if (res.status === 401 && !isAuthenticating && !path.includes('/auth/')) {
-    isAuthenticating = true
-    try {
-      console.log('Session unauthenticated or expired, attempting admin auto-login...')
-      const loginRes = await fetch(getApiBase() + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: 'admin@habesha.com', password: 'Test1234' }),
-      })
-
-      if (loginRes.ok) {
-        const loginData = await loginRes.json()
-        if (loginData.success && loginData.data?.tokens?.accessToken) {
-          const newToken = loginData.data.tokens.accessToken
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('admin_access_token', newToken)
-          }
-          headers['Authorization'] = `Bearer ${newToken}`
-          console.log('Admin auto-login successful, retrying request:', url)
-          res = await fetch(url, {
-            credentials: 'include',
-            ...options,
-            headers,
-          })
-        }
-      }
-    } catch (err) {
-      console.warn('Auto-login attempt failed:', err)
-    } finally {
-      isAuthenticating = false
-    }
-  }
-  
   if (!res.ok) {
     const errorText = await res.text()
     if (res.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('admin_access_token')
+      document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      document.cookie = 'refresh_token=; path=/api/v1/auth; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
     }
     console.error('Client API Error:', res.status, errorText)
     throw new Error(`API error ${res.status}: ${errorText || res.statusText}`)

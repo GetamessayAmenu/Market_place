@@ -146,4 +146,17 @@ export class SessionsService {
   async isAccessTokenBlacklisted(jti: string): Promise<boolean> {
     return this.sessionsRepository.isAccessTokenBlacklisted(jti);
   }
+
+  async getUserSessions(userId: string): Promise<SessionRecord[]> {
+    const sessionIds = await this.sessionsRepository.listUserSessionIds(userId);
+    const sessions = await Promise.all(
+      sessionIds.map((sid) => this.sessionsRepository.getSession(sid)),
+    );
+    return sessions.filter((s): s is SessionRecord => s !== null);
+  }
+
+  async getUserSessionCount(userId: string): Promise<number> {
+    const sessionIds = await this.sessionsRepository.listUserSessionIds(userId);
+    return sessionIds.length;
+  }
 }

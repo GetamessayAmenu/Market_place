@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -21,8 +21,8 @@ import { MessagingRestrictionsService } from './messaging-restrictions.service';
 import { MessagingRestrictionType } from '@prisma/client';
 
 @Controller('admin/chats')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'super_admin', 'moderator', 'support')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@Roles('admin', 'super_admin', 'platform_admin', 'moderator', 'support')
 export class AdminChatsController {
   constructor(
     private readonly adminChatsService: AdminChatsService,
@@ -30,16 +30,19 @@ export class AdminChatsController {
   ) {}
 
   @Get('metrics')
+  @RequirePermission('chat_reports.view')
   getMetrics() {
     return this.adminChatsService.getMetrics();
   }
 
   @Get('analytics')
+  @RequirePermission('chat_reports.view')
   getAnalyticsOverview() {
     return this.adminChatsService.getAnalyticsOverview();
   }
 
   @Get('search')
+  @RequirePermission('chat_reports.view')
   searchConversations(
     @Query('search') search?: string,
     @Query('conversationId') conversationId?: string,
@@ -65,23 +68,25 @@ export class AdminChatsController {
   }
 
   @Get('sellers/:sellerId/analytics')
+  @RequirePermission('chat_reports.view')
   getSellerAnalytics(@Param('sellerId') sellerId: string) {
     return this.adminChatsService.getSellerChatAnalytics(sellerId);
   }
 
   @Get('listings/:listingId/analytics')
+  @RequirePermission('chat_reports.view')
   getListingAnalytics(@Param('listingId') listingId: string) {
     return this.adminChatsService.getListingChatAnalytics(listingId);
   }
 
   @Get('users/:userId/activity')
+  @RequirePermission('chat_reports.view')
   getUserChatActivity(@Param('userId') userId: string) {
     return this.adminChatsService.getUserChatActivity(userId);
   }
 
   @Post('users/:userId/restrict')
-  @UseGuards(PermissionsGuard)
-  @Permissions({ resource: 'user', action: 'suspend' })
+  @RequirePermission('chat_reports.manage')
   restrictUser(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('userId') userId: string,
@@ -97,8 +102,7 @@ export class AdminChatsController {
   }
 
   @Delete('users/:userId/restrict/:restrictionId')
-  @UseGuards(PermissionsGuard)
-  @Permissions({ resource: 'user', action: 'suspend' })
+  @RequirePermission('chat_reports.manage')
   liftRestriction(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('userId') userId: string,
@@ -108,8 +112,7 @@ export class AdminChatsController {
   }
 
   @Post('messages/:messageId/remove')
-  @UseGuards(PermissionsGuard)
-  @Permissions({ resource: 'conversation', action: 'moderate' })
+  @RequirePermission('chat_reports.manage')
   removeMessage(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('messageId') messageId: string,

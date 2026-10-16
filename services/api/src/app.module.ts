@@ -35,6 +35,10 @@ import { SellerModule } from './modules/seller/seller.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminChatsModule } from './modules/admin-chats/admin-chats.module';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
+import { AuthorizationModule } from './modules/authorization/authorization.module';
+import { SecurityEventsModule } from './modules/security-events/security-events.module';
+import { AdminManagementModule } from './modules/admin-management/admin-management.module';
+import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
 
 @Module({
   imports: [
@@ -65,6 +69,10 @@ import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.
     ChatModule,
     AdminChatsModule,
     AdminDashboardModule,
+    AuthorizationModule,
+    SecurityEventsModule,
+    AdminManagementModule,
+    SystemSettingsModule,
   ],
   controllers: [AppController, AdminLogsController, AdminCategoriesController],
   providers: [

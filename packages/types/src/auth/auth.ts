@@ -14,6 +14,10 @@ export interface AuthUser {
   readonly id: string;
   readonly email: string;
   readonly role: UserRole;
+  readonly roles?: string[];
+  readonly permissions?: string[];
+  readonly isSuperAdmin?: boolean;
+  readonly mfaEnabled?: boolean;
   readonly displayName: string;
   readonly avatarUrl: string | null;
   readonly emailVerified: boolean;

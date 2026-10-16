@@ -1,4 +1,4 @@
-import { Inter, Playfair_Display } from 'next/font/google'
+import localFont from 'next/font/local'
 import React from 'react'
 
 import '../styles/globals.css'
@@ -6,16 +6,15 @@ import '../styles/globals.css'
 import PublicLayout from '../components/layouts/PublicLayout'
 import Providers from '../providers/Providers'
 
-const inter = Inter({
-  subsets: ['latin'],
+const inter = localFont({
+  src: '../fonts/Inter-Variable.woff2',
   display: 'swap',
   variable: '--font-body',
 })
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
+const playfair = localFont({
+  src: '../fonts/PlayfairDisplay-Variable.woff2',
   display: 'swap',
-  weight: ['400', '500', '600', '700'],
   variable: '--font-display',
 })
 

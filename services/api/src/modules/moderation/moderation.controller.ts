@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { BulkModerationActionDto } from './dto/moderation-action.dto';
@@ -17,32 +19,37 @@ import { ModerationService } from './moderation.service';
  * Allows moderators to moderate reviews, images, and other content.
  */
 @Controller('admin/moderation')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'super_admin', 'moderator', 'support')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@Roles('admin', 'super_admin', 'platform_admin', 'moderator', 'support')
 export class ModerationController {
   constructor(private readonly moderationService: ModerationService) {}
 
   @Get()
+  @RequirePermission('reports.view')
   findAll(@Query() query: ModerationQueryDto) {
     return this.moderationService.findAll(query);
   }
 
   @Get('stats')
+  @RequirePermission('reports.view')
   getStats() {
     return this.moderationService.getStats();
   }
 
   @Get(':id')
+  @RequirePermission('reports.view')
   findOne(@Param('id') id: string) {
     return this.moderationService.findOne(id);
   }
 
   @Get(':id/history')
+  @RequirePermission('reports.view')
   getHistory(@Param('id') id: string) {
     return this.moderationService.getModerationHistory(id);
   }
 
   @Post('bulk-action')
+  @RequirePermission('reports.manage')
   bulkAction(
     @Body() dto: BulkModerationActionDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -51,6 +58,7 @@ export class ModerationController {
   }
 
   @Post('review/:reviewId')
+  @RequirePermission('reports.manage')
   moderateReview(
     @Param('reviewId') reviewId: string,
     @Body() dto: ReviewModerationDto,
@@ -60,6 +68,7 @@ export class ModerationController {
   }
 
   @Post(':id/approve')
+  @RequirePermission('reports.manage')
   approve(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -68,6 +77,7 @@ export class ModerationController {
   }
 
   @Post(':id/reject')
+  @RequirePermission('reports.manage')
   reject(
     @Param('id') id: string,
     @Body() dto: ModerationActionDto,
@@ -77,6 +87,7 @@ export class ModerationController {
   }
 
   @Post(':id/restore')
+  @RequirePermission('reports.manage')
   restore(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -85,6 +96,7 @@ export class ModerationController {
   }
 
   @Delete(':id')
+  @RequirePermission('reports.manage')
   delete(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -93,6 +105,7 @@ export class ModerationController {
   }
 
   @Patch(':id/spam')
+  @RequirePermission('reports.manage')
   toggleSpam(
     @Param('id') id: string,
     @Body() dto: SpamFlagDto,

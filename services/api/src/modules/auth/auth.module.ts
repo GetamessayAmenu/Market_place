@@ -20,6 +20,9 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { TokenService } from './token.service';
 import { VerificationService } from './verification/verification.service';
 
+import { SecurityEventsModule } from '../security-events/security-events.module';
+import { MfaService } from './mfa/mfa.service';
+
 @Module({
   imports: [
     UsersModule,
@@ -27,6 +30,7 @@ import { VerificationService } from './verification/verification.service';
     SessionsModule,
     PermissionsModule,
     AdminLogsModule,
+    SecurityEventsModule,
     PassportModule.register({ defaultStrategy: JWT_ACCESS_STRATEGY }),
     JwtModule.registerAsync({
       inject: [ApiConfigService],
@@ -42,11 +46,12 @@ import { VerificationService } from './verification/verification.service';
     AuthRepository,
     TokenService,
     VerificationService,
+    MfaService,
     JwtAccessStrategy,
     JwtRefreshStrategy,
     JwtRefreshGuard,
     RateLimitGuard,
   ],
-  exports: [AuthService, JwtModule, TokenService, VerificationService],
+  exports: [AuthService, JwtModule, TokenService, VerificationService, MfaService],
 })
 export class AuthModule {}

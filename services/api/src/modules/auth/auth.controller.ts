@@ -10,6 +10,7 @@ import {
 import type { Request, Response } from 'express';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OptionalAuth } from '../../common/decorators/optional-auth.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
@@ -21,17 +22,22 @@ import { AuthService } from './auth.service';
 import type { AuthResponseDto, MeResponseDto } from './dto/auth-response.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { DisableMfaDto, EnableMfaDto, VerifyMfaLoginDto } from './dto/mfa.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SessionInvalidException } from './exceptions/auth.exceptions';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import { MfaService } from './mfa/mfa.service';
 import { extractRefreshToken } from './utils/cookie.util';
 
 @Controller('auth')
 @UseGuards(RateLimitGuard)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly mfaService: MfaService,
+  ) {}
 
   @Public()
   @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: RATE_LIMIT_AUTH_PREFIX })
@@ -83,9 +89,10 @@ export class AuthController {
     );
   }
 
+  @OptionalAuth()
   @Post('logout')
   logout(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser | undefined,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ readonly success: true }> {
@@ -123,6 +130,45 @@ export class AuthController {
     @Body() dto: ResetPasswordDto,
   ): Promise<{ readonly success: true }> {
     return this.authService.resetPassword(dto);
+  }
+
+  @Public()
+  @RateLimit({ limit: 20, windowMs: 60_000, keyPrefix: RATE_LIMIT_AUTH_PREFIX })
+  @Post('mfa/verify-login')
+  verifyMfaLogin(
+    @Body() dto: VerifyMfaLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    return this.authService.verifyMfaLogin(
+      dto.mfaTicket,
+      dto.mfaCode,
+      this.requestContext(req),
+      res,
+    );
+  }
+
+  @Post('mfa/setup')
+  setupMfa(@CurrentUser() user: AuthenticatedUser) {
+    return this.mfaService.generateMfaSetup(user.id);
+  }
+
+  @Post('mfa/enable')
+  enableMfa(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: EnableMfaDto,
+    @Req() req: Request,
+  ) {
+    return this.mfaService.enableMfa(user.id, dto.code, req.ip, req.get('user-agent'));
+  }
+
+  @Post('mfa/disable')
+  disableMfa(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: DisableMfaDto,
+    @Req() req: Request,
+  ) {
+    return this.mfaService.disableMfa(user.id, dto.password, req.ip, req.get('user-agent'));
   }
 
   private requestContext(req: Request): {

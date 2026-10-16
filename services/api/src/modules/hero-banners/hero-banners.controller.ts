@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { HeroBannersService } from './hero-banners.service';
@@ -11,12 +13,13 @@ import type { CreateHeroBannerDto } from './dto/create-hero-banner.dto';
 import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('admin/hero-banners')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin', 'super_admin', 'moderator')
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@Roles('admin', 'super_admin', 'platform_admin', 'content_manager', 'moderator')
 export class HeroBannersController {
   constructor(private readonly heroBannersService: HeroBannersService) {}
 
   @Get()
+  @RequirePermission('cms.hero.view')
   async findAll(@Query() query: any) {
     try {
       const take = query.limit ? Number(query.limit) : 50;
@@ -70,31 +73,37 @@ export class HeroBannersController {
   }
 
   @Get(':id')
+  @RequirePermission('cms.hero.view')
   async findOne(@Param('id') id: string) {
     return await this.heroBannersService.findOne(id);
   }
 
   @Post()
+  @RequirePermission('cms.hero.manage')
   async create(@Body() dto: CreateHeroBannerDto, @CurrentUser() user: AuthenticatedUser) {
     return await this.heroBannersService.create(dto, user);
   }
 
   @Patch(':id')
+  @RequirePermission('cms.hero.manage')
   async update(@Param('id') id: string, @Body() dto: Partial<CreateHeroBannerDto>, @CurrentUser() user: AuthenticatedUser) {
     return await this.heroBannersService.update(id, dto, user);
   }
 
   @Patch(':id/publish')
+  @RequirePermission('cms.hero.manage')
   async publish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return await this.heroBannersService.publish(id, user);
   }
 
   @Patch(':id/unpublish')
+  @RequirePermission('cms.hero.manage')
   async unpublish(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return await this.heroBannersService.unpublish(id, user);
   }
 
   @Delete(':id')
+  @RequirePermission('cms.hero.manage')
   async delete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return await this.heroBannersService.delete(id, user);
   }

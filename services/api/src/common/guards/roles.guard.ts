@@ -35,10 +35,19 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Insufficient role');
     }
 
-    if (!requiredRoles.includes(user.role)) {
+    // Super Admin has centralized full administrative authority
+    if (user.role === 'super_admin' || user.roles?.includes('super_admin')) {
+      return true;
+    }
+
+    const userRoles = [user.role, ...(user.roles ?? [])];
+    const hasRole = requiredRoles.some((role) => userRoles.includes(role));
+
+    if (!hasRole) {
       throw new ForbiddenException('Insufficient role');
     }
 
     return true;
   }
 }
+

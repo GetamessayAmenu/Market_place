@@ -3,8 +3,14 @@ import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 
+export const USER_WITH_ROLE_INCLUDE = {
+  role: true,
+  adminProfile: true,
+  userRoles: { include: { role: true } },
+} as const;
+
 export type UserWithRole = Prisma.UserGetPayload<{
-  include: { role: true };
+  include: typeof USER_WITH_ROLE_INCLUDE;
 }>;
 
 @Injectable()
@@ -14,21 +20,21 @@ export class UsersRepository {
   async findByEmail(email: string): Promise<UserWithRole | null> {
     return this.prisma.user.findFirst({
       where: { email: email.toLowerCase(), deletedAt: null },
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 
   async findActiveById(id: string): Promise<UserWithRole | null> {
     return this.prisma.user.findFirst({
       where: { id, deletedAt: null },
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 
   async create(data: Prisma.UserCreateInput): Promise<UserWithRole> {
     return this.prisma.user.create({
       data,
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 
@@ -61,7 +67,7 @@ export class UsersRepository {
         orderBy,
         skip,
         take: limit,
-        include: { role: true },
+        include: USER_WITH_ROLE_INCLUDE,
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -73,7 +79,7 @@ export class UsersRepository {
     return this.prisma.user.update({
       where: { id: userId },
       data: { roleId },
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 
@@ -91,7 +97,7 @@ export class UsersRepository {
     return this.prisma.user.update({
       where: { id },
       data,
-      include: { role: true },
+      include: USER_WITH_ROLE_INCLUDE,
     });
   }
 
@@ -106,7 +112,7 @@ export class UsersRepository {
     return this.prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: {
-        role: true,
+        ...USER_WITH_ROLE_INCLUDE,
         _count: {
           select: {
             listings: true,
