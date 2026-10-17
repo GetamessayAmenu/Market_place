@@ -8,6 +8,7 @@ import { useMyListings } from '../../../hooks/useSeller';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { blackoutDateSchema, type BlackoutDateInput } from '../../../lib/validations/seller';
+import { useBlackoutDates, useAddBlackoutDate, useDeleteBlackoutDate } from '../../../hooks/seller/useBlackoutDates';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -22,12 +23,6 @@ interface Listing {
   city?: string;
   condition: string;
   rejectedReason?: string | null;
-}
-
-interface BlackoutDate {
-  startDate: string;
-  endDate: string;
-  reason: string;
 }
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -143,10 +138,10 @@ function BusinessModelBadges({ models }: { models: Listing['businessModels'] }) 
   );
 }
 
-function BlackoutCalendar() {
-  const [blackoutDates, setBlackoutDates] = useState<BlackoutDate[]>([
-    { startDate: '2026-08-15', endDate: '2026-08-20', reason: 'Shop maintenance' },
-  ]);
+function BlackoutCalendar({ sellerId }: { sellerId: string }) {
+  const { data: blackoutDates = [], isLoading } = useBlackoutDates(sellerId);
+  const addMutation = useAddBlackoutDate();
+  const deleteMutation = useDeleteBlackoutDate();
 
   const {
     register,
@@ -157,13 +152,14 @@ function BlackoutCalendar() {
     resolver: zodResolver(blackoutDateSchema),
   });
 
-  const addBlackoutDate = (data: BlackoutDateInput) => {
-    setBlackoutDates([...blackoutDates, data]);
-    reset();
+  const onSubmit = (data: BlackoutDateInput) => {
+    addMutation.mutate(data, {
+      onSuccess: () => reset(),
+    });
   };
 
-  const removeBlackoutDate = (index: number) => {
-    setBlackoutDates(blackoutDates.filter((_, i) => i !== index));
+  const removeBlackoutDate = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -171,14 +167,14 @@ function BlackoutCalendar() {
       <CardContent className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <IconCalendar />
-          Blackout Calendar
+          Rental Blackout Calendar
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Block dates when items are unavailable for rental (cleaning, repairs, shop closure).
+          Block dates when your rental inventory is unavailable for bookings (cleaning, maintenance, repairs, or seasonal closure).
         </p>
 
         {/* Add New Blackout Date */}
-        <form onSubmit={handleSubmit(addBlackoutDate)} className="space-y-3 mb-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 mb-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-sm font-medium mb-1 block">Start Date</label>
@@ -201,34 +197,45 @@ function BlackoutCalendar() {
             <div>
               <label className="text-sm font-medium mb-1 block">Reason</label>
               <input
-                placeholder="e.g., Shop maintenance"
+                placeholder="e.g., Seasonal maintenance / dry cleaning"
                 {...register('reason')}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               />
               {errors.reason && <p className="text-destructive text-xs mt-1">{errors.reason.message}</p>}
             </div>
           </div>
-          <Button type="submit" className="w-full sm:w-auto">
+          <Button type="submit" disabled={addMutation.isPending} className="w-full sm:w-auto">
             <IconPlus />
-            Add Blackout Period
+            {addMutation.isPending ? 'Adding Period...' : 'Add Blackout Period'}
           </Button>
         </form>
 
         {/* Existing Blackout Dates */}
         <div className="space-y-2">
-          {blackoutDates.map((date, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <p className="font-medium text-sm">{date.reason}</p>
-                <p className="text-xs text-muted-foreground">
-                  {date.startDate} → {date.endDate}
-                </p>
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground py-2">Loading blackout dates...</p>
+          ) : blackoutDates.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No blackout dates currently scheduled. Your rental items are available according to standard hours.</p>
+          ) : (
+            blackoutDates.map((date) => (
+              <div key={date.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <p className="font-medium text-sm">{date.reason}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {date.startDate} → {date.endDate}
+                  </p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  disabled={deleteMutation.isPending}
+                  onClick={() => removeBlackoutDate(date.id)}
+                >
+                  Remove
+                </Button>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => removeBlackoutDate(index)}>
-                Remove
-              </Button>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </CardContent>
     </Card>
@@ -347,7 +354,7 @@ export default function CatalogPage() {
       </div>
 
       {/* Blackout Calendar */}
-      <BlackoutCalendar />
+      <BlackoutCalendar sellerId={user.id} />
 
       {/* Stock Quick-Edit Table */}
       <Card>

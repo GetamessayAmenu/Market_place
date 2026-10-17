@@ -33,15 +33,31 @@ export class AuthorizationService {
       return false;
     }
 
+    const { resource: reqResource, action: reqAction } = normalizePermissionRequirement(permission);
+    const targetRes = this.normalizeResource(reqResource);
+
+    // 3. Built-in permission guarantee for verified active seller role on listing management
+    const isSeller =
+      user.role === 'seller' ||
+      (Array.isArray(user.roles) && user.roles.includes('seller'));
+    if (
+      isSeller &&
+      targetRes === 'listings' &&
+      ['create', 'read', 'view', 'update', 'delete'].includes(reqAction)
+    ) {
+      return true;
+    }
+
     if (!user.permissions || user.permissions.length === 0) {
       return false;
     }
 
-    const { resource: reqResource, action: reqAction } = normalizePermissionRequirement(permission);
-
-    return user.permissions.some((p) => {
-      const pRes = this.normalizeResource(p.resource);
-      const targetRes = this.normalizeResource(reqResource);
+    return user.permissions.some((p: any) => {
+      const pNorm = typeof p === 'string' ? normalizePermissionRequirement(p) : p;
+      if (!pNorm || !pNorm.resource) {
+        return false;
+      }
+      const pRes = this.normalizeResource(pNorm.resource);
 
       const resourceMatches = pRes === targetRes || pRes === '*';
       if (!resourceMatches) {
@@ -50,11 +66,11 @@ export class AuthorizationService {
 
       // Action match: exact, wildcard, or 'manage' permission implies all actions on resource
       return (
-        p.action === reqAction ||
-        p.action === '*' ||
-        p.action === 'manage' ||
-        (reqAction === 'read' && p.action === 'view') ||
-        (reqAction === 'view' && p.action === 'read')
+        pNorm.action === reqAction ||
+        pNorm.action === '*' ||
+        pNorm.action === 'manage' ||
+        (reqAction === 'read' && pNorm.action === 'view') ||
+        (reqAction === 'view' && pNorm.action === 'read')
       );
     });
   }

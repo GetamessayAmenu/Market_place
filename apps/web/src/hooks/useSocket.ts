@@ -16,8 +16,14 @@ export function useSocket(namespace = '/chat') {
       auth: { token },
       withCredentials: true,
       transports: ['websocket', 'polling'],
+      autoConnect: Boolean(token),
       reconnectionAttempts: 5,
       reconnectionDelay: 2000,
+    });
+
+    socket.on('connect_error', (err) => {
+      // Avoid uncaught unhandled errors in console when server is disconnected or starting up
+      console.warn(`[Socket] Connection notice on ${namespace}:`, err.message);
     });
 
     socketRef.current = socket;

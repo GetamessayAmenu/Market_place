@@ -17,7 +17,11 @@ interface SuccessResponse {
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  return apiPost<AuthResponse>('/auth/login', { email, password })
+  const res = await apiPost<AuthResponse>('/auth/login', { email, password })
+  if (typeof window !== 'undefined' && res?.tokens?.accessToken) {
+    localStorage.setItem('accessToken', res.tokens.accessToken)
+  }
+  return res
 }
 
 export async function register(data: {
@@ -27,10 +31,18 @@ export async function register(data: {
   phone?: string
   userType?: 'buyer' | 'seller'
 }): Promise<AuthResponse> {
-  return apiPost<AuthResponse>('/auth/register', data)
+  const res = await apiPost<AuthResponse>('/auth/register', data)
+  if (typeof window !== 'undefined' && res?.tokens?.accessToken) {
+    localStorage.setItem('accessToken', res.tokens.accessToken)
+  }
+  return res
 }
 
 export async function logout(): Promise<SuccessResponse> {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('token')
+  }
   return apiPost<SuccessResponse>('/auth/logout')
 }
 

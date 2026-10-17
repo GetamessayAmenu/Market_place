@@ -168,11 +168,11 @@ export default function ShopSetupPage() {
             </p>
           </div>
           <div className="space-y-3">
-            <Button onClick={() => router.push('/dashboard/listings/new')} className="w-full">
+            <Button onClick={() => router.push('/seller/catalog/new')} className="w-full">
               Add Your First Product
             </Button>
-            <Button variant="outline" onClick={() => router.push('/dashboard/shop')} className="w-full">
-              Go to Shop Dashboard
+            <Button variant="outline" onClick={() => router.push('/seller/catalog')} className="w-full">
+              Go to Catalog
             </Button>
           </div>
         </div>

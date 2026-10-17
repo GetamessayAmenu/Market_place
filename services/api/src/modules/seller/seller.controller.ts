@@ -39,6 +39,11 @@ export class SellerController {
     return this.sellerService.getEngagementMetrics(user.id);
   }
 
+  @Get('dashboard/promotional-banner')
+  getPromotionalBanner(@CurrentUser() user: AuthenticatedUser) {
+    return this.sellerService.getPromotionalBanner(user.id);
+  }
+
   // ─── Hub 2: Catalog & Stock Manager ────────────────────────────────────────
 
   @Get('listings')

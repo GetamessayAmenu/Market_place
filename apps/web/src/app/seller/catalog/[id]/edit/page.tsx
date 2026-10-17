@@ -6,7 +6,7 @@ import { Button, Card, CardContent, Spinner, Alert } from '@marketplace/ui';
 import ListingForm from '../../../../../components/seller/ListingForm';
 import type { ListingFormData } from '../../../../../components/seller/ListingForm';
 import useAuth from '../../../../../hooks/useAuth';
-import { apiGet, apiPatch } from '../../../../../lib/api';
+import { apiGet, apiPatch, getApiErrorMessage } from '../../../../../lib/api';
 
 export default function EditListingPage() {
   const router = useRouter();
@@ -113,6 +113,46 @@ export default function EditListingPage() {
     setError(null);
 
     try {
+      // Ensure all images are permanently persisted to the server without losing user photos
+      const resolvedImages = await Promise.all(
+        data.images.map(async (img, idx) => {
+          let finalUrl = img.url;
+          let publicId = img.cloudinaryPublicId;
+
+          if (finalUrl.startsWith('blob:')) {
+            try {
+              const blobRes = await fetch(finalUrl);
+              const blob = await blobRes.blob();
+              const uploadForm = new FormData();
+              uploadForm.append('file', blob, `photo_${idx}.jpg`);
+
+              const uploadRes = await fetch('/api/upload', {
+                method: 'POST',
+                body: uploadForm,
+              });
+
+              if (uploadRes.ok) {
+                const uploadJson = await uploadRes.json();
+                finalUrl = uploadJson.url;
+                publicId = uploadJson.cloudinaryPublicId;
+              }
+            } catch (blobErr) {
+              console.error('Failed to upload blob photo to server:', blobErr);
+            }
+          }
+
+          return {
+            url: finalUrl,
+            cloudinaryPublicId:
+              publicId && publicId.includes('listings')
+                ? publicId
+                : `marketplace/listings/item_${idx}_${Date.now()}`,
+            sortOrder: img.sortOrder ?? idx,
+            isPrimary: (img.sortOrder ?? idx) === 0,
+          };
+        }),
+      );
+
       // Transform form data to match API DTO
       const apiData: Record<string, unknown> = {
         title: data.title,
@@ -125,12 +165,7 @@ export default function EditListingPage() {
         availableForPurchase: data.listingType === 'sale',
         availableForRent: data.listingType === 'rent',
         customOrderAvailable: data.customOrderAvailable,
-        images: data.images.map((img) => ({
-          url: img.url,
-          cloudinaryPublicId: img.cloudinaryPublicId,
-          sortOrder: img.sortOrder,
-          isPrimary: img.sortOrder === 0,
-        })),
+        images: resolvedImages,
       };
 
       // Add rental pricing if applicable
@@ -140,16 +175,24 @@ export default function EditListingPage() {
       }
 
       // Add custom order details if applicable
-      if (data.customOrderAvailable && data.customDetails) {
-        if (data.customDetails.additionalCustomPrice) {
+      if (data.customOrderAvailable) {
+        apiData.supportsCustomDesign = true;
+        apiData.estimatedProductionDays = data.customDetails?.productionDays
+          ? parseInt(data.customDetails.productionDays, 10)
+          : 7;
+        if (data.customDetails?.additionalCustomPrice) {
           apiData.startingCustomPrice = parseFloat(data.customDetails.additionalCustomPrice) || 0;
         }
-        apiData.attributes = {
-          sizeAdjustments: data.customDetails.sizeAdjustments,
-          colorFabricChanges: data.customDetails.colorFabricChanges,
-          embroidery: data.customDetails.embroidery,
-          otherCustomization: data.customDetails.otherCustomization,
-        };
+        if (data.customDetails) {
+          apiData.attributes = {
+            sizeAdjustments: Boolean(data.customDetails.sizeAdjustments),
+            colorFabricChanges: Boolean(data.customDetails.colorFabricChanges),
+            embroidery: Boolean(data.customDetails.embroidery),
+            otherCustomization: data.customDetails.otherCustomization || '',
+          };
+        }
+      } else {
+        apiData.supportsCustomDesign = false;
       }
 
       // Merge product details into attributes
@@ -163,11 +206,11 @@ export default function EditListingPage() {
 
       await apiPatch(`/listings/${id}`, apiData);
       setSuccess(true);
-    } catch (err: any) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Failed to update listing. Please try again.';
+    } catch (err: unknown) {
+      const errorMessage = getApiErrorMessage(
+        err,
+        'Failed to update listing. Please try again.',
+      );
       setError(errorMessage);
       console.error('Listing update error:', err);
     } finally {
@@ -255,50 +298,41 @@ export default function EditListingPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight">
+          <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
             Edit Listing
           </h1>
-          <p className="text-muted-foreground">
-            Update your item details or resubmit after fixing feedback
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Update your fashion item details or fix feedback from moderation.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => router.push('/seller/catalog')}>
-          Cancel & Back
+          ← Cancel & Back
         </Button>
       </div>
 
       {rejectedReason && (
-        <Alert variant="warning" className="mb-6">
-          <p className="font-semibold text-sm">Moderator Feedback / Reason:</p>
-          <p className="mt-1 text-sm">{rejectedReason}</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Fixing issues and clicking "Save & Resubmit Changes" will resubmit your listing for admin review.
+        <Alert variant="warning">
+          <p className="font-semibold text-xs">Moderator Feedback / Reason:</p>
+          <p className="mt-1 text-xs">{rejectedReason}</p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Making changes and submitting will resubmit your listing for admin review.
           </p>
         </Alert>
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-sm text-destructive">{error}</p>
-        </div>
-      )}
-
       {initialData && (
-        <Card>
-          <CardContent className="p-6">
-            <ListingForm
-              key={id}
-              initialData={initialData}
-              onSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
-              submitLabel="Save & Resubmit Changes"
-              error={error}
-            />
-          </CardContent>
-        </Card>
+        <ListingForm
+          key={id}
+          initialData={initialData}
+          onSubmit={handleSubmit}
+          isSubmitting={isSubmitting}
+          submitLabel="Save & Resubmit Changes"
+          error={error}
+          onClearError={() => setError(null)}
+        />
       )}
     </div>
   );

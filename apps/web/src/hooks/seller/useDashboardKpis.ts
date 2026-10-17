@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../lib/api';
 
-interface DashboardKpis {
+export interface DashboardKpis {
   listingViews: number;
   chatStarts: number;
   whatsappClicks: number;
   phoneReveals: number;
   pendingActions: number;
+  activeListings?: number;
 }
 
 export function useDashboardKpis(sellerId: string) {

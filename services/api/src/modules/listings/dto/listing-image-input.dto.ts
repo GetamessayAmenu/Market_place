@@ -4,14 +4,13 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUrl,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
 
 export class ListingImageInputDto {
-  @IsUrl({ require_tld: false })
+  @IsString()
   @MaxLength(500)
   url!: string;
 

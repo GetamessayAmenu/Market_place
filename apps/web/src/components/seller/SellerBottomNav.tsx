@@ -1,8 +1,10 @@
-"use client"
+'use client';
 import { cn } from '@marketplace/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import useAuth from '../../hooks/useAuth';
+import { apiGet } from '../../lib/api';
 
 interface NavItem {
   label: string;
@@ -74,10 +76,30 @@ interface SellerBottomNavProps {
 
 export default function SellerBottomNav({ unreadMessageCount = 0, className }: SellerBottomNavProps) {
   const pathname = usePathname();
+  const user = useAuth((s) => s.user);
+  const [liveUnread, setLiveUnread] = useState(unreadMessageCount);
+
+  useEffect(() => {
+    if (unreadMessageCount > 0) {
+      setLiveUnread(unreadMessageCount);
+      return;
+    }
+    if (user?.id) {
+      apiGet<{ unreadCount: number }>('/chat/unread-count')
+        .then((res) => {
+          if (typeof res?.unreadCount === 'number') {
+            setLiveUnread(res.unreadCount);
+          }
+        })
+        .catch(() => {
+          // non-fatal
+        });
+    }
+  }, [user?.id, unreadMessageCount]);
 
   const items = bottomNavItems.map(item => ({
     ...item,
-    badge: item.href === '/seller/messages' ? unreadMessageCount : item.badge
+    badge: item.href === '/seller/messages' ? liveUnread : item.badge
   }));
 
   return (

@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Optional } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import {
@@ -40,7 +40,7 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('Authentication required');
+      throw new UnauthorizedException('Authentication required');
     }
 
     const hasAll = this.authorizationService.canAll(user, required);
@@ -64,7 +64,7 @@ export class PermissionsGuard implements CanActivate {
         });
       }
 
-      throw new ForbiddenException('Missing required permission');
+      throw new ForbiddenException('Missing required seller permission to create or manage listings');
     }
 
     return true;

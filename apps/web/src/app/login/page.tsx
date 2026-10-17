@@ -56,7 +56,11 @@ function LoginForm() {
       router.push(targetRedirect);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      setError(err.response?.data?.message ?? 'Invalid email or password. Please try again.');
+      if (!err.response) {
+        setError('Cannot connect to authentication server. Please ensure the backend API is running on port 3001.');
+      } else {
+        setError(err.response?.data?.message ?? 'Invalid email or password. Please try again.');
+      }
       setIsSubmitting(false);
     }
   }

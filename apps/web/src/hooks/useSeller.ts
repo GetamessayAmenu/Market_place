@@ -214,7 +214,38 @@ export function useImageUpload() {
               sortOrder: index,
             };
           } catch (_err) {
-            // Local Object URL fallback preview so image upload never fails
+            // If Cloudinary upload is not configured or failed, upload directly to the application server
+            try {
+              const localFormData = new FormData();
+              localFormData.append('file', file);
+
+              const localRes = await fetch('/api/upload', {
+                method: 'POST',
+                body: localFormData,
+              });
+
+              if (localRes.ok) {
+                const localData = await localRes.json();
+                completed++;
+                const currentProgress: UploadProgress = {
+                  completed,
+                  total,
+                  percentage: Math.round((completed / total) * 100),
+                };
+                setUploadProgress(currentProgress);
+                if (onProgress) onProgress(currentProgress);
+
+                return {
+                  url: localData.url,
+                  cloudinaryPublicId: localData.cloudinaryPublicId,
+                  sortOrder: index,
+                };
+              }
+            } catch (_localErr) {
+              console.error('Local upload failed, using object URL preview:', _localErr);
+            }
+
+            // Local Object URL preview fallback
             const localUrl = URL.createObjectURL(file);
             completed++;
             const currentProgress: UploadProgress = {
@@ -227,7 +258,7 @@ export function useImageUpload() {
 
             return {
               url: localUrl,
-              cloudinaryPublicId: `local_${Date.now()}_${index}`,
+              cloudinaryPublicId: `marketplace/listings/local_${Date.now()}_${index}`,
               sortOrder: index,
             };
           }

@@ -1,11 +1,13 @@
 "use client"
-import { Alert, Button, Card, CardContent, Checkbox, FormInput, FormSelect, FormTextarea, Select, Spinner } from '@marketplace/ui';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { Alert, Button, Checkbox, FormInput, FormSelect, FormTextarea, Modal, Select, Spinner } from '@marketplace/ui';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import useAuth from '../../hooks/useAuth';
 import { useCategories, type Category } from '../../hooks/useCategories';
+import { useSellerProfile } from '../../hooks/seller/useSellerProfile';
 import { useImageUpload, type UploadedImage } from '../../hooks/useSeller';
-
-import ListingStepper, { type StepDef } from './ListingStepper';
+import { getApiErrorMessage } from '../../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,7 @@ export interface ListingFormData {
     rentalDeposit: string;
     minRentalDays: string;
     maxRentalDays: string;
+    quantity?: number;
   } | null;
   // Custom-made option
   customOrderAvailable: boolean;
@@ -48,6 +51,7 @@ export interface ListingFormData {
     embroidery: boolean;
     otherCustomization: string;
     additionalCustomPrice: string;
+    productionDays?: string;
   } | null;
 }
 
@@ -58,118 +62,113 @@ interface ListingFormProps {
   isSubmitting?: boolean;
   submitLabel?: string;
   error?: string | null;
+  onClearError?: () => void;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const CONDITIONS = [
   { value: '', label: 'Select condition' },
-  { value: 'new', label: 'New' },
-  { value: 'like_new', label: 'Like New' },
-  { value: 'good', label: 'Good' },
-  { value: 'fair', label: 'Fair' },
-  { value: 'poor', label: 'Poor' },
+  { value: 'new', label: 'Brand New (Handmade / Tailored)' },
+  { value: 'like_new', label: 'Like New (Worn once for celebration)' },
+  { value: 'good', label: 'Good Condition (Gently used)' },
+  { value: 'fair', label: 'Fair Condition (Visible wear)' },
 ];
 
-// ─── Step Definitions ────────────────────────────────────────────────────────
+const ETHIOPIAN_SIZES = [
+  'Free Size',
+  'XS',
+  'S',
+  'M',
+  'L',
+  'XL',
+  'XXL',
+  'Custom Fit',
+];
 
-const STEP_ICONS = {
-  info: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-    </svg>
-  ),
-  image: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-    </svg>
-  ),
-  pricing: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  delivery: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.079-.504 1.042-1.123l-.314-5.267A2.25 2.25 0 0018.14 10.5H15M2.25 14.25V5.625c0-.621.504-1.125 1.125-1.125h8.25M2.25 14.25h8.25m0 0V4.5h4.5v6h-4.5z" />
-    </svg>
-  ),
-  review: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-};
+const ETHIOPIAN_FABRICS = [
+  'Pure Ethiopian Cotton (Shemane)',
+  'Cotton with Silk Tilet',
+  'Chiffon Kemis',
+  'Linen & Cotton Blend',
+  'Velvet & Gold Tilf',
+  'Traditional Netela Wool/Cotton',
+  'Other Traditional Fabric',
+];
 
-function getSteps(_type: 'sale' | 'rent' | null): StepDef[] {
-  const steps: StepDef[] = [
-    { id: 'photos', label: 'Photos', description: 'Upload 1-8 product photos', icon: STEP_ICONS.image },
-    { id: 'info', label: 'Basic Information', description: 'Title, category, description', icon: STEP_ICONS.info },
-    { id: 'details', label: 'Product Details', description: 'Size, color, material', icon: STEP_ICONS.info },
-    { id: 'type', label: 'Listing Type', description: 'For sale or for rent', icon: STEP_ICONS.pricing },
-    { id: 'custom', label: 'Custom Option', description: 'Custom-made available?', icon: STEP_ICONS.delivery },
-    { id: 'contact', label: 'Contact', description: 'How buyers reach you', icon: STEP_ICONS.delivery },
-    { id: 'review', label: 'Preview', description: 'Review before publishing', icon: STEP_ICONS.review },
-  ];
-  return steps;
+const ETHIOPIAN_STYLES = [
+  'Classic Traditional Habesha',
+  'Modern Fusion Kemis',
+  'Bridal / Wedding Kemis',
+  'Gondar Style',
+  'Wollo Style',
+  'Gojjam Style',
+  'Tigray Style',
+  'Oromo Cultural Dress',
+  'Gurage Traditional',
+  'Men Cultural Libs',
+];
+
+const ETHIOPIAN_GENDERS = [
+  { value: 'Women', label: "Women's Fashion" },
+  { value: 'Men', label: "Men's Fashion" },
+  { value: 'Kids', label: "Baby & Kid's Fashion" },
+  { value: 'Unisex', label: 'Unisex Cultural' },
+];
+
+function categoryLabel(cat: Category) {
+  return cat.nameAm ? `${cat.name} (${cat.nameAm})` : cat.name;
 }
 
-// ─── Image Upload Section ────────────────────────────────────────────────────
+// ─── Image Upload Component ──────────────────────────────────────────────────
 
 interface ImageUploadSectionProps {
   images: UploadedImage[];
   onImagesChange: (images: UploadedImage[]) => void;
-  error?: string;
+  error?: string | undefined;
 }
 
 function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectionProps) {
   const { uploadImages, isUploading, uploadProgress, uploadError, clearError } = useImageUpload();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const [validationNotice, setValidationNotice] = React.useState<string | null>(null);
-  const dragCounterRef = React.useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const dragCounterRef = useRef(0);
 
-  const processBatchUpload = React.useCallback(
+  const processBatchUpload = useCallback(
     async (fileList: File[]) => {
-      setValidationNotice(null);
+      setNotice(null);
       if (!fileList || fileList.length === 0) return;
 
       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
       const maxSizeBytes = 5 * 1024 * 1024; // 5MB
 
       const validFiles: File[] = [];
-      let skippedInvalid = 0;
-      let skippedSize = 0;
+      let skippedCount = 0;
 
       for (const file of fileList) {
-        if (!allowedTypes.includes(file.type)) {
-          skippedInvalid++;
-          continue;
-        }
-        if (file.size > maxSizeBytes) {
-          skippedSize++;
+        if (!allowedTypes.includes(file.type) || file.size > maxSizeBytes) {
+          skippedCount++;
           continue;
         }
         validFiles.push(file);
       }
 
-      if (skippedInvalid > 0 || skippedSize > 0) {
-        setValidationNotice(
-          `Skipped ${skippedInvalid + skippedSize} file(s) (JPEG/PNG/WebP only, under 5MB each).`,
-        );
+      if (skippedCount > 0) {
+        setNotice(`Skipped ${skippedCount} file(s). Please use JPEG, PNG, or WebP under 5MB each.`);
       }
 
       if (validFiles.length === 0) return;
 
       const remainingSlots = 8 - images.length;
       if (remainingSlots <= 0) {
-        setValidationNotice('Maximum 8 photos limit reached.');
+        setNotice('Maximum 8 photos limit reached.');
         return;
       }
 
       const batchToUpload = validFiles.slice(0, remainingSlots);
       if (validFiles.length > remainingSlots) {
-        setValidationNotice(
-          `Selected ${validFiles.length} photos, but only ${remainingSlots} slot(s) available. Uploading first ${remainingSlots}.`,
-        );
+        setNotice(`Added first ${remainingSlots} photo(s). Maximum 8 allowed.`);
       }
 
       const uploaded = await uploadImages(batchToUpload);
@@ -187,10 +186,10 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     [images, uploadImages, onImagesChange],
   );
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files) return;
-    await processBatchUpload(Array.from(files));
+    void processBatchUpload(Array.from(files));
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -205,8 +204,9 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
+    if (dragCounterRef.current <= 0) {
       setIsDragging(false);
+      dragCounterRef.current = 0;
     }
   }
 
@@ -215,13 +215,13 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     e.stopPropagation();
   }
 
-  async function handleDrop(e: React.DragEvent) {
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     dragCounterRef.current = 0;
     const files = Array.from(e.dataTransfer.files);
-    await processBatchUpload(files);
+    void processBatchUpload(files);
   }
 
   function handleRemove(index: number) {
@@ -229,100 +229,150 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
     onImagesChange(updated);
   }
 
-  function handleMoveUp(index: number) {
-    if (index === 0) return;
+  function handleMove(index: number, direction: 'left' | 'right') {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= images.length) return;
     const updated = [...images];
-    const a = updated[index - 1];
-    const b = updated[index];
-    if (a && b) { updated[index - 1] = b; updated[index] = a; }
-    onImagesChange(updated.map((img, i) => ({ ...img, sortOrder: i })));
-  }
-
-  function handleMoveDown(index: number) {
-    if (index === images.length - 1) return;
-    const updated = [...images];
-    const a = updated[index];
-    const b = updated[index + 1];
-    if (a && b) { updated[index + 1] = a; updated[index] = b; }
-    onImagesChange(updated.map((img, i) => ({ ...img, sortOrder: i })));
+    const temp = updated[index];
+    const target = updated[targetIndex];
+    if (temp && target) {
+      updated[index] = target;
+      updated[targetIndex] = temp;
+      onImagesChange(updated.map((img, i) => ({ ...img, sortOrder: i })));
+    }
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-medium">Product Photos</h3>
-        <p className="text-sm text-muted-foreground">Upload 1-8 photos at once. The first photo will be the main product image. Show clear photos of the complete clothing item.</p>
-      </div>
-
+    <div className="space-y-3">
       {uploadError && <Alert variant="error" onDismiss={clearError}>{uploadError}</Alert>}
-      {validationNotice && <Alert variant="warning" onDismiss={() => setValidationNotice(null)}>{validationNotice}</Alert>}
-      {error !== undefined && <p className="text-sm text-destructive">{error}</p>}
+      {notice && <Alert variant="warning" onDismiss={() => setNotice(null)}>{notice}</Alert>}
+      {error && <p className="text-sm font-medium text-destructive">{error}</p>}
 
+      {/* Drop area */}
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+        className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all ${
+          isDragging
+            ? 'border-primary bg-primary/5 ring-4 ring-primary/10'
+            : 'border-muted-foreground/20 hover:border-primary/50 bg-muted/20'
         }`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { void handleFileSelect(e); }} className="hidden" id="listing-images-input" />
-        <div className="space-y-3">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <svg className="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+          id="listing-images-input"
+        />
+
+        <div className="flex flex-col items-center justify-center gap-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
+
           <div>
-            <p className="text-sm font-medium">Drag and drop multiple photos here</p>
-            <p className="text-xs text-muted-foreground">or click to select multiple photos from device</p>
+            <p className="text-sm font-semibold text-foreground">
+              Add photos of your Ethiopian fashion item
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Select multiple photos at once or drag and drop (up to 8 photos)
+            </p>
           </div>
-          <Button type="button" variant="outline" onClick={() => { fileInputRef.current?.click(); }} disabled={isUploading || images.length >= 8}>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || images.length >= 8}
+            className="mt-1"
+          >
             {isUploading ? (
               <span className="flex items-center gap-2">
                 <Spinner size="sm" />
                 {uploadProgress
-                  ? `Uploading ${uploadProgress.completed} of ${uploadProgress.total} (${uploadProgress.percentage}%)...`
-                  : 'Uploading photos...'}
+                  ? `Uploading (${uploadProgress.completed}/${uploadProgress.total})...`
+                  : 'Uploading...'}
               </span>
             ) : (
-              'Select Multiple Photos'
+              'Choose Photos'
             )}
           </Button>
+
+          <span className="text-[11px] text-muted-foreground">
+            {images.length}/8 photos • JPG, PNG, WebP up to 5MB • The 1st photo is your main cover
+          </span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{images.length}/8 photos</span>
-        <span>JPEG, PNG, WebP • Max 5MB each • Multi-select supported</span>
-      </div>
-
+      {/* Thumbnails list */}
       {images.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 md:grid-cols-4">
           {images.map((img, index) => (
-            <div key={img.cloudinaryPublicId} className="group relative overflow-hidden rounded-lg border bg-muted">
-              <div className="aspect-square">
-                <img src={img.url} alt={'Photo ' + String(index + 1)} className="h-full w-full object-cover" />
-              </div>
+            <div
+              key={img.cloudinaryPublicId || img.url}
+              className="group relative aspect-square overflow-hidden rounded-lg border bg-muted shadow-sm transition-all hover:shadow"
+            >
+              <img
+                src={img.url}
+                alt={`Product photo ${index + 1}`}
+                className="h-full w-full object-cover"
+              />
+
               {index === 0 && (
-                <div className="absolute left-1 top-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">Main</div>
+                <div className="absolute left-1.5 top-1.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow">
+                  Main Photo
+                </div>
               )}
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <div className="flex gap-0.5">
+
+              {/* Action bar overlay */}
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5 opacity-90 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                <div className="flex gap-1">
                   {index > 0 && (
-                    <button type="button" onClick={() => { handleMoveUp(index); }} className="rounded p-0.5 text-white hover:bg-white/20" aria-label="Move left">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    <button
+                      type="button"
+                      onClick={() => handleMove(index, 'left')}
+                      className="rounded bg-white/20 p-1 text-white hover:bg-white/40"
+                      title="Move left"
+                      aria-label="Move photo left"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
                     </button>
                   )}
                   {index < images.length - 1 && (
-                    <button type="button" onClick={() => { handleMoveDown(index); }} className="rounded p-0.5 text-white hover:bg-white/20" aria-label="Move right">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    <button
+                      type="button"
+                      onClick={() => handleMove(index, 'right')}
+                      className="rounded bg-white/20 p-1 text-white hover:bg-white/40"
+                      title="Move right"
+                      aria-label="Move photo right"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </button>
                   )}
                 </div>
-                <button type="button" onClick={() => { handleRemove(index); }} className="rounded p-0.5 text-white hover:bg-red-500" aria-label="Remove image">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+
+                <button
+                  type="button"
+                  onClick={() => handleRemove(index)}
+                  className="rounded bg-red-600/80 p-1 text-white hover:bg-red-600"
+                  title="Remove photo"
+                  aria-label="Remove photo"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
             </div>
@@ -333,16 +383,12 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
   );
 }
 
-// ─── Category Picker ─────────────────────────────────────────────────────────
+// ─── Dynamic Category Selector ───────────────────────────────────────────────
 
 interface CategoryPickerProps {
   value: string;
   onChange: (id: string, name: string) => void;
-  error?: string;
-}
-
-function categoryLabel(cat: Category) {
-  return cat.nameAm ? `${cat.name} (${cat.nameAm})` : cat.name;
+  error?: string | undefined;
 }
 
 function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
@@ -373,7 +419,7 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
 
   const parentOptions = useMemo(
     () => [
-      { value: '', label: 'Select a fashion category' },
+      { value: '', label: 'Select fashion category' },
       ...roots.map((cat) => ({ value: cat.id, label: categoryLabel(cat) })),
     ],
     [roots],
@@ -381,7 +427,7 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
 
   const childOptions = useMemo(
     () => [
-      { value: '', label: 'Select a subcategory' },
+      { value: '', label: 'Select subcategory' },
       ...children.map((cat) => ({ value: cat.id, label: categoryLabel(cat) })),
     ],
     [children],
@@ -412,19 +458,21 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
 
   if (isLoading) {
     return (
-      <div className="sm:col-span-2">
-        <label className="block text-sm font-medium text-foreground mb-1.5">Category</label>
-        <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
-          <Spinner size="sm" /> Loading fashion categories...
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-foreground mb-1">Category</label>
+          <div className="flex h-10 items-center gap-2 rounded-lg border bg-muted/30 px-3 text-xs text-muted-foreground">
+            <Spinner size="sm" /> Loading fashion categories...
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       <Select
-        label="Fashion category"
+        label="Category"
         options={parentOptions}
         value={parentId}
         required
@@ -445,616 +493,1167 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
   );
 }
 
-// ─── Main Form ───────────────────────────────────────────────────────────────
+// ─── Main Form Component ─────────────────────────────────────────────────────
 
-export default function ListingForm({ initialData, initialListingType, onSubmit, isSubmitting, submitLabel = 'Publish Listing', error }: ListingFormProps) {
-  const [listingType, setListingType] = useState<'sale' | 'rent' | null>(initialListingType ?? initialData?.listingType ?? null);
-  const [step, setStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+export default function ListingForm({
+  initialData,
+  initialListingType,
+  onSubmit,
+  isSubmitting = false,
+  submitLabel = 'Submit for Review',
+  error,
+  onClearError,
+}: ListingFormProps) {
+  const user = useAuth((s) => s.user);
+  const { data: sellerProfile } = useSellerProfile(user?.id ?? '');
 
-  // Form state
+  // Form State
+  const [listingType, setListingType] = useState<'sale' | 'rent'>(
+    initialListingType ?? initialData?.listingType ?? 'sale',
+  );
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [description, setDescription] = useState(initialData?.description ?? '');
   const [price, setPrice] = useState(initialData?.price ?? '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId ?? '');
   const [categoryName, setCategoryName] = useState(initialData?.categoryName ?? '');
-  const [city, setCity] = useState(initialData?.city ?? '');
-  const [condition, setCondition] = useState(initialData?.condition ?? '');
+  const [city, setCity] = useState(
+    initialData?.city ?? sellerProfile?.location?.subCity ?? sellerProfile?.location?.regionalHub ?? 'Addis Ababa',
+  );
+  const [condition, setCondition] = useState(initialData?.condition ?? 'new');
   const [images, setImages] = useState<UploadedImage[]>(initialData?.images ?? []);
-  
-  // Product details
-  const [productDetails, setProductDetails] = useState(initialData?.productDetails ?? {
-    size: '',
-    color: '',
-    material: '',
-    gender: '',
-    style: '',
-  });
-  
-  // Rental info
-  const [rentalInfo, setRentalInfo] = useState(initialData?.rentalInfo ?? {
-    rentalPricePerDay: '',
-    rentalDeposit: '',
-    minRentalDays: '',
-    maxRentalDays: '',
-  });
-  
-  // Custom order
-  const [customOrderAvailable, setCustomOrderAvailable] = useState(initialData?.customOrderAvailable ?? false);
-  const [customDetails, setCustomDetails] = useState(initialData?.customDetails ?? {
-    sizeAdjustments: false,
-    colorFabricChanges: false,
-    embroidery: false,
-    otherCustomization: '',
-    additionalCustomPrice: '',
-  });
-  
-  // Contact options
-  const [contactOptions, setContactOptions] = useState(initialData?.contactOptions ?? {
-    showPhone: false,
-    whatsapp: '',
-    telegram: '',
-    inAppMessaging: true,
-  });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Fashion Product Details
+  const [size, setSize] = useState(initialData?.productDetails?.size ?? 'Free Size');
+  const [color, setColor] = useState(initialData?.productDetails?.color ?? 'White & Gold Tilf');
+  const [material, setMaterial] = useState(
+    initialData?.productDetails?.material ?? 'Pure Ethiopian Cotton (Shemane)',
+  );
+  const [style, setStyle] = useState(
+    initialData?.productDetails?.style ?? 'Classic Traditional Habesha',
+  );
+  const [gender, setGender] = useState(initialData?.productDetails?.gender ?? 'Women');
 
-  const steps = useMemo(() => getSteps(listingType), [listingType]);
+  // Rental Settings
+  const [rentalPricePerDay, setRentalPricePerDay] = useState(
+    initialData?.rentalInfo?.rentalPricePerDay ?? '',
+  );
+  const [rentalDeposit, setRentalDeposit] = useState(
+    initialData?.rentalInfo?.rentalDeposit ?? '',
+  );
+  const [rentalQuantity, setRentalQuantity] = useState<number>(
+    initialData?.rentalInfo?.quantity ?? 1,
+  );
+  const [minRentalDays, setMinRentalDays] = useState(
+    initialData?.rentalInfo?.minRentalDays ?? '1',
+  );
+  const [maxRentalDays, setMaxRentalDays] = useState(
+    initialData?.rentalInfo?.maxRentalDays ?? '30',
+  );
 
-  const clearField = useCallback((field: string) => {
-    setErrors((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([k]) => k !== field))
-    );
-  }, []);
+  // Custom-Made Option
+  const [customOrderAvailable, setCustomOrderAvailable] = useState(
+    initialData?.customOrderAvailable ?? false,
+  );
+  const [sizeAdjustments, setSizeAdjustments] = useState(
+    initialData?.customDetails?.sizeAdjustments ?? true,
+  );
+  const [colorFabricChanges, setColorFabricChanges] = useState(
+    initialData?.customDetails?.colorFabricChanges ?? true,
+  );
+  const [embroidery, setEmbroidery] = useState(
+    initialData?.customDetails?.embroidery ?? true,
+  );
+  const [otherCustomization, setOtherCustomization] = useState(
+    initialData?.customDetails?.otherCustomization ?? '',
+  );
+  const [additionalCustomPrice, setAdditionalCustomPrice] = useState(
+    initialData?.customDetails?.additionalCustomPrice ?? '',
+  );
+  const [productionDays, setProductionDays] = useState(
+    initialData?.customDetails?.productionDays ?? '7',
+  );
 
-  const updateContact = useCallback(<K extends keyof typeof contactOptions>(key: K, value: (typeof contactOptions)[K]) => {
-    setContactOptions((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  // Contact Preferences
+  const [inAppMessaging, setInAppMessaging] = useState(
+    initialData?.contactOptions?.inAppMessaging ?? true,
+  );
+  const [showPhone, setShowPhone] = useState(
+    initialData?.contactOptions?.showPhone ?? Boolean(sellerProfile?.phone || user?.phone),
+  );
+  const [whatsapp, setWhatsapp] = useState(
+    initialData?.contactOptions?.whatsapp ?? sellerProfile?.phone ?? user?.phone ?? '',
+  );
+  const [telegram, setTelegram] = useState(
+    initialData?.contactOptions?.telegram ?? '',
+  );
+
+  // Validation & UI State
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [hasDraftNotice, setHasDraftNotice] = useState(false);
+
+  // Draft Storage Key
+  const draftKey = useMemo(() => `habesha_draft_${user?.id || 'guest'}`, [user?.id]);
+
+  // Check for existing draft on initial mount
+  useEffect(() => {
+    if (!initialData && typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(draftKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.title || parsed.images?.length > 0)) {
+            setHasDraftNotice(true);
+          }
+        }
+      } catch (_e) {
+        // Ignore JSON parse errors
+      }
+    }
+  }, [draftKey, initialData]);
+
+  // Auto-save draft on changes (debounced)
+  useEffect(() => {
+    if (initialData || typeof window === 'undefined') return;
+
+    const timer = setTimeout(() => {
+      try {
+        const draftData = {
+          listingType,
+          title,
+          description,
+          price,
+          categoryId,
+          categoryName,
+          city,
+          condition,
+          images,
+          productDetails: { size, color, material, style, gender },
+          rentalInfo: { rentalPricePerDay, rentalDeposit, minRentalDays, maxRentalDays, quantity: rentalQuantity },
+          customOrderAvailable,
+          customDetails: { sizeAdjustments, colorFabricChanges, embroidery, otherCustomization, additionalCustomPrice, productionDays },
+          contactOptions: { inAppMessaging, showPhone, whatsapp, telegram },
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+      } catch (_e) {
+        // quota exceeded or storage disabled
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [
+    draftKey,
+    initialData,
+    listingType,
+    title,
+    description,
+    price,
+    categoryId,
+    categoryName,
+    city,
+    condition,
+    images,
+    size,
+    color,
+    material,
+    style,
+    gender,
+    rentalPricePerDay,
+    rentalDeposit,
+    minRentalDays,
+    maxRentalDays,
+    rentalQuantity,
+    customOrderAvailable,
+    sizeAdjustments,
+    colorFabricChanges,
+    embroidery,
+    otherCustomization,
+    additionalCustomPrice,
+    productionDays,
+    inAppMessaging,
+    showPhone,
+    whatsapp,
+    telegram,
+  ]);
+
+  function restoreDraft() {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (!saved) return;
+      const d = JSON.parse(saved);
+      if (d.listingType) setListingType(d.listingType);
+      if (d.title) setTitle(d.title);
+      if (d.description) setDescription(d.description);
+      if (d.price) setPrice(d.price);
+      if (d.categoryId) setCategoryId(d.categoryId);
+      if (d.categoryName) setCategoryName(d.categoryName);
+      if (d.city) setCity(d.city);
+      if (d.condition) setCondition(d.condition);
+      if (Array.isArray(d.images)) setImages(d.images);
+      if (d.productDetails) {
+        if (d.productDetails.size) setSize(d.productDetails.size);
+        if (d.productDetails.color) setColor(d.productDetails.color);
+        if (d.productDetails.material) setMaterial(d.productDetails.material);
+        if (d.productDetails.style) setStyle(d.productDetails.style);
+        if (d.productDetails.gender) setGender(d.productDetails.gender);
+      }
+      if (d.rentalInfo) {
+        if (d.rentalInfo.rentalPricePerDay) setRentalPricePerDay(d.rentalInfo.rentalPricePerDay);
+        if (d.rentalInfo.rentalDeposit) setRentalDeposit(d.rentalInfo.rentalDeposit);
+        if (d.rentalInfo.minRentalDays) setMinRentalDays(d.rentalInfo.minRentalDays);
+        if (d.rentalInfo.maxRentalDays) setMaxRentalDays(d.rentalInfo.maxRentalDays);
+        if (d.rentalInfo.quantity) setRentalQuantity(d.rentalInfo.quantity);
+      }
+      if (d.customOrderAvailable !== undefined) setCustomOrderAvailable(d.customOrderAvailable);
+      if (d.customDetails) {
+        if (d.customDetails.sizeAdjustments !== undefined) setSizeAdjustments(d.customDetails.sizeAdjustments);
+        if (d.customDetails.colorFabricChanges !== undefined) setColorFabricChanges(d.customDetails.colorFabricChanges);
+        if (d.customDetails.embroidery !== undefined) setEmbroidery(d.customDetails.embroidery);
+        if (d.customDetails.otherCustomization) setOtherCustomization(d.customDetails.otherCustomization);
+        if (d.customDetails.additionalCustomPrice) setAdditionalCustomPrice(d.customDetails.additionalCustomPrice);
+        if (d.customDetails.productionDays) setProductionDays(d.customDetails.productionDays);
+      }
+      if (d.contactOptions) {
+        if (d.contactOptions.inAppMessaging !== undefined) setInAppMessaging(d.contactOptions.inAppMessaging);
+        if (d.contactOptions.showPhone !== undefined) setShowPhone(d.contactOptions.showPhone);
+        if (d.contactOptions.whatsapp) setWhatsapp(d.contactOptions.whatsapp);
+        if (d.contactOptions.telegram) setTelegram(d.contactOptions.telegram);
+      }
+      setHasDraftNotice(false);
+    } catch (_e) {
+      setHasDraftNotice(false);
+    }
+  }
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch (_e) {
+      // ignore
+    }
+    setHasDraftNotice(false);
+  }
 
   // ─── Validation ──────────────────────────────────────────────────────────
 
-  function validateStep(stepIndex: number): boolean {
-    const errs: Record<string, string> = {};
+  function validate(): boolean {
+    const errors: Record<string, string> = {};
 
-    if (stepIndex === 0) {
-      // Photos
-      if (images.length === 0) errs.images = 'At least one photo is required';
-      if (images.length > 8) errs.images = 'Maximum 8 photos allowed';
+    if (images.length === 0) {
+      errors.images = 'Please upload at least one photo of the item.';
     }
 
-    if (stepIndex === 1) {
-      // Basic Info
-      if (!title || title.length < 3) errs.title = 'Title must be at least 3 characters';
-      if (title.length > 200) errs.title = 'Title must be 200 characters or less';
-      if (!description || description.length < 10) errs.description = 'Description must be at least 10 characters';
-      if (!categoryId) errs.categoryId = 'Please select a fashion category';
-      if (!condition) errs.condition = 'Please select a condition';
-      if (!city || city.length < 2) errs.city = 'City is required';
-      if (!price || Number(price) <= 0) errs.price = 'Price must be greater than 0';
+    if (!title.trim() || title.trim().length < 3) {
+      errors.title = 'Title must be at least 3 characters.';
     }
 
-    if (stepIndex === 2) {
-      // Product Details - optional, no validation
+    if (!categoryId) {
+      errors.categoryId = 'Please select a fashion category.';
     }
 
-    if (stepIndex === 3) {
-      // Listing Type
-      if (!listingType) errs.listingType = 'Please select a listing type';
-      if (listingType === 'rent') {
-        if (!rentalInfo.rentalPricePerDay || Number(rentalInfo.rentalPricePerDay) <= 0) errs.rentalPricePerDay = 'Rental price per day is required';
-        if (!rentalInfo.rentalDeposit || Number(rentalInfo.rentalDeposit) < 0) errs.rentalDeposit = 'Security deposit is required';
+    if (!description.trim() || description.trim().length < 10) {
+      errors.description = 'Please provide a description (at least 10 characters).';
+    }
+
+    if (!condition) {
+      errors.condition = 'Please select the condition.';
+    }
+
+    if (listingType === 'sale') {
+      if (!price || Number(price) <= 0) {
+        errors.price = 'Please enter a valid sale price in ETB.';
       }
     }
 
-    if (stepIndex === 4) {
-      // Custom Option - optional, no validation
-    }
-
-    if (stepIndex === 5) {
-      // Contact - at least one method required
-      if (!contactOptions.inAppMessaging && !contactOptions.showPhone && !contactOptions.whatsapp && !contactOptions.telegram) {
-        errs.contact = 'Please select at least one contact method';
+    if (listingType === 'rent') {
+      if (!rentalPricePerDay || Number(rentalPricePerDay) <= 0) {
+        errors.rentalPricePerDay = 'Daily rental price is required.';
+      }
+      if (!rentalDeposit || Number(rentalDeposit) < 0) {
+        errors.rentalDeposit = 'Security deposit is required.';
       }
     }
 
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  }
-
-  // ─── Navigation ──────────────────────────────────────────────────────────
-
-  function handleNext() {
-    if (validateStep(step)) {
-      setCompletedSteps((prev) => new Set([...prev, step]));
-      setStep((s) => Math.min(s + 1, steps.length - 1));
+    if (!inAppMessaging && !showPhone && !whatsapp.trim() && !telegram.trim()) {
+      errors.contact = 'Please enable at least one contact method for buyers.';
     }
-  }
 
-  function handleBack() {
-    setStep((s) => Math.max(s - 1, 0));
-  }
+    setValidationErrors(errors);
 
-  function handleStepClick(index: number) {
-    if (index < step || completedSteps.has(index)) {
-      setStep(index);
-    }
-  }
-
-  function handlePublish() {
-    // Validate all steps
-    for (let i = 0; i < steps.length - 1; i++) {
-      if (!validateStep(i)) {
-        setStep(i);
-        return;
+    if (Object.keys(errors).length > 0) {
+      // Scroll to the first error
+      const firstErrorKey = Object.keys(errors)[0];
+      const element = document.getElementById(`field-${firstErrorKey}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      return false;
     }
 
-    const effectiveType = listingType ?? 'sale';
+    return true;
+  }
+
+  function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (onClearError) onClearError();
+
+    if (!validate()) return;
 
     onSubmit({
-      listingType: effectiveType,
-      title,
-      description,
-      price,
+      listingType,
+      title: title.trim(),
+      description: description.trim(),
+      price: listingType === 'sale' ? price : (rentalPricePerDay || price || '0'),
       categoryId,
       categoryName,
-      city,
+      city: city.trim(),
       condition,
-      contactOptions,
       images,
-      productDetails: productDetails || null,
-      rentalInfo: listingType === 'rent' ? rentalInfo : null,
+      productDetails: {
+        size,
+        color,
+        material,
+        style,
+        gender,
+      },
+      rentalInfo:
+        listingType === 'rent'
+          ? {
+              rentalPricePerDay,
+              rentalDeposit,
+              minRentalDays,
+              maxRentalDays,
+              quantity: rentalQuantity,
+            }
+          : null,
       customOrderAvailable,
-      customDetails: customOrderAvailable ? customDetails : null,
+      customDetails: customOrderAvailable
+        ? {
+            sizeAdjustments,
+            colorFabricChanges,
+            embroidery,
+            otherCustomization,
+            additionalCustomPrice,
+            productionDays,
+          }
+        : null,
+      contactOptions: {
+        showPhone,
+        whatsapp: whatsapp.trim(),
+        telegram: telegram.trim(),
+        inAppMessaging,
+      },
     });
   }
 
-  // ─── Type selector (pre-step, not in stepper) ─────────────────────────
+  // ─── Buyer Card Live Preview Component ───────────────────────────────────
 
-  if (!listingType) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-display font-semibold">Select Listing Type</h3>
-            <p className="text-sm text-muted-foreground">Choose how you want to sell this item</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setListingType('sale')}
-                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 text-center transition-colors hover:border-primary hover:bg-primary/5"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-medium">For Sale</h4>
-                  <p className="text-xs text-muted-foreground">Sell your item directly</p>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setListingType('rent')}
-                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 text-center transition-colors hover:border-primary hover:bg-primary/5"
-              >
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-medium">For Rent</h4>
-                  <p className="text-xs text-muted-foreground">Rent out your item</p>
-                </div>
-              </button>
-            </div>
+  const BuyerPreviewCard = (
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm transition-all">
+      <div className="relative aspect-[4/3] bg-muted">
+        {images.length > 0 && images[0]?.url ? (
+          <img
+            src={images[0].url}
+            alt={title || 'Product preview'}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground">
+            <svg className="h-10 w-10 mb-1 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-xs">Photo will appear here</span>
           </div>
-          {error && <Alert variant="error" className="mt-4">{error}</Alert>}
-        </CardContent>
-      </Card>
-    );
-  }
+        )}
 
-  // ─── Render ──────────────────────────────────────────────────────────────
-
-  return (
-    <div className="space-y-6">
-      {/* Mobile stepper */}
-      <ListingStepper
-        steps={steps}
-        currentStep={step}
-        completedSteps={completedSteps}
-        onStepClick={handleStepClick}
-        listingType={listingType}
-      />
-
-      {error && <Alert variant="error" onDismiss={() => { /* parent controls */ }}>{error}</Alert>}
-
-      {/* Desktop layout: sidebar + form */}
-      <div className="flex gap-8">
-        {/* Desktop stepper sidebar */}
-        <div className="hidden w-64 shrink-0 fashion-lg:block">
-          <div className="sticky top-24">
-            <ListingStepper
-              steps={steps}
-              currentStep={step}
-              completedSteps={completedSteps}
-              onStepClick={handleStepClick}
-              listingType={listingType}
-            />
-            <button
-              type="button"
-              onClick={() => { setListingType(null); setStep(0); setCompletedSteps(new Set()); }}
-              className="mt-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Change listing type
-            </button>
-          </div>
+        {/* Badges */}
+        <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
+          <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm ${
+            listingType === 'sale' ? 'bg-emerald-600' : 'bg-amber-600'
+          }`}>
+            {listingType === 'sale' ? 'For Sale' : 'For Rent'}
+          </span>
+          {customOrderAvailable && (
+            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm">
+              Custom Made
+            </span>
+          )}
         </div>
 
-        {/* Form card */}
-        <div className="flex-1 min-w-0">
-          <Card>
-            <CardContent className="p-6">
-              {/* Step 0: Photos */}
-              {step === 0 && (
-                <ImageUploadSection
-                  images={images}
-                  onImagesChange={setImages}
-                  {...(errors.images !== undefined && { error: errors.images })}
-                />
-              )}
+        {images.length > 1 && (
+          <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+            📷 {images.length}
+          </span>
+        )}
+      </div>
 
-              {/* Step 1: Basic Information */}
-              {step === 1 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Basic Information</h3>
+      <div className="p-4 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="font-semibold text-foreground text-sm line-clamp-1">
+            {title || 'Your Ethiopian Fashion Title'}
+          </h4>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            📍 {city || 'Addis Ababa'}
+          </span>
+        </div>
 
-                  <FormInput
-                    label="Product Title"
-                    placeholder="e.g. Handwoven Ethiopian Cotton Dress"
-                    value={title}
-                    onChange={(e) => { setTitle(e.target.value); clearField('title'); }}
-                    {...(errors.title !== undefined && { error: errors.title })}
-                  />
+        {/* Price display */}
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-bold text-primary">
+            {listingType === 'sale'
+              ? (price ? `${Number(price).toLocaleString()} ETB` : 'Price in ETB')
+              : (rentalPricePerDay ? `${Number(rentalPricePerDay).toLocaleString()} ETB / day` : 'Rental rate in ETB')}
+          </span>
+          {listingType === 'rent' && rentalDeposit && (
+            <span className="text-[11px] text-muted-foreground">
+              (+{Number(rentalDeposit).toLocaleString()} deposit)
+            </span>
+          )}
+        </div>
 
-                  <FormTextarea
-                    label="Description"
-                    placeholder="Describe your item in detail — materials, craftsmanship, dimensions..."
-                    rows={6}
-                    value={description}
-                    onChange={(e) => { setDescription(e.target.value); clearField('description'); }}
-                    {...(errors.description !== undefined && { error: errors.description })}
-                  />
+        {/* Fashion details tags */}
+        <div className="flex flex-wrap gap-1 pt-1">
+          {categoryName && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium">
+              {categoryName.split('>').pop()?.trim()}
+            </span>
+          )}
+          {size && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium">
+              Size: {size}
+            </span>
+          )}
+          {condition && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium capitalize">
+              {condition.replace('_', ' ')}
+            </span>
+          )}
+        </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <CategoryPicker
-                      value={categoryId}
-                      onChange={(id, name) => { setCategoryId(id); setCategoryName(name); clearField('categoryId'); }}
-                      {...(errors.categoryId !== undefined && { error: errors.categoryId })}
-                    />
-                    <FormSelect
-                      label="Condition"
-                      options={CONDITIONS}
-                      value={condition}
-                      onChange={(e) => { setCondition(e.target.value); clearField('condition'); }}
-                      {...(errors.condition !== undefined && { error: errors.condition })}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Price (ETB)"
-                      placeholder="e.g. 3500"
-                      type="number"
-                      value={price}
-                      onChange={(e) => { setPrice(e.target.value); clearField('price'); }}
-                      {...(errors.price !== undefined && { error: errors.price })}
-                    />
-                    <FormInput
-                      label="Location"
-                      placeholder="e.g. Addis Ababa"
-                      value={city}
-                      onChange={(e) => { setCity(e.target.value); clearField('city'); }}
-                      {...(errors.city !== undefined && { error: errors.city })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Product Details */}
-              {step === 2 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Product Details</h3>
-                  <p className="text-sm text-muted-foreground">Add relevant details based on your category (optional)</p>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Size"
-                      placeholder="e.g. M, L, XL"
-                      value={productDetails.size || ''}
-                      onChange={(e) => setProductDetails({ ...productDetails, size: e.target.value })}
-                    />
-                    <FormInput
-                      label="Color"
-                      placeholder="e.g. Red, Blue, Black"
-                      value={productDetails.color || ''}
-                      onChange={(e) => setProductDetails({ ...productDetails, color: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="Material/Fabric"
-                      placeholder="e.g. Cotton, Silk, Linen"
-                      value={productDetails.material || ''}
-                      onChange={(e) => setProductDetails({ ...productDetails, material: e.target.value })}
-                    />
-                    <FormInput
-                      label="Gender"
-                      placeholder="e.g. Women, Men, Unisex"
-                      value={productDetails.gender || ''}
-                      onChange={(e) => setProductDetails({ ...productDetails, gender: e.target.value })}
-                    />
-                  </div>
-
-                  <FormInput
-                    label="Style"
-                    placeholder="e.g. Traditional, Modern, Casual"
-                    value={productDetails.style || ''}
-                    onChange={(e) => setProductDetails({ ...productDetails, style: e.target.value })}
-                  />
-                </div>
-              )}
-
-              {/* Step 3: Listing Type */}
-              {step === 3 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Listing Type</h3>
-                  <p className="text-sm text-muted-foreground">Current selection: {listingType === 'sale' ? 'For Sale' : 'For Rent'}</p>
-
-                  <div className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                          {listingType === 'sale' ? (
-                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                            </svg>
-                          ) : (
-                            <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{listingType === 'sale' ? 'For Sale' : 'For Rent'}</h4>
-                          <p className="text-xs text-muted-foreground">{listingType === 'sale' ? 'Sell your item directly' : 'Rent out your item'}</p>
-                        </div>
-                      </div>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setListingType(null)}>
-                        Change
-                      </Button>
-                    </div>
-
-                    {listingType === 'rent' && (
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="font-medium">Rental Information</h4>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <FormInput
-                            label="Rental Price (ETB/day)"
-                            placeholder="e.g. 200"
-                            type="number"
-                            value={rentalInfo.rentalPricePerDay}
-                            onChange={(e) => setRentalInfo({ ...rentalInfo, rentalPricePerDay: e.target.value })}
-                            {...(errors.rentalPricePerDay !== undefined && { error: errors.rentalPricePerDay })}
-                          />
-                          <FormInput
-                            label="Security Deposit (ETB)"
-                            placeholder="e.g. 500"
-                            type="number"
-                            value={rentalInfo.rentalDeposit}
-                            onChange={(e) => setRentalInfo({ ...rentalInfo, rentalDeposit: e.target.value })}
-                            {...(errors.rentalDeposit !== undefined && { error: errors.rentalDeposit })}
-                          />
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <FormInput
-                            label="Minimum Rental Days"
-                            placeholder="e.g. 1"
-                            type="number"
-                            value={rentalInfo.minRentalDays}
-                            onChange={(e) => setRentalInfo({ ...rentalInfo, minRentalDays: e.target.value })}
-                          />
-                          <FormInput
-                            label="Maximum Rental Days"
-                            placeholder="e.g. 30"
-                            type="number"
-                            value={rentalInfo.maxRentalDays}
-                            onChange={(e) => setRentalInfo({ ...rentalInfo, maxRentalDays: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Custom Option */}
-              {step === 4 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Custom-Made Option</h3>
-                  <p className="text-sm text-muted-foreground">Can this item be customized for buyers?</p>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={customOrderAvailable}
-                        onChange={(e) => setCustomOrderAvailable(e.target.checked)}
-                      />
-                      <div>
-                        <span className="font-medium">Available for custom order?</span>
-                        <p className="text-xs text-muted-foreground">Buyers can request customizations</p>
-                      </div>
-                    </div>
-
-                    {customOrderAvailable && (
-                      <div className="space-y-4 border-t pt-4">
-                        <h4 className="font-medium">Customization Details</h4>
-                        
-                        <div className="space-y-3">
-                          <label className="flex items-center gap-3">
-                            <Checkbox
-                              checked={customDetails.sizeAdjustments}
-                              onChange={(e) => setCustomDetails({ ...customDetails, sizeAdjustments: e.target.checked })}
-                            />
-                            <span className="text-sm">Size adjustments available</span>
-                          </label>
-                          <label className="flex items-center gap-3">
-                            <Checkbox
-                              checked={customDetails.colorFabricChanges}
-                              onChange={(e) => setCustomDetails({ ...customDetails, colorFabricChanges: e.target.checked })}
-                            />
-                            <span className="text-sm">Color/fabric changes available</span>
-                          </label>
-                          <label className="flex items-center gap-3">
-                            <Checkbox
-                              checked={customDetails.embroidery}
-                              onChange={(e) => setCustomDetails({ ...customDetails, embroidery: e.target.checked })}
-                            />
-                            <span className="text-sm">Embroidery customization available</span>
-                          </label>
-                        </div>
-
-                        <FormTextarea
-                          label="Other Customization Options"
-                          placeholder="Describe any other customization options you offer..."
-                          rows={3}
-                          value={customDetails.otherCustomization}
-                          onChange={(e) => setCustomDetails({ ...customDetails, otherCustomization: e.target.value })}
-                        />
-
-                        <FormInput
-                          label="Additional Custom Price (ETB) - Optional"
-                          placeholder="e.g. 500"
-                          type="number"
-                          value={customDetails.additionalCustomPrice}
-                          onChange={(e) => setCustomDetails({ ...customDetails, additionalCustomPrice: e.target.value })}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Contact */}
-              {step === 5 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Contact Options</h3>
-                  <p className="text-sm text-muted-foreground">How can buyers reach you?</p>
-
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3">
-                      <Checkbox
-                        checked={contactOptions.inAppMessaging}
-                        onChange={(e) => updateContact('inAppMessaging', e.target.checked)}
-                      />
-                      <div>
-                        <span className="font-medium">Platform chat</span>
-                        <p className="text-xs text-muted-foreground">Buyers can message you through the platform</p>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-3">
-                      <Checkbox
-                        checked={contactOptions.showPhone}
-                        onChange={(e) => updateContact('showPhone', e.target.checked)}
-                      />
-                      <div>
-                        <span className="font-medium">Phone</span>
-                        <p className="text-xs text-muted-foreground">Show your phone number to buyers</p>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormInput
-                      label="WhatsApp Number"
-                      placeholder="e.g. +251911123456"
-                      value={contactOptions.whatsapp}
-                      onChange={(e) => updateContact('whatsapp', e.target.value)}
-                    />
-                    <FormInput
-                      label="Telegram Username"
-                      placeholder="e.g. @username"
-                      value={contactOptions.telegram}
-                      onChange={(e) => updateContact('telegram', e.target.value)}
-                    />
-                  </div>
-
-                  {errors.contact && (
-                    <p className="text-sm text-destructive">{errors.contact}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Step 6: Preview */}
-              {step === 6 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-display font-semibold">Preview Your Listing</h3>
-                  <p className="text-sm text-muted-foreground">This is how your listing will appear to buyers</p>
-
-                  <div className="rounded-lg border bg-card p-6">
-                    <div className="flex gap-6">
-                      {images.length > 0 && images[0] && (
-                        <div className="h-48 w-48 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
-                          <img src={images[0].url} alt={title} className="h-full w-full object-cover" />
-                        </div>
-                      )}
-                      <div className="flex-1 space-y-2">
-                        <h4 className="text-xl font-semibold">{title || 'Product Title'}</h4>
-                        <p className="text-2xl font-bold text-primary">{price ? `${price} ETB` : 'Price'}</p>
-                        <p className="text-sm text-muted-foreground">📍 {city || 'Location'}</p>
-                        <p className="text-sm line-clamp-2">{description || 'Product description...'}</p>
-                        <div className="flex gap-2">
-                          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{condition || 'Condition'}</span>
-                          <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">{listingType === 'sale' ? 'For Sale' : 'For Rent'}</span>
-                          {customOrderAvailable && (
-                            <span className="rounded-full bg-brand-gold/10 px-2 py-1 text-xs font-medium text-brand-gold">Custom Available</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </CardContent>
-          </Card>
-
-          {/* Navigation */}
-          <div className="mt-4 flex items-center justify-between">
-            <Button type="button" variant="outline" onClick={handleBack} disabled={step === 0}>
-              Back
-            </Button>
-
-            {step < steps.length - 1 ? (
-              <Button type="button" onClick={handleNext}>
-                Next
-              </Button>
-            ) : (
-              <Button type="button" onClick={handlePublish} disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <span className="flex items-center gap-2"><Spinner size="sm" /> Publishing...</span>
-                ) : (
-                  submitLabel
-                )}
-              </Button>
-            )}
+        {/* Contact preview pills */}
+        <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {sellerProfile?.displayName || user?.displayName || 'Your Seller Shop'}
+          </span>
+          <div className="flex items-center gap-1.5 text-[11px]">
+            {inAppMessaging && <span className="text-primary font-medium">💬 Chat</span>}
+            {(showPhone || whatsapp) && <span>📞 Direct</span>}
           </div>
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <form onSubmit={handleFormSubmit} className="space-y-8">
+      {/* Draft restoration banner */}
+      {hasDraftNotice && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">📝</span>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Unsaved listing draft found</p>
+              <p className="text-[11px] text-muted-foreground">
+                You have work from a previous session. Would you like to restore it?
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" size="sm" variant="primary" onClick={restoreDraft}>
+              Restore Draft
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Main 2-column layout on desktop, single column on mobile */}
+      <div className="grid gap-8 lg:grid-cols-12 items-start">
+        {/* Form Fields: 8 columns on large screens */}
+        <div className="space-y-8 lg:col-span-8">
+
+          {/* ════════ SECTION 1: PHOTOS ════════ */}
+          <section id="field-images" className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm">
+            <div className="mb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <span>📸</span> Photos
+                </h3>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {images.length}/8 uploaded
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Clear photos from different angles increase inquiries by 3×. The first photo is your main cover.
+              </p>
+            </div>
+
+            <ImageUploadSection
+              images={images}
+              onImagesChange={(imgs) => {
+                setImages(imgs);
+                if (validationErrors.images) {
+                  setValidationErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.images;
+                    return next;
+                  });
+                }
+              }}
+              error={validationErrors.images}
+            />
+          </section>
+
+          {/* ════════ SECTION 2: BASIC INFORMATION ════════ */}
+          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <span>ℹ️</span> Basic Information
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Key details that help Ethiopian fashion buyers find your item.
+              </p>
+            </div>
+
+            {/* Category */}
+            <div id="field-categoryId">
+              <CategoryPicker
+                value={categoryId}
+                onChange={(id, name) => {
+                  setCategoryId(id);
+                  setCategoryName(name);
+                  if (validationErrors.categoryId) {
+                    setValidationErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.categoryId;
+                      return next;
+                    });
+                  }
+                }}
+                error={validationErrors.categoryId}
+              />
+            </div>
+
+            {/* Title */}
+            <div id="field-title">
+              <FormInput
+                label="Product Title"
+                placeholder="e.g. Traditional Handwoven Habesha Kemis with Royal Gold Tilf"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (validationErrors.title) {
+                    setValidationErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.title;
+                      return next;
+                    });
+                  }
+                }}
+                required
+                {...(validationErrors.title ? { error: validationErrors.title } : {})}
+              />
+            </div>
+
+            {/* Description */}
+            <div id="field-description">
+              <FormTextarea
+                label="Description"
+                placeholder="Describe fabric craftsmanship, embroidery details, fit, occasion (weddings, festivals, holidays), and care instructions..."
+                rows={4}
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  if (validationErrors.description) {
+                    setValidationErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.description;
+                      return next;
+                    });
+                  }
+                }}
+                required
+                {...(validationErrors.description ? { error: validationErrors.description } : {})}
+              />
+            </div>
+
+            {/* Condition & Location */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div id="field-condition">
+                <FormSelect
+                  label="Condition"
+                  options={CONDITIONS}
+                  value={condition}
+                  onChange={(e) => {
+                    setCondition(e.target.value);
+                    if (validationErrors.condition) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.condition;
+                        return next;
+                      });
+                    }
+                  }}
+                  required
+                  {...(validationErrors.condition ? { error: validationErrors.condition } : {})}
+                />
+              </div>
+
+              <div>
+                <FormInput
+                  label="Location / City"
+                  placeholder="e.g. Addis Ababa (Bole)"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ════════ SECTION 3: FASHION & GARMENT DETAILS ════════ */}
+          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <span>👗</span> Fashion & Garment Details
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Attributes tailored to traditional and modern Ethiopian fashion.
+              </p>
+            </div>
+
+            {/* Target Audience / Gender */}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Category Group
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ETHIOPIAN_GENDERS.map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => setGender(g.value)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                      gender === g.value
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Size */}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Size
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {ETHIOPIAN_SIZES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSize(s)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                      size === s
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Cultural Style & Fabric */}
+            <div className="grid gap-4 sm:grid-cols-2 pt-1">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Cultural Style / Design
+                </label>
+                <select
+                  value={style}
+                  onChange={(e) => setStyle(e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {ETHIOPIAN_STYLES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Fabric / Material
+                </label>
+                <select
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {ETHIOPIAN_FABRICS.map((fb) => (
+                    <option key={fb} value={fb}>
+                      {fb}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Color / Tilf */}
+            <div>
+              <FormInput
+                label="Color & Embroidery (Tilf) Details"
+                placeholder="e.g. White with Gold and Emerald Tilf"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+              />
+            </div>
+          </section>
+
+          {/* ════════ SECTION 4: LISTING TYPE & PRICING ════════ */}
+          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-5">
+            <div>
+              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <span>💰</span> Listing Type & Pricing
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Choose whether you are selling this fashion piece or offering it for temporary rental.
+              </p>
+            </div>
+
+            {/* Segmented Switch: Sale vs Rent */}
+            <div className="grid grid-cols-2 gap-3 p-1 rounded-xl bg-muted/50 border">
+              <button
+                type="button"
+                onClick={() => setListingType('sale')}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all ${
+                  listingType === 'sale'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>🏷️</span> For Sale
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setListingType('rent')}
+                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all ${
+                  listingType === 'rent'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>📅</span> For Rent
+              </button>
+            </div>
+
+            {/* Sale Fields */}
+            {listingType === 'sale' && (
+              <div id="field-price" className="space-y-4 pt-1">
+                <div className="max-w-xs">
+                  <FormInput
+                    label="Price (ETB)"
+                    placeholder="e.g. 5500"
+                    type="number"
+                    value={price}
+                    onChange={(e) => {
+                      setPrice(e.target.value);
+                      if (validationErrors.price) {
+                        setValidationErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.price;
+                          return next;
+                        });
+                      }
+                    }}
+                    required
+                    {...(validationErrors.price ? { error: validationErrors.price } : {})}
+                  />
+                  <span className="text-[11px] text-muted-foreground block mt-1">
+                    Buyers contact you directly through chat or phone to arrange purchase.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Rental Fields */}
+            {listingType === 'rent' && (
+              <div className="space-y-4 pt-1">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div id="field-rentalPricePerDay">
+                    <FormInput
+                      label="Daily Rental Rate (ETB / day)"
+                      placeholder="e.g. 350"
+                      type="number"
+                      value={rentalPricePerDay}
+                      onChange={(e) => {
+                        setRentalPricePerDay(e.target.value);
+                        if (validationErrors.rentalPricePerDay) {
+                          setValidationErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.rentalPricePerDay;
+                            return next;
+                          });
+                        }
+                      }}
+                      required
+                      {...(validationErrors.rentalPricePerDay
+                        ? { error: validationErrors.rentalPricePerDay }
+                        : {})}
+                    />
+                  </div>
+
+                  <div id="field-rentalDeposit">
+                    <FormInput
+                      label="Refundable Security Deposit (ETB)"
+                      placeholder="e.g. 1000"
+                      type="number"
+                      value={rentalDeposit}
+                      onChange={(e) => {
+                        setRentalDeposit(e.target.value);
+                        if (validationErrors.rentalDeposit) {
+                          setValidationErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.rentalDeposit;
+                            return next;
+                          });
+                        }
+                      }}
+                      required
+                      {...(validationErrors.rentalDeposit
+                        ? { error: validationErrors.rentalDeposit }
+                        : {})}
+                    />
+                  </div>
+                </div>
+
+                {/* Rental Copies & Duration */}
+                <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      Identical Rental Copies Available
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRentalQuantity(Math.max(1, rentalQuantity - 1))}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/30 text-foreground hover:bg-muted"
+                      >
+                        -
+                      </button>
+                      <span className="flex h-9 w-12 items-center justify-center font-semibold text-sm">
+                        {rentalQuantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRentalQuantity(rentalQuantity + 1)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/30 text-foreground hover:bg-muted"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground block mt-1">
+                      Used internally to manage multiple identical rental copies. Not displayed as bulk inventory to buyers.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <FormInput
+                        label="Min Days"
+                        type="number"
+                        value={minRentalDays}
+                        onChange={(e) => setMinRentalDays(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <FormInput
+                        label="Max Days"
+                        type="number"
+                        value={maxRentalDays}
+                        onChange={(e) => setMaxRentalDays(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ════════ SECTION 5: CUSTOM-MADE OPTION ════════ */}
+          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <span>✨</span> Custom-Made Option
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Can this dress or outfit be tailored to a buyer&apos;s specific measurements or color request?
+                </p>
+              </div>
+
+              {/* Yes / No Toggle */}
+              <div className="flex rounded-lg border bg-muted/40 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCustomOrderAvailable(false)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all ${
+                    !customOrderAvailable
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomOrderAvailable(true)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition-all ${
+                    customOrderAvailable
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+
+            {/* Custom details (Progressive disclosure) */}
+            {customOrderAvailable && (
+              <div className="space-y-4 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Select what customization options you offer for this listing:
+                </p>
+
+                <div className="grid gap-2.5 sm:grid-cols-3">
+                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                    <Checkbox
+                      checked={sizeAdjustments}
+                      onChange={(e) => setSizeAdjustments(e.target.checked)}
+                    />
+                    <span className="text-xs font-medium">Bespoke Measurements</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                    <Checkbox
+                      checked={colorFabricChanges}
+                      onChange={(e) => setColorFabricChanges(e.target.checked)}
+                    />
+                    <span className="text-xs font-medium">Color & Fabric Variations</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                    <Checkbox
+                      checked={embroidery}
+                      onChange={(e) => setEmbroidery(e.target.checked)}
+                    />
+                    <span className="text-xs font-medium">Custom Tilf Patterns</span>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 pt-1">
+                  <div>
+                    <FormInput
+                      label="Tailoring / Production Time (Days)"
+                      type="number"
+                      placeholder="e.g. 7"
+                      value={productionDays}
+                      onChange={(e) => setProductionDays(e.target.value)}
+                    />
+                    <span className="text-[11px] text-muted-foreground block mt-1">
+                      Estimated days needed to tailor and prepare the custom order.
+                    </span>
+                  </div>
+
+                  <div>
+                    <FormInput
+                      label="Custom Order Starting Price (ETB) - Optional"
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={additionalCustomPrice}
+                      onChange={(e) => setAdditionalCustomPrice(e.target.value)}
+                    />
+                    <span className="text-[11px] text-muted-foreground block mt-1">
+                      Starting custom price or base customization surcharge.
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <FormInput
+                    label="Customization Instructions (Optional)"
+                    placeholder="e.g. Provide bust, waist, and shoulder-to-floor measurements in inches or cm."
+                    value={otherCustomization}
+                    onChange={(e) => setOtherCustomization(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ════════ SECTION 6: CONTACT PREFERENCES ════════ */}
+          <section id="field-contact" className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <span>📞</span> Contact Preferences
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                How should interested buyers reach you? Reused automatically from your seller profile.
+              </p>
+            </div>
+
+            {validationErrors.contact && (
+              <p className="text-xs font-medium text-destructive">{validationErrors.contact}</p>
+            )}
+
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-muted/30">
+                <Checkbox
+                  checked={inAppMessaging}
+                  onChange={(e) => setInAppMessaging(e.target.checked)}
+                />
+                <div>
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    Platform Chat <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] text-primary">Recommended</span>
+                  </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Receive instant messages securely within Habesha Market.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-muted/30">
+                <Checkbox
+                  checked={showPhone}
+                  onChange={(e) => setShowPhone(e.target.checked)}
+                />
+                <div>
+                  <span className="text-xs font-semibold text-foreground">Phone Call</span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Display your verified phone number to buyers on the listing page.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 pt-1">
+              <div>
+                <FormInput
+                  label="WhatsApp Number (Optional)"
+                  placeholder="e.g. +251911123456"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                />
+                <span className="text-[11px] text-muted-foreground block mt-1">
+                  Enables a 1-click &quot;Chat on WhatsApp&quot; button for buyers.
+                </span>
+              </div>
+
+              <div>
+                <FormInput
+                  label="Telegram Username (Optional)"
+                  placeholder="e.g. @ethio_fashion"
+                  value={telegram}
+                  onChange={(e) => setTelegram(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ════════ SUBMIT ACTION & ERROR REPORTING ════════ */}
+          <div className="pt-2 space-y-4">
+            {/* Single clean error location right above the primary submit button */}
+            {error && (
+              <Alert variant="error" {...(onClearError ? { onDismiss: onClearError } : {})}>
+                <div className="space-y-1">
+                  <p className="font-semibold text-xs">Submission Error</p>
+                  <p className="text-xs">{typeof error === 'string' ? error : getApiErrorMessage(error)}</p>
+                </div>
+              </Alert>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border bg-muted/30 p-4">
+              <div className="text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">Listing Approval Process</p>
+                <p className="text-[11px] mt-0.5">
+                  Your listing will be submitted to our admin team for quality review before publishing.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="flex-1 sm:flex-initial"
+                >
+                  Preview
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 sm:flex-initial min-w-[160px]"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <Spinner size="sm" /> Submitting...
+                    </span>
+                  ) : (
+                    submitLabel
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sticky Sidebar (Desktop): Live Buyer Card Preview */}
+        <div className="hidden lg:block lg:col-span-4 sticky top-24 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Live Buyer Preview
+            </h4>
+            <span className="text-[11px] text-primary font-medium">Updates live</span>
+          </div>
+
+          {BuyerPreviewCard}
+
+          <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground text-[11px]">💡 Seller Tip</p>
+            <p className="text-[11px] leading-relaxed">
+              Listings with detailed cultural fabric info and clear Habesha Kemis photos receive 3× more calls and inquiries.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Preview Modal */}
+      <Modal
+        open={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title="Buyer Listing Preview"
+      >
+        <div className="p-4 space-y-4">
+          {BuyerPreviewCard}
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => setIsPreviewOpen(false)}>
+              Back to Editing
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </form>
   );
 }

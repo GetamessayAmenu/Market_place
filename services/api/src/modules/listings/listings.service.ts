@@ -1115,7 +1115,10 @@ export class ListingsService {
     images: readonly { url: string; cloudinaryPublicId: string }[],
   ): void {
     for (const image of images) {
-      if (!image.cloudinaryPublicId.includes('listings')) {
+      if (
+        !image.cloudinaryPublicId.includes('listings') &&
+        !image.cloudinaryPublicId.startsWith('seed/')
+      ) {
         throw new ListingForbiddenException('Invalid image upload folder');
       }
     }

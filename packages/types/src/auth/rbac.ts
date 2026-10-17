@@ -73,7 +73,7 @@ export type PermissionResource =
   | 'security'
   | 'feature_flag'
   | 'feature_flags'
-  | string;
+  | (string & {});
 
 export type PermissionAction =
   | 'view'
@@ -91,7 +91,7 @@ export type PermissionAction =
   | 'assign_roles'
   | 'assign_permissions'
   | 'export'
-  | string;
+  | (string & {});
 
 export interface PermissionDefinition {
   readonly id?: string;
