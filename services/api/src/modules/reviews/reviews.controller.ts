@@ -59,6 +59,12 @@ export class ReviewsController {
     });
   }
 
+  @Public()
+  @Get('seller/:sellerId/summary')
+  getSellerSummary(@Param('sellerId') sellerId: string) {
+    return this.reviewsService.getSellerSummary(sellerId);
+  }
+
   @Delete(':id')
   remove(
     @Param('id') id: string,

@@ -72,6 +72,7 @@ export interface ReviewData {
   helpfulCount: number
   createdAt: string
   reviewer?: { id: string; displayName: string; avatarUrl: string | null }
+  listing?: { id: string; title: string; slug?: string }
 }
 
 export interface ReviewSummaryData {
@@ -100,6 +101,10 @@ export async function getSellerReviews(sellerId: string, params?: { page?: numbe
   if (params?.page) queryParams.page = params.page
   if (params?.limit) queryParams.limit = params.limit
   return apiGet<{ data: ReviewData[]; meta: { total: number; page: number; totalPages: number } }>(`/reviews/seller/${sellerId}`, queryParams)
+}
+
+export async function getSellerReviewSummary(sellerId: string) {
+  return apiGet<ReviewSummaryData>(`/reviews/seller/${sellerId}/summary`)
 }
 
 export async function deleteReview(id: string) {

@@ -8,6 +8,7 @@ import { usePendingActions, type PendingAction } from '../../hooks/seller/usePen
 import { useEngagementMetrics } from '../../hooks/seller/useEngagementMetrics';
 import { useDashboardKpis } from '../../hooks/seller/useDashboardKpis';
 import { usePromotionalBanner } from '../../hooks/seller/usePromotionalBanner';
+import { useSellerOrders } from '../../hooks/seller/useSellerOrders';
 import { useMyListings } from '../../hooks/useSeller';
 import { apiGet } from '../../lib/api';
 
@@ -20,13 +21,13 @@ const IconAlert = () => (
 );
 
 const IconCheckCircle = () => (
-  <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+  <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
 const IconPlus = () => (
-  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
   </svg>
 );
@@ -54,6 +55,8 @@ const IconStore = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
   </svg>
 );
+
+
 
 const IconEye = () => (
   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
@@ -84,24 +87,46 @@ const IconUsers = () => (
 
 function ActionTriageCard({ action }: { action: PendingAction }) {
   const urgencyStyles = {
-    high: 'border-red-300 bg-red-50/60 dark:bg-red-950/20 dark:border-red-900/50',
-    medium: 'border-amber-300 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900/50',
-    low: 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40',
+    high: 'border-red-200 bg-red-50/70 text-red-950 dark:bg-red-950/20 dark:border-red-900/50',
+    medium: 'border-amber-200 bg-amber-50/60 text-amber-950 dark:bg-amber-950/20 dark:border-amber-900/50',
+    low: 'border-blue-200 bg-blue-50/50 text-blue-950 dark:bg-blue-950/20 dark:border-blue-900/40',
   };
 
   const badgeConfig = {
-    high: { label: 'High Priority', className: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
-    medium: { label: 'Attention', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
-    low: { label: 'Info', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+    high: { label: 'Urgent Action', className: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200' },
+    medium: { label: 'Attention Required', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200' },
+    low: { label: 'Notice', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200' },
   };
 
   const currentBadge = badgeConfig[action.urgency] || badgeConfig.low;
   const targetHref = action.href || '/seller/listings';
 
+  const getActionLabel = (type: string) => {
+    switch (type) {
+      case 'rejection':
+      case 'changes_requested':
+        return 'Edit & Resubmit →';
+      case 'rental_request':
+        return 'Respond to Rental →';
+      case 'custom_order':
+        return 'Review Request →';
+      case 'unread_message':
+        return 'Reply in Chat →';
+      case 'handover':
+        return 'Inspect Return →';
+      case 'profile_completion':
+        return 'Complete Profile →';
+      case 'approval':
+        return 'View Listings →';
+      default:
+        return 'Take Action →';
+    }
+  };
+
   return (
-    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-4 transition-all ${urgencyStyles[action.urgency] || urgencyStyles.low}`}>
+    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-4 transition-all shadow-2xs ${urgencyStyles[action.urgency] || urgencyStyles.low}`}>
       <div className="flex items-start gap-3 min-w-0">
-        <div className={`mt-0.5 rounded-full p-1.5 ${action.urgency === 'high' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+        <div className={`mt-0.5 rounded-full p-1.5 flex-shrink-0 ${action.urgency === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/50' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50'}`}>
           <IconAlert />
         </div>
         <div className="min-w-0 flex-1">
@@ -116,8 +141,8 @@ function ActionTriageCard({ action }: { action: PendingAction }) {
       </div>
       <div className="flex-shrink-0 self-end sm:self-center">
         <Link href={targetHref}>
-          <Button size="sm" variant={action.urgency === 'high' ? 'primary' : 'outline'}>
-            Take Action →
+          <Button size="sm" variant={action.urgency === 'high' ? 'primary' : 'outline'} className="text-xs">
+            {getActionLabel(action.type)}
           </Button>
         </Link>
       </div>
@@ -129,13 +154,13 @@ function QuickActionCard({ icon, label, description, href }: { icon: React.React
   return (
     <Link href={href} className="group block">
       <Card className="h-full hover:border-primary/50 hover:shadow-sm transition-all duration-200">
-        <CardContent className="p-4 flex flex-col items-start gap-2.5">
-          <div className="p-2.5 rounded-lg bg-primary/10 text-primary group-hover:scale-105 transition-transform">
+        <CardContent className="p-3.5 flex flex-col items-start gap-2">
+          <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:scale-105 transition-transform">
             {icon}
           </div>
           <div>
-            <span className="text-sm font-semibold group-hover:text-primary transition-colors">{label}</span>
-            <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+            <span className="text-xs font-semibold group-hover:text-primary transition-colors block">{label}</span>
+            <p className="text-2xs text-muted-foreground mt-0.5 line-clamp-1">{description}</p>
           </div>
         </CardContent>
       </Card>
@@ -156,17 +181,17 @@ function MetricCard({
 }) {
   return (
     <Card className="hover:border-primary/30 transition-colors">
-      <CardContent className="p-4">
+      <CardContent className="p-3.5">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <div className="p-1.5 rounded-md bg-muted text-foreground/70">
+          <p className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+          <div className="p-1 rounded bg-muted text-foreground/70">
             {icon}
           </div>
         </div>
-        <div className="mt-2 flex items-baseline justify-between">
-          <p className="text-2xl font-bold tracking-tight">{value.toLocaleString()}</p>
+        <div className="mt-1.5 flex items-baseline justify-between">
+          <p className="text-xl font-bold tracking-tight">{value.toLocaleString()}</p>
           {change !== undefined && (
-            <span className={`text-xs font-semibold ${change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`text-2xs font-semibold ${change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
               {change >= 0 ? '+' : ''}{change}%
             </span>
           )}
@@ -182,6 +207,7 @@ export default function SellerOverviewPage() {
   const user = useAuth((s) => s.user);
   const sellerId = user?.id || '';
   const [followerCount, setFollowerCount] = useState<number>(0);
+  const [unreadMsgCount, setUnreadMsgCount] = useState<number>(0);
 
   // Real backend queries
   const { data: pendingActions = [], isLoading: isLoadingActions } = usePendingActions(sellerId);
@@ -189,8 +215,9 @@ export default function SellerOverviewPage() {
   const { data: kpis } = useDashboardKpis(sellerId);
   const { data: promoBanner } = usePromotionalBanner();
   const { data: myListingsRes } = useMyListings(sellerId);
+  const { data: sellerOrders = [] } = useSellerOrders(sellerId);
 
-  // Fetch follower count
+  // Fetch unread count & follower count
   useEffect(() => {
     if (sellerId) {
       apiGet<{ _count: { storeFollowers: number } }>(`/users/${sellerId}`)
@@ -199,6 +226,14 @@ export default function SellerOverviewPage() {
         })
         .catch(() => {
           setFollowerCount(0);
+        });
+
+      apiGet<{ unreadCount: number }>('/chat/unread-count')
+        .then((data) => {
+          setUnreadMsgCount(data?.unreadCount || 0);
+        })
+        .catch(() => {
+          setUnreadMsgCount(0);
         });
     }
   }, [sellerId]);
@@ -214,7 +249,7 @@ export default function SellerOverviewPage() {
     );
   }
 
-  // Listing data parsing
+  // Parse listing data
   const rawListings: any[] = Array.isArray(myListingsRes)
     ? myListingsRes
     : Array.isArray((myListingsRes as any)?.data)
@@ -225,21 +260,26 @@ export default function SellerOverviewPage() {
 
   const activeListingCount = kpis?.activeListings ?? rawListings.filter((l: any) => l.status === 'active').length;
 
+  // Filter requests requiring response
+  const activeRequests = sellerOrders.filter(
+    (o) => o.status === 'REQUESTED' || o.status === 'INQUIRY_PENDING' || o.status === 'submitted' || o.status === 'requested'
+  );
+
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       {/* ── 1. Seller Header & Status ────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl font-bold tracking-tight">
-              Welcome, {user.displayName || 'Seller'}
+              Welcome, {user.displayName || 'Artisan Seller'}
             </h1>
-            <Badge variant="outline" className="text-2xs bg-emerald-50 text-emerald-700 border-emerald-200">
-              Active Seller
+            <Badge variant="outline" className="text-2xs bg-emerald-50 text-emerald-800 border-emerald-200">
+              Verified Seller
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Habesha Market Seller Hub — Overview & Live Activity
+          <p className="text-xs text-muted-foreground mt-1">
+            Habesha Market Seller Command Center — Addis Ababa & Regional Marketplace
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,12 +297,12 @@ export default function SellerOverviewPage() {
         </div>
       </div>
 
-      {/* ── 2. Dynamic Promotional Banner (Only if active in backend) ───────── */}
+      {/* ── 2. Cultural / Promotional Alert Banner (when active) ─────────────── */}
       {promoBanner && (
-        <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">✨</span>
+              <span className="text-2xl" aria-hidden="true">✨</span>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-sm text-foreground">{promoBanner.title}</p>
@@ -273,7 +313,7 @@ export default function SellerOverviewPage() {
                   )}
                 </div>
                 {promoBanner.description && (
-                  <p className="text-xs text-muted-foreground mt-1">{promoBanner.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{promoBanner.description}</p>
                 )}
               </div>
             </div>
@@ -288,11 +328,11 @@ export default function SellerOverviewPage() {
         </div>
       )}
 
-      {/* ── 3. Priority: Needs Attention / Action Required ────────────────── */}
+      {/* ── 3. Priority: Needs Attention ────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold tracking-tight">Needs Attention</h2>
+            <h2 className="text-sm font-semibold tracking-tight uppercase text-foreground/80">Needs Attention</h2>
             {pendingActions.length > 0 && (
               <Badge className="bg-destructive text-white text-2xs px-1.5 py-0.5">
                 {pendingActions.length}
@@ -300,13 +340,13 @@ export default function SellerOverviewPage() {
             )}
           </div>
           {pendingActions.length > 0 && (
-            <span className="text-xs text-muted-foreground">High priority tasks requiring your immediate response</span>
+            <span className="text-xs text-muted-foreground">Actionable alerts requiring your review or response</span>
           )}
         </div>
 
         {isLoadingActions ? (
-          <div className="p-6 border rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">
-            Checking for pending actions...
+          <div className="p-6 border rounded-xl bg-muted/20 text-center text-xs text-muted-foreground">
+            Checking for actionable seller items...
           </div>
         ) : pendingActions.length > 0 ? (
           <div className="space-y-2.5">
@@ -315,14 +355,14 @@ export default function SellerOverviewPage() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-3.5 rounded-lg border border-emerald-200/60 bg-emerald-50/40 p-4 dark:border-emerald-950/50 dark:bg-emerald-950/10">
+          <div className="flex items-center gap-3.5 rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-4 dark:border-emerald-950/50 dark:bg-emerald-950/10">
             <IconCheckCircle />
             <div>
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
                 You're all caught up!
               </p>
               <p className="text-xs text-emerald-800/80 dark:text-emerald-400/80 mt-0.5">
-                No listings require review, all rental dates are confirmed, and no unanswered buyer inquiries remain.
+                No listings require review, rental dates are confirmed, and no unanswered buyer inquiries remain.
               </p>
             </div>
           </div>
@@ -331,12 +371,12 @@ export default function SellerOverviewPage() {
 
       {/* ── 4. Quick Actions ─────────────────────────────────────────────────── */}
       <div>
-        <h2 className="text-base font-semibold tracking-tight mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <h2 className="text-sm font-semibold tracking-tight uppercase text-foreground/80 mb-2.5">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <QuickActionCard
             icon={<IconPlus />}
             label="Add Listing"
-            description="Sell, rent, or custom-made"
+            description="Sell, rent, or custom"
             href="/seller/catalog/new"
           />
           <QuickActionCard
@@ -348,31 +388,33 @@ export default function SellerOverviewPage() {
           <QuickActionCard
             icon={<IconCalendar />}
             label="Rental Calendar"
-            description="Set blackout & maintenance"
-            href="/seller/catalog#calendar"
+            description="Block dates & maintenance"
+            href="/seller/listings?tab=calendar"
           />
           <QuickActionCard
             icon={<IconMessages />}
             label="Inquiries & Chat"
-            description="Buyer chats & requests"
+            description={unreadMsgCount > 0 ? `${unreadMsgCount} unread message(s)` : 'Direct buyer chats'}
             href="/seller/messages"
           />
           <QuickActionCard
             icon={<IconStore />}
-            label="Store Profile"
-            description="KYC, location & branding"
+            label="Store & Profile"
+            description="Branding, location & KYC"
             href="/seller/store"
           />
         </div>
       </div>
 
-      {/* ── 5. Engagement Health & Inquiries (Real contact-first metrics) ────── */}
+      {/* ── 5. Engagement & Buyer Activity ───────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold tracking-tight">Engagement & Buyer Activity</h2>
-          <span className="text-xs text-muted-foreground">Last 30 days</span>
+        <div className="flex items-center justify-between mb-2.5">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight uppercase text-foreground/80">Buyer Engagement & Inquiries</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Real contact interactions across your shop in the last 30 days</p>
+          </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard
             label="Listing Views"
             value={kpis?.listingViews ?? 0}
@@ -405,30 +447,106 @@ export default function SellerOverviewPage() {
         </div>
       </div>
 
-      {/* ── 6. Live Listings Overview & Quick Status ────────────────────────── */}
+      {/* ── 6. Recent Requests & Orders Activity (Rental & Custom pipeline) ───── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold tracking-tight">Recent Listings Status</h2>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold tracking-tight uppercase text-foreground/80">Recent Requests & Orders Activity</h2>
+            {activeRequests.length > 0 && (
+              <Badge className="bg-amber-100 text-amber-800 text-2xs border-none">
+                {activeRequests.length} pending
+              </Badge>
+            )}
+          </div>
+          <Link href="/seller/orders" className="text-xs font-medium text-primary hover:underline">
+            View all orders & requests ({sellerOrders.length}) →
+          </Link>
+        </div>
+
+        {sellerOrders.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-sm text-foreground font-medium">No customer orders or rental requests yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                When a buyer submits a rental date request, custom tailoring measurements, or initiates an order, it will appear here.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {sellerOrders.slice(0, 3).map((order) => (
+              <Card key={order.id} className="hover:border-primary/40 transition-colors">
+                <CardContent className="p-4 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {order.orderNumber || order.type || 'Order'}
+                      </span>
+                      <Badge variant="outline" className={`text-2xs capitalize ${
+                        order.status === 'REQUESTED' || order.status === 'submitted'
+                          ? 'bg-amber-100 text-amber-800 border-amber-200'
+                          : order.status === 'APPROVED' || order.status === 'in_production'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {String(order.status).replace(/_/g, ' ')}
+                      </Badge>
+                    </div>
+
+                    <p className="font-semibold text-sm truncate text-foreground">
+                      {order.product?.title || order.title || 'Ethiopian Fashion Item'}
+                    </p>
+
+                    <div className="mt-1.5 text-xs text-muted-foreground space-y-0.5">
+                      <p>Buyer: <span className="text-foreground font-medium">{order.buyer?.displayName || order.customerName || 'Customer'}</span></p>
+                      {order.rentalStartDate && (
+                        <p>Dates: {new Date(order.rentalStartDate).toLocaleDateString()} → {order.rentalEndDate ? new Date(order.rentalEndDate).toLocaleDateString() : 'N/A'}</p>
+                      )}
+                      {order.price && (
+                        <p className="font-semibold text-primary mt-1">ETB {Number(order.price).toLocaleString()}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 pt-3 border-t flex justify-end">
+                    <Link href="/seller/orders">
+                      <Button size="sm" variant="outline" className="text-xs">
+                        Manage in Orders →
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 7. Recent Listings Status ────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <h2 className="text-sm font-semibold tracking-tight uppercase text-foreground/80">Recent Listings Status</h2>
           <Link href="/seller/listings" className="text-xs font-medium text-primary hover:underline">
-            View all ({rawListings.length}) →
+            Manage all listings ({rawListings.length}) →
           </Link>
         </div>
 
         {rawListings.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-sm text-muted-foreground">You don't have any listings yet.</p>
+              <p className="text-sm text-foreground font-medium">You don't have any listings in your shop yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Publish ready-to-wear Habesha Kemis, rental dresses, or custom tailoring services.</p>
               <Link href="/seller/catalog/new" className="mt-3 inline-block">
                 <Button size="sm">Create Your First Listing</Button>
               </Link>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {rawListings.slice(0, 3).map((listing: any) => (
               <Card key={listing.id} className="hover:border-primary/40 transition-colors">
                 <CardContent className="p-3.5 flex gap-3 items-center">
-                  <div className="h-14 w-14 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                  <div className="h-14 w-14 rounded-lg bg-muted overflow-hidden flex-shrink-0 border">
                     {listing.primaryImageUrl || listing.images?.[0]?.url ? (
                       <img
                         src={listing.primaryImageUrl || listing.images?.[0]?.url}
@@ -452,7 +570,7 @@ export default function SellerOverviewPage() {
                         listing.status === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
                       }`} />
                       <span className="text-2xs capitalize text-muted-foreground">
-                        {listing.status === 'active' ? 'Live' : listing.status?.replace('_', ' ')}
+                        {listing.status === 'active' ? 'Live / Approved' : listing.status?.replace('_', ' ')}
                       </span>
                     </div>
                   </div>

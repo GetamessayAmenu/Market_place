@@ -18,10 +18,16 @@ export interface SerializedReview {
     readonly displayName: string;
     readonly avatarUrl: string | null;
   };
+  readonly listing?: {
+    readonly id: string;
+    readonly title: string;
+    readonly slug?: string;
+  };
 }
 
 export type ReviewWithRelations = Review & {
   reviewer?: { id: string; displayName: string; avatarUrl: string | null };
+  listing?: { id: string; title: string; slug?: string };
 };
 
 export function serializeReview(review: ReviewWithRelations): SerializedReview {
@@ -44,6 +50,15 @@ export function serializeReview(review: ReviewWithRelations): SerializedReview {
             id: review.reviewer.id,
             displayName: review.reviewer.displayName,
             avatarUrl: review.reviewer.avatarUrl,
+          },
+        }
+      : {}),
+    ...(review.listing
+      ? {
+          listing: {
+            id: review.listing.id,
+            title: review.listing.title,
+            ...(review.listing.slug ? { slug: review.listing.slug } : {}),
           },
         }
       : {}),

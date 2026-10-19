@@ -33,9 +33,20 @@ interface SellerData {
   emailVerifiedAt?: string | null
   phoneVerifiedAt?: string | null
   createdAt: string
+  rating?: number | null
+  reviewCount?: number
+  isVerified?: boolean
+  followerCount?: number
+  listingCounts?: {
+    all: number
+    buy: number
+    rent: number
+    custom: number
+  }
   _count?: {
-    listings: number
+    listings?: number
     storeFollowers?: number
+    followers?: number
   }
 }
 
@@ -43,13 +54,20 @@ interface ListingRaw {
   id: string
   title: string
   price: number
-  condition: string
-  city: string
+  currency?: string
+  condition?: string
+  city?: string
+  location?: string
   primaryImageUrl?: string | null
   availableForPurchase?: boolean
   availableForRent?: boolean
-  customOrderAvailable?: boolean
   rentalPricePerDay?: number | null
+  customOrderAvailable?: boolean
+  startingCustomPrice?: number | null
+  supportsReadyMade?: boolean
+  supportsCustomDesign?: boolean
+  rating?: number | string | null
+  reviewCount?: number
   createdAt: string
 }
 
@@ -61,6 +79,12 @@ interface PaginatedResponse<T> {
     page: number
     limit: number
     totalPages: number
+  }
+  counts?: {
+    all: number
+    buy: number
+    rent: number
+    custom: number
   }
 }
 
@@ -78,17 +102,17 @@ export async function generateMetadata({ params }: Props) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
     return {
       title: `${u.displayName} — Marketplace`,
-      description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings.`,
+      description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings on Habesha Fashion Marketplace.`,
       openGraph: {
         title: `${u.displayName} — Marketplace`,
-        description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings.`,
+        description: u.bio?.slice(0, 160) ?? `View ${u.displayName}'s profile and listings on Habesha Fashion Marketplace.`,
         url: `${siteUrl}/sellers/${u.id}`,
         ...(u.avatarUrl != null && { images: [u.avatarUrl] }),
         type: 'profile',
       },
     }
   } catch {
-    return { title: `Seller — Marketplace` }
+    return { title: `Seller Profile — Marketplace` }
   }
 }
 
@@ -97,6 +121,7 @@ export default async function SellerPage({ params, searchParams: _searchParams }
 
   let seller: SellerData | null = null
   let listings: ListingRaw[] = []
+  let counts: { all: number; buy: number; rent: number; custom: number } | undefined = undefined
 
   try {
     const [sellerRes, listingsRes] = await Promise.allSettled([
@@ -113,12 +138,41 @@ export default async function SellerPage({ params, searchParams: _searchParams }
       console.error('Seller fetch error:', sellerRes.reason)
     }
     if (listingsRes.status === 'fulfilled') {
-      listings = listingsRes.value.data
+      const val = listingsRes.value as any
+      if (Array.isArray(val)) {
+        listings = val
+      } else if (Array.isArray(val?.data)) {
+        listings = val.data
+      } else if (Array.isArray(val?.items)) {
+        listings = val.items
+      } else {
+        listings = []
+      }
+      counts = val?.counts ?? seller?.listingCounts
     } else {
       console.error('Listings fetch error:', listingsRes.reason)
     }
+
+    // Safety fallback: if 0 listings returned, query public active listings by sellerId
+    if (listings.length === 0) {
+      try {
+        const fallbackRes = await serverGet<any>(`/listings`, {
+          revalidate: 60,
+          params: { sellerId: id, limit: 50 },
+        })
+        if (Array.isArray(fallbackRes)) {
+          listings = fallbackRes
+        } else if (Array.isArray(fallbackRes?.data)) {
+          listings = fallbackRes.data
+        } else if (Array.isArray(fallbackRes?.items)) {
+          listings = fallbackRes.items
+        }
+      } catch (fallbackErr) {
+        console.error('Listings fallback error:', fallbackErr)
+      }
+    }
   } catch (error) {
-    console.error('Unexpected error:', error)
+    console.error('Unexpected error in SellerPage:', error)
   }
 
   if (seller == null) {
@@ -126,7 +180,7 @@ export default async function SellerPage({ params, searchParams: _searchParams }
       <Container>
         <section className="py-16 text-center">
           <h1 className="text-2xl font-bold text-foreground">Seller Not Found</h1>
-          <p className="mt-4 text-muted-foreground">The seller you are looking for does not exist.</p>
+          <p className="mt-4 text-muted-foreground">The seller you are looking for does not exist or has been removed.</p>
           <Link href="/" className="mt-6 inline-block text-sm font-medium text-primary hover:text-primary/80">
             Go to homepage
           </Link>
@@ -142,23 +196,41 @@ export default async function SellerPage({ params, searchParams: _searchParams }
 
   const sellerType = (seller.sellerType?.replace('_', '-') ?? 'designer') as SellerType
 
+  // Real listing counts strictly aligned with backend data
+  const realListingCount = counts?.all ?? seller.listingCounts?.all ?? seller._count?.listings ?? listings.length
+
   const stats: SellerStatsData = {
-    listingCount: seller._count?.listings ?? 0,
+    listingCount: realListingCount,
+    reviewCount: seller.reviewCount ?? 0,
+    ...(seller.rating != null && { averageRating: seller.rating }),
     ...(seller.totalSales != null && { totalSales: seller.totalSales }),
     ...(seller.responseRate != null && { responseRate: seller.responseRate }),
     ...(seller.responseTimeHours != null && { responseTimeHours: seller.responseTimeHours }),
   }
 
-  const sellerListings: SellerListing[] = listings.map((l) => ({
-    id: l.id,
-    title: l.title,
-    price: l.price,
-    createdAt: l.createdAt,
-    ...(l.primaryImageUrl !== undefined && { imageUrl: l.primaryImageUrl }),
-    ...(l.availableForPurchase !== undefined && { availableForPurchase: l.availableForPurchase }),
-    ...(l.availableForRent !== undefined && { availableForRent: l.availableForRent }),
-    ...(l.customOrderAvailable !== undefined && { customOrderAvailable: l.customOrderAvailable }),
-  }))
+  const sellerListings: SellerListing[] = listings.map((l) => {
+    const imgUrl = l.primaryImageUrl || (l as any).images?.[0]?.url || (l as any).imageUrl || undefined
+    const locationStr = l.location || l.city || undefined
+    return {
+      id: l.id,
+      title: l.title,
+      price: Number(l.price),
+      currency: (l.currency as any) || 'ETB',
+      createdAt: l.createdAt,
+      ...(imgUrl !== undefined && { imageUrl: imgUrl, primaryImageUrl: imgUrl }),
+      ...(l.city !== undefined && { city: l.city }),
+      ...(locationStr !== undefined && { location: locationStr }),
+      ...(l.availableForPurchase !== undefined && { availableForPurchase: l.availableForPurchase }),
+      ...(l.availableForRent !== undefined && { availableForRent: l.availableForRent }),
+      ...(l.rentalPricePerDay !== undefined && { rentalPricePerDay: l.rentalPricePerDay }),
+      ...(l.customOrderAvailable !== undefined && { customOrderAvailable: l.customOrderAvailable }),
+      ...(l.startingCustomPrice !== undefined && { startingCustomPrice: l.startingCustomPrice }),
+      ...(l.supportsReadyMade !== undefined && { supportsReadyMade: l.supportsReadyMade }),
+      ...(l.supportsCustomDesign !== undefined && { supportsCustomDesign: l.supportsCustomDesign }),
+      ...(l.rating !== undefined && { rating: l.rating }),
+      ...(l.reviewCount !== undefined && { reviewCount: l.reviewCount }),
+    }
+  })
 
   const fastResponder = (seller.responseTimeHours ?? Infinity) <= 2
   const topRated = stats.totalSales != null && stats.totalSales > 10
@@ -187,8 +259,13 @@ export default async function SellerPage({ params, searchParams: _searchParams }
         seller={{
           ...seller,
           sellerType,
-          ...(seller._count?.listings !== undefined && { _count: { listings: seller._count.listings } }),
-          ...(seller._count?.storeFollowers !== undefined && { _count: { storeFollowers: seller._count.storeFollowers } }),
+          rating: seller.rating ?? null,
+          reviewCount: seller.reviewCount ?? 0,
+          ...(seller.isVerified !== undefined && { isVerified: seller.isVerified }),
+          _count: {
+            listings: realListingCount,
+            storeFollowers: seller._count?.storeFollowers ?? seller._count?.followers ?? seller.followerCount ?? 0,
+          },
         }}
       />
 
@@ -209,14 +286,20 @@ export default async function SellerPage({ params, searchParams: _searchParams }
         {/* Divider */}
         <hr className="border-border/50" />
 
-        {/* Listings */}
-        <SellerListings listings={sellerListings} sellerName={seller.displayName} />
+        <SellerListings
+          listings={sellerListings}
+          sellerName={seller.displayName}
+          {...(seller.location !== undefined && { sellerLocation: seller.location })}
+          {...(seller.rating !== undefined && { sellerRating: seller.rating })}
+          {...(seller.isVerified !== undefined && { isVerified: seller.isVerified })}
+          {...((counts ?? seller.listingCounts) !== undefined && { counts: counts ?? seller.listingCounts })}
+        />
 
         {/* Divider */}
         <hr className="border-border/50" />
 
         {/* Reviews section */}
-        <section aria-labelledby="seller-reviews-heading">
+        <section id="reviews" aria-labelledby="seller-reviews-heading" className="scroll-mt-16">
           <h2
             id="seller-reviews-heading"
             className="text-lg font-display font-bold text-foreground mb-6"
@@ -253,7 +336,6 @@ export default async function SellerPage({ params, searchParams: _searchParams }
             sellerId={seller.id}
             sellerName={seller.displayName}
             {...(seller.phone !== undefined && { phone: seller.phone })}
-            {...(seller.email !== undefined && { email: seller.email })}
             {...(seller.location !== undefined && { location: seller.location })}
           />
         </div>

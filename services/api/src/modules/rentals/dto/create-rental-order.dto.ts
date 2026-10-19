@@ -9,7 +9,6 @@ export enum RentalPricingTier {
 
 export class CreateRentalOrderDto {
   @IsString()
-  @MaxLength(20)
   listingId!: string;
 
   @IsDateString()
@@ -25,12 +24,27 @@ export class CreateRentalOrderDto {
   @IsOptional()
   @IsString()
   @MaxLength(200)
+  pickupLocation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
   handoverLocation?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
   pickupHub?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  renterNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  rentalNotes?: string;
 
   @IsOptional()
   @IsString()

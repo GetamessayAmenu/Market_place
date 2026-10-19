@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -89,6 +90,11 @@ export class SellerController {
     @Body() data: { startDate?: string; endDate?: string; reason?: string },
   ) {
     return this.sellerService.updateBlackoutDate(user.id, id, data);
+  }
+
+  @Delete('blackout-dates/:id')
+  removeBlackoutDate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.sellerService.deleteBlackoutDate(user.id, id);
   }
 
   @Patch('blackout-dates/:id/delete')

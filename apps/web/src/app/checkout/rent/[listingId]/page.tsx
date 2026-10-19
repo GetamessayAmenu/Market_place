@@ -7,6 +7,7 @@ import Container from '../../../../components/Container'
 import BreadcrumbNav from '../../../../components/marketplace/BreadcrumbNav'
 import { useAuth } from '../../../../hooks/useAuth'
 import { serverGet } from '../../../../lib/serverApi'
+import { apiPost, getApiErrorMessage } from '../../../../lib/api'
 
 interface ListingData {
   id: string
@@ -70,21 +71,27 @@ export default function RentCheckoutPage({ params }: Props) {
   const total = rentalCost + deposit
   const currency = listing?.currency ?? 'ETB'
 
-  const handleSubmit = () => {
-    if (!fullName || !phone || !address || !city) {
-      setError('Please fill in all required fields')
-      return
-    }
+  const handleSubmit = async () => {
     if (!startDate || !endDate || days < 1) {
-      setError('Invalid rental period')
-      return
+      setError('Please select a valid rental period.');
+      return;
     }
-    setIsSubmitting(true)
-    setError(null)
-    setTimeout(() => {
-      router.push(`/dashboard/orders?success=rent-${listingId}`)
-    }, 1500)
-  }
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await apiPost('/rentals', {
+        listingId,
+        startDate,
+        endDate,
+        renterNotes: notes.trim() || undefined,
+      });
+      router.push('/dashboard/rentals');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to submit rental request. Please try again.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -234,22 +241,26 @@ export default function RentCheckoutPage({ params }: Props) {
                 ) : null}
               </div>
 
-              <div className="flex justify-between text-base font-bold border-t border-border/50 pt-4 mb-6">
-                <span className="text-card-foreground">Total</span>
+              <div className="flex justify-between text-base font-bold border-t border-border/50 pt-4 mb-4">
+                <span className="text-card-foreground">Total Direct Arrangement</span>
                 <span className="text-brand-gold">{currency} {total.toLocaleString()}</span>
+              </div>
+
+              {/* Offline Payment Transparency Notice */}
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-800 dark:text-amber-300 mb-4 space-y-1">
+                <p className="font-semibold">⚠️ Offline Arrangement</p>
+                <p className="text-[11px] leading-relaxed">
+                  Payment and security deposit are arranged directly between you and the seller. The platform does not process online payments.
+                </p>
               </div>
 
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || days < 1}
-                className="w-full bg-brand-gold text-brand-gold-foreground hover:bg-brand-gold/90"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                {isSubmitting ? 'Processing...' : 'Confirm Rental'}
+                {isSubmitting ? 'Submitting Request...' : 'Request to Rent'}
               </Button>
-
-              <p className="mt-3 text-xs text-center text-muted-foreground">
-                Deposit is refundable upon return of the item in good condition.
-              </p>
             </div>
           </div>
         </div>

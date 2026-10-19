@@ -11,11 +11,14 @@ import { RentalRemindersProcessor } from './processors/rental-reminders.processo
 import { RentalExpirationProcessor } from './processors/rental-expiration.processor';
 import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 
+import { ChatModule } from '../chat/chat.module';
+
 @Module({
   imports: [
     AdminLogsModule,
     NotificationsModule,
     QueueModule,
+    ChatModule,
     BullModule.registerQueue({ name: QUEUE_NAMES.RENTAL_REMINDERS }),
     BullModule.registerQueue({ name: QUEUE_NAMES.RENTAL_EXPIRATION }),
   ],

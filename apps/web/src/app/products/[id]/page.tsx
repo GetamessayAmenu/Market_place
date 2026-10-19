@@ -14,6 +14,7 @@ import SafetyTips from '../../../components/marketplace/SafetyTips'
 import ShareButton from '../../../components/marketplace/ShareButton'
 import RevealContact from '../../../components/marketplace/RevealContact'
 import ContactSellerButton from '../../../components/marketplace/ContactSellerButton'
+import RentButton from '../../../components/marketplace/RentButton'
 import { optionalUser } from '../../../lib/authServer'
 import { serverGet } from '../../../lib/serverApi'
 
@@ -56,6 +57,8 @@ interface ListingData {
     responseRate?: number | null
     responseTimeHours?: number | null
     totalSales?: number | null
+    rating?: number | null
+    reviewCount?: number
   }
   category?: {
     id: string
@@ -72,6 +75,8 @@ interface ListingData {
   rentalDeposit?: number | null
   minRentalDurationDays?: number
   maxRentalDurationDays?: number | null
+  rentalPickupLocation?: string | null
+  rentalNotes?: string | null
   cleaningPolicy?: string | null
   fabricCareTags?: string[]
   // Unified custom design fields
@@ -283,14 +288,54 @@ export default async function ProductPage({ params }: Props) {
                   <FavoriteButton listingId={listing.id} />
                 </div>
               </div>
-              <div className="flex items-baseline gap-4 flex-wrap">
-                <p className="text-3xl md:text-4xl font-bold text-primary">{listing.currency}{listing.price.toLocaleString()}</p>
+              {/* Pricing Display: Sale & Rental independently displayed */}
+              <div className="space-y-3">
+                {listing.availableForPurchase !== false && (
+                  <div>
+                    <div className="text-3xl md:text-4xl font-bold text-primary">
+                      {listing.currency}{listing.price.toLocaleString()}
+                    </div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      For sale
+                    </span>
+                  </div>
+                )}
+
+                {listing.availableForRent && listing.rentalPricePerDay != null && (
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+                          Rental available
+                        </div>
+                        <div className="text-xl font-bold text-foreground">
+                          {listing.currency}{listing.rentalPricePerDay.toLocaleString()}{' '}
+                          <span className="text-xs font-normal text-muted-foreground">/ day</span>
+                        </div>
+                      </div>
+                      <RentButton
+                        listing={{
+                          ...listing,
+                          rentalPickupLocation: listing.rentalPickupLocation || listing.location || listing.city,
+                          rentalNotes: listing.rentalNotes,
+                        }}
+                        isOwner={isOwner}
+                      />
+                    </div>
+                    <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                      <span>
+                        Min: {listing.minRentalDurationDays ?? 1} day{(listing.minRentalDurationDays ?? 1) > 1 ? 's' : ''}
+                      </span>
+                      {listing.rentalDeposit != null && listing.rentalDeposit > 0 && (
+                        <span>Deposit: {listing.currency}{listing.rentalDeposit.toLocaleString()}</span>
+                      )}
+                      {(listing.rentalPickupLocation || listing.city) && (
+                        <span>Pickup: {listing.rentalPickupLocation || listing.city}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              {listing.availableForRent && listing.rentalPricePerDay != null && (
-                <p className="text-base text-muted-foreground">
-                  or rent for {listing.currency}{listing.rentalPricePerDay.toLocaleString()}/day
-                </p>
-              )}
             </div>
 
             {/* Badges */}
@@ -311,19 +356,21 @@ export default async function ProductPage({ params }: Props) {
                 {/* Seller Info */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    {listing.seller.avatarUrl ? (
-                      <img 
-                        src={listing.seller.avatarUrl} 
-                        alt={listing.seller.displayName}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        <svg className="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
+                    <Link href={`/sellers/${listing.seller.id}`} className="shrink-0">
+                      {listing.seller.avatarUrl ? (
+                        <img 
+                          src={listing.seller.avatarUrl} 
+                          alt={listing.seller.displayName}
+                          className="h-10 w-10 rounded-full object-cover transition-opacity hover:opacity-80"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center transition-opacity hover:opacity-80">
+                          <svg className="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                      )}
+                    </Link>
                     <div>
                       <Link 
                         href={`/sellers/${listing.seller.id}`}
@@ -333,17 +380,19 @@ export default async function ProductPage({ params }: Props) {
                       </Link>
                       <p className="text-sm text-muted-foreground">
                         {listing.seller.createdAt 
-                          ? `${Math.floor((Date.now() - new Date(listing.seller.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 365)) + 1}+ years on marketplace`
+                          ? `Member since ${new Date(listing.seller.createdAt).getFullYear()}`
                           : 'Member on marketplace'}
                       </p>
                     </div>
                   </div>
-                  {listing.seller.responseTimeHours && (
+                  {listing.seller.responseTimeHours != null && (
                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
-                      Typically replies within {listing.seller.responseTimeHours}h
+                      {listing.seller.responseTimeHours <= 1
+                        ? 'Typically replies within an hour'
+                        : `Typically replies within ${listing.seller.responseTimeHours}h`}
                     </p>
                   )}
                 </div>
@@ -364,12 +413,16 @@ export default async function ProductPage({ params }: Props) {
             {listing.seller && (
               <div className="rounded-xl border bg-card p-4">
                 <Link 
-                  href={`/sellers/${listing.seller.id}/reviews`}
-                  className="flex items-center justify-between"
+                  href={`/sellers/${listing.seller.id}#reviews`}
+                  className="flex items-center justify-between group"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-lg">💬</span>
-                    <span className="text-sm font-medium text-foreground">24 Reviews</span>
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                      {listing.seller.reviewCount != null && listing.seller.reviewCount > 0
+                        ? `${listing.seller.reviewCount} ${listing.seller.reviewCount === 1 ? 'Review' : 'Reviews'}`
+                        : 'Seller Reviews'}
+                    </span>
                   </div>
                   <span className="text-sm text-primary hover:text-primary/80 font-medium">View all</span>
                 </Link>

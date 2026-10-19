@@ -232,7 +232,60 @@ export class SellerService {
       });
     }
 
-    // 8. Seller Profile completion (low urgency)
+    // 8. Rental extension requests awaiting seller response (high urgency)
+    const extensionRequests = await this.prisma.rentalExtension.findMany({
+      where: {
+        rentalOrder: { sellerId },
+        status: 'REQUESTED',
+      },
+      include: {
+        rentalOrder: {
+          select: {
+            id: true,
+            orderNumber: true,
+            listing: { select: { title: true } },
+          },
+        },
+      },
+      take: 5,
+    });
+    for (const ext of extensionRequests) {
+      actions.push({
+        id: `ext-${ext.id}`,
+        type: 'rental_request',
+        urgency: 'high',
+        title: 'Rental Extension Requested',
+        description: `Customer requested +${ext.additionalDays} days for "${ext.rentalOrder.listing?.title}". Review and confirm.`,
+        relatedId: ext.rentalOrderId,
+        href: `/seller/orders`,
+        createdAt: ext.createdAt.toISOString(),
+      });
+    }
+
+    // 9. Verification issue / action required (high urgency)
+    const rejectedVerification = await this.prisma.verificationRequest.findFirst({
+      where: {
+        userId: sellerId,
+        status: 'rejected',
+        deletedAt: null,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (rejectedVerification) {
+      actions.push({
+        id: `verif-${rejectedVerification.id}`,
+        type: 'profile_completion',
+        urgency: 'high',
+        title: 'Seller Verification Attention Required',
+        description: rejectedVerification.rejectionReason
+          ? `Verification issue: ${rejectedVerification.rejectionReason}. Please resubmit updated documents.`
+          : 'Your seller verification request requires updated documentation.',
+        href: `/seller/store`,
+        createdAt: rejectedVerification.updatedAt.toISOString(),
+      });
+    }
+
+    // 10. Seller Profile completion (low urgency)
     const seller = await this.prisma.user.findUnique({
       where: { id: sellerId },
       select: { phone: true, location: true, bio: true },

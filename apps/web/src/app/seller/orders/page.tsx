@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Badge, Button, Card, CardContent, Drawer, Select, Alert } from '@marketplace/ui';
 import useAuth from '../../../hooks/useAuth';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPatch, apiPost } from '../../../lib/api';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -853,11 +853,13 @@ export default function OrdersPage() {
 
     const fetchOrders = async () => {
       try {
-        console.log('Fetching orders for seller:', user.id);
-        const response = await apiGet<any>('/orders/seller', { _t: Date.now() });
-        console.log('Orders API response:', response);
-        console.log('Response type:', typeof response, 'Is array:', Array.isArray(response));
-        
+        let response: any;
+        try {
+          response = await apiGet<any>('/seller/orders', { _t: Date.now() });
+        } catch {
+          response = await apiGet<any>('/orders/seller', { _t: Date.now() });
+        }
+
         // Handle different response structures
         let ordersArray = [];
         if (Array.isArray(response)) {
@@ -868,16 +870,11 @@ export default function OrdersPage() {
           ordersArray = response.items;
         } else if (response && response.data && Array.isArray(response.data.items)) {
           ordersArray = response.data.items;
-        } else if (response && response.data && typeof response.data === 'object') {
-          console.log('Inner data object keys:', Object.keys(response.data));
-          console.log('Inner data object:', response.data);
         }
-        
-        console.log('Orders array length:', ordersArray.length);
+
         setOrders(ordersArray);
       } catch (err: any) {
         console.error('Failed to load orders:', err);
-        console.error('Error details:', err.response?.data, err.message);
         if (err.response?.status === 401) {
           setError('Authentication required. Please log in again.');
         } else if (err.response?.status === 403) {
@@ -898,8 +895,23 @@ export default function OrdersPage() {
 
   const filteredOrders = filter === 'all' ? orders : orders.filter(o => o.type === filter);
 
-  const handleStatusUpdate = (orderId: string, status: OrderStatus) => {
-    console.log('Update status:', orderId, status);
+  const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
+    try {
+      await apiPatch(`/seller/orders/${orderId}/status`, { status });
+      let response: any;
+      try {
+        response = await apiGet<any>('/seller/orders', { _t: Date.now() });
+      } catch {
+        response = await apiGet<any>('/orders/seller', { _t: Date.now() });
+      }
+      const ordersArray = Array.isArray(response) ? response : response?.data || response?.items || [];
+      setOrders(ordersArray);
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status } : null);
+      }
+    } catch (err: any) {
+      console.error('Failed to update status:', err);
+    }
   };
 
   if (!user) {

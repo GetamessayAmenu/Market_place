@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OptionalAuth } from '../../common/decorators/optional-auth.decorator';
@@ -9,7 +9,7 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UsersService } from './users.service';
 
-@Controller('users')
+@Controller(['users', 'sellers'])
 export class ProfileController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -37,16 +37,33 @@ export class ProfileController {
 
   // Parameterized routes
   @Public()
+  @OptionalAuth()
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() viewer?: AuthenticatedUser) {
+    return this.usersService.findOne(id, viewer);
   }
 
   @Public()
   @OptionalAuth()
   @Get(':id/listings')
-  findUserListings(@Param('id') id: string, @CurrentUser() viewer?: AuthenticatedUser) {
-    return this.usersService.findUserListings(id, viewer);
+  findUserListings(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('type') type?: 'all' | 'buy' | 'rent' | 'custom',
+    @Query('sortBy') sortBy?: 'newest' | 'price_asc' | 'price_desc',
+    @CurrentUser() viewer?: AuthenticatedUser,
+  ) {
+    return this.usersService.findUserListings(
+      id,
+      {
+        ...(page ? { page: Number(page) } : {}),
+        ...(limit ? { limit: Number(limit) } : {}),
+        ...(type ? { type } : {}),
+        ...(sortBy ? { sortBy } : {}),
+      },
+      viewer,
+    );
   }
 
   // ─── Store Follow Feature ───────────────────────────────────────────────────

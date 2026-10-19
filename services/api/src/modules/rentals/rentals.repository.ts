@@ -21,7 +21,17 @@ export class RentalsRepository {
             id: true,
             title: true,
             slug: true,
-            images: true,
+            price: true,
+            currency: true,
+            rentalPricePerDay: true,
+            rentalDeposit: true,
+            rentalPickupLocation: true,
+            rentalNotes: true,
+            city: true,
+            images: {
+              where: { deletedAt: null },
+              orderBy: { sortOrder: 'asc' },
+            },
           },
         },
         renter: {
@@ -29,6 +39,7 @@ export class RentalsRepository {
             id: true,
             displayName: true,
             email: true,
+            phone: true,
             avatarUrl: true,
           },
         },
@@ -37,11 +48,24 @@ export class RentalsRepository {
             id: true,
             displayName: true,
             email: true,
+            phone: true,
             avatarUrl: true,
           },
         },
         extensions: {
           orderBy: { createdAt: 'desc' },
+        },
+        histories: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            actor: {
+              select: {
+                id: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
         },
       },
     });
@@ -56,9 +80,21 @@ export class RentalsRepository {
             id: true,
             title: true,
             slug: true,
-            images: true,
+            price: true,
+            currency: true,
             rentalPricePerDay: true,
             rentalDeposit: true,
+            minRentalDurationDays: true,
+            maxRentalDurationDays: true,
+            rentalPickupLocation: true,
+            rentalNotes: true,
+            city: true,
+            status: true,
+            sellerId: true,
+            images: {
+              where: { deletedAt: null },
+              orderBy: { sortOrder: 'asc' },
+            },
           },
         },
         renter: {
@@ -81,6 +117,49 @@ export class RentalsRepository {
         },
         extensions: {
           orderBy: { createdAt: 'desc' },
+          include: {
+            requestedByUser: {
+              select: {
+                id: true,
+                displayName: true,
+              },
+            },
+            approvedByUser: {
+              select: {
+                id: true,
+                displayName: true,
+              },
+            },
+          },
+        },
+        histories: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            actor: {
+              select: {
+                id: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+        conditionLogs: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            loggedByUser: {
+              select: {
+                id: true,
+                displayName: true,
+              },
+            },
+          },
+        },
+        conversationsAsRental: {
+          select: {
+            id: true,
+          },
+          take: 1,
         },
       },
     });
@@ -94,6 +173,7 @@ export class RentalsRepository {
         renter: true,
         seller: true,
         extensions: true,
+        histories: true,
       },
     });
   }
@@ -118,6 +198,7 @@ export class RentalsRepository {
         renter: true,
         seller: true,
         extensions: true,
+        histories: true,
       },
     });
   }
@@ -129,24 +210,35 @@ export class RentalsRepository {
     return this.prisma.rentalOrder.count();
   }
 
-  // Check availability for a listing during a date range
+  /**
+   * Check availability for a listing during a date range.
+   * Confirmed/accepted/active rentals block dates.
+   * Blackout dates also block dates.
+   */
   async checkAvailability(
     listingId: string,
     startDate: Date,
     endDate: Date,
     excludeOrderId?: string,
   ) {
+    const activeStatuses: any[] = [
+      'ACCEPTED',
+      'APPROVED',
+      'READY_FOR_PICKUP',
+      'HANDOVER_PENDING',
+      'ACTIVE',
+      'RETURN_PENDING',
+      'RETURN_INITIATED',
+      'RETURNED_PENDING_INSPECTION',
+    ];
+
     const where: Prisma.RentalOrderWhereInput = {
       listingId,
       status: {
-        in: ['APPROVED', 'HANDOVER_PENDING', 'ACTIVE'],
+        in: activeStatuses,
       },
-      OR: [
-        {
-          startDate: { lte: endDate },
-          endDate: { gte: startDate },
-        },
-      ],
+      startDate: { lte: endDate },
+      endDate: { gte: startDate },
     };
 
     if (excludeOrderId) {
@@ -155,6 +247,7 @@ export class RentalsRepository {
 
     const conflictingOrders = await this.prisma.rentalOrder.findMany({
       where,
+      select: { id: true, startDate: true, endDate: true, status: true },
     });
 
     if (conflictingOrders.length > 0) {
@@ -165,34 +258,153 @@ export class RentalsRepository {
     const conflictingBlackoutDates = await this.prisma.rentalBlackoutDate.findMany({
       where: {
         listingId,
-        OR: [
-          {
-            startDate: { lte: endDate },
-            endDate: { gte: startDate },
-          },
-        ],
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
       },
+      select: { id: true },
     });
 
     return conflictingBlackoutDates.length === 0;
   }
 
+  /**
+   * Get booked date ranges for a listing (used by frontend calendar).
+   */
+  async getBookedDateRanges(listingId: string) {
+    const activeStatuses: any[] = [
+      'ACCEPTED',
+      'APPROVED',
+      'READY_FOR_PICKUP',
+      'HANDOVER_PENDING',
+      'ACTIVE',
+      'RETURN_PENDING',
+      'RETURN_INITIATED',
+      'RETURNED_PENDING_INSPECTION',
+    ];
+
+    const bookings = await this.prisma.rentalOrder.findMany({
+      where: {
+        listingId,
+        status: { in: activeStatuses },
+        endDate: { gte: new Date() },
+      },
+      select: {
+        startDate: true,
+        endDate: true,
+      },
+    });
+
+    const blackoutDates = await this.prisma.rentalBlackoutDate.findMany({
+      where: {
+        listingId,
+        endDate: { gte: new Date() },
+      },
+      select: {
+        startDate: true,
+        endDate: true,
+        reason: true,
+      },
+    });
+
+    return {
+      bookedRanges: bookings.map((b) => ({
+        startDate: b.startDate.toISOString(),
+        endDate: b.endDate.toISOString(),
+      })),
+      blackoutRanges: blackoutDates.map((b) => ({
+        startDate: b.startDate.toISOString(),
+        endDate: b.endDate.toISOString(),
+        reason: b.reason,
+      })),
+    };
+  }
+
   // Get rental orders for a user (as renter or seller)
-  async findByUser(userId: string, role: 'renter' | 'seller') {
+  async findByUser(userId: string, role: 'renter' | 'seller', status?: string) {
+    const where: Prisma.RentalOrderWhereInput = role === 'renter' ? { renterId: userId } : { sellerId: userId };
+
+    if (status && status !== 'all') {
+      where.status = status as any;
+    }
+
     return this.prisma.rentalOrder.findMany({
-      where: role === 'renter' ? { renterId: userId } : { sellerId: userId },
+      where,
       include: {
         listing: {
           select: {
             id: true,
             title: true,
             slug: true,
-            images: true,
+            price: true,
+            currency: true,
+            rentalPricePerDay: true,
+            rentalDeposit: true,
+            rentalPickupLocation: true,
+            rentalNotes: true,
+            images: {
+              where: { deletedAt: null },
+              orderBy: { sortOrder: 'asc' },
+            },
           },
         },
-        extensions: true,
+        renter: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        seller: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        extensions: {
+          orderBy: { createdAt: 'desc' },
+        },
+        conversationsAsRental: {
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createHistory(data: {
+    rentalOrderId: string;
+    actorId: string;
+    action: string;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    notes?: string | null;
+    metadata?: any;
+  }) {
+    const createData: Prisma.RentalHistoryCreateInput = {
+      rentalOrder: { connect: { id: data.rentalOrderId } },
+      actor: { connect: { id: data.actorId } },
+      action: data.action,
+    };
+    if (data.fromStatus !== undefined) createData.fromStatus = data.fromStatus;
+    if (data.toStatus !== undefined) createData.toStatus = data.toStatus;
+    if (data.notes !== undefined) createData.notes = data.notes;
+    if (data.metadata !== undefined) createData.metadata = data.metadata;
+
+    return this.prisma.rentalHistory.create({
+      data: createData,
+      include: {
+        actor: {
+          select: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
     });
   }
 
@@ -330,23 +542,20 @@ export class RentalsRepository {
     });
   }
 
-  // Cancel concurrent pending requests when a booking is approved
+  // Cancel concurrent pending requests when a booking is approved/accepted
   async cancelConcurrentPendingRequests(listingId: string, startDate: Date, endDate: Date, approvedBookingId: string) {
     return this.prisma.rentalOrder.updateMany({
       where: {
         listingId,
-        status: 'REQUESTED',
+        status: { in: ['PENDING', 'REQUESTED'] },
         id: { not: approvedBookingId },
-        OR: [
-          {
-            startDate: { lte: endDate },
-            endDate: { gte: startDate },
-          },
-        ],
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
       },
       data: {
         status: 'DECLINED',
-        cancellationReason: 'Automatically declined due to conflicting approved booking',
+        cancellationReason: 'Automatically declined due to conflicting accepted booking',
+        declineReason: 'Dates no longer available',
       },
     });
   }

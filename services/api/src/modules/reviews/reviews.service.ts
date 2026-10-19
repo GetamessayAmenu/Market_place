@@ -73,6 +73,11 @@ export class ReviewsService {
     return buildReviewSummary(ratings, distribution);
   }
 
+  async getSellerSummary(sellerId: string) {
+    const { ratings, distribution } = await this.reviewsRepository.getSellerRatingSummary(sellerId);
+    return buildReviewSummary(ratings, distribution);
+  }
+
   async softDelete(id: string, user: AuthenticatedUser) {
     const review = await this.reviewsRepository.findById(id);
     if (!review || review.deletedAt) {

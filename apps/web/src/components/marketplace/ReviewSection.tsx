@@ -8,12 +8,14 @@ import {
   deleteReview,
   getListReviews,
   getListReviewSummary,
+  getSellerReviews,
+  getSellerReviewSummary,
   type ReviewData,
   type ReviewSummaryData,
 } from '../../lib/marketplaceApi'
 
 export interface ReviewSectionProps {
-  listingId: string
+  listingId?: string
   sellerId: string
   className?: string
 }
@@ -54,6 +56,12 @@ function ReviewCard({ review, currentUserId, onDelete }: { review: ReviewData; c
               )}
             </div>
           </div>
+          {review.listing?.title && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Item:{' '}
+              <span className="font-medium text-foreground">{review.listing.title}</span>
+            </p>
+          )}
           {review.title && <p className="mt-1 font-semibold text-sm text-foreground">{review.title}</p>}
           {review.body && <p className="mt-1 text-sm text-muted-foreground">{review.body}</p>}
           {isOwner && (
@@ -86,31 +94,45 @@ export default function ReviewSection({ listingId, sellerId, className }: Review
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const isSellerOnly = !listingId && !!sellerId
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [summaryRes, reviewsRes] = await Promise.allSettled([
-        getListReviewSummary(listingId),
-        getListReviews(listingId, { page, limit: 5 }),
-      ])
-      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value)
-      if (reviewsRes.status === 'fulfilled') {
-        setReviews(reviewsRes.value?.data ?? [])
-        setTotalPages(reviewsRes.value?.meta?.totalPages ?? 1)
+      if (isSellerOnly) {
+        const [summaryRes, reviewsRes] = await Promise.allSettled([
+          getSellerReviewSummary(sellerId),
+          getSellerReviews(sellerId, { page, limit: 5 }),
+        ])
+        if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value)
+        if (reviewsRes.status === 'fulfilled') {
+          setReviews(reviewsRes.value?.data ?? [])
+          setTotalPages(reviewsRes.value?.meta?.totalPages ?? 1)
+        }
+      } else if (listingId) {
+        const [summaryRes, reviewsRes] = await Promise.allSettled([
+          getListReviewSummary(listingId),
+          getListReviews(listingId, { page, limit: 5 }),
+        ])
+        if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value)
+        if (reviewsRes.status === 'fulfilled') {
+          setReviews(reviewsRes.value?.data ?? [])
+          setTotalPages(reviewsRes.value?.meta?.totalPages ?? 1)
+        }
       }
     } catch {
       // Graceful fallback
     } finally {
       setLoading(false)
     }
-  }, [listingId, page])
+  }, [isSellerOnly, listingId, sellerId, page])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
   const handleSubmitReview = async () => {
-    if (!user) return
+    if (!user || !listingId) return
     setSubmitting(true)
     setError(null)
     setSuccess(null)
@@ -160,8 +182,8 @@ export default function ReviewSection({ listingId, sellerId, className }: Review
         </div>
       )}
 
-      {/* Write review */}
-      {user && user.id !== sellerId && (
+      {/* Write review - only available when viewing a specific listing */}
+      {user && user.id !== sellerId && !!listingId && (
         <div>
           {!showForm ? (
             <Button variant="outline" onClick={() => { setShowForm(true) }}>Write a Review</Button>
@@ -239,7 +261,9 @@ export default function ReviewSection({ listingId, sellerId, className }: Review
           )}
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">No reviews yet. Be the first to review!</p>
+        <p className="text-sm text-muted-foreground">
+          {isSellerOnly ? 'No reviews yet.' : 'No reviews yet. Be the first to review!'}
+        </p>
       )}
     </div>
   )

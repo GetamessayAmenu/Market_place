@@ -36,8 +36,8 @@ export default function NewListingPage() {
 
     try {
       // Build API payload aligned with backend CreateListingDto
-      const isRent = data.listingType === 'rent';
-      const isSale = data.listingType === 'sale';
+      const isRent = Boolean(data.availableForRent);
+      const isSale = Boolean(data.availableForPurchase);
 
       // Ensure all images are permanently persisted to the server without losing user photos
       const resolvedImages = await Promise.all(
@@ -82,7 +82,7 @@ export default function NewListingPage() {
       const apiData: Record<string, unknown> = {
         title: data.title,
         description: data.description,
-        price: isSale ? parseFloat(data.price) || 0 : parseFloat(data.rentalInfo?.rentalPricePerDay || data.price) || 0,
+        price: isSale ? (parseFloat(data.price) || 0) : (parseFloat(data.rentalPricePerDay || data.price) || 0),
         categoryId: data.categoryId,
         condition: data.condition,
         city: data.city,
@@ -95,9 +95,19 @@ export default function NewListingPage() {
       };
 
       // Add rental parameters
-      if (isRent && data.rentalInfo) {
-        apiData.rentalPricePerDay = parseFloat(data.rentalInfo.rentalPricePerDay) || 0;
-        apiData.rentalDeposit = parseFloat(data.rentalInfo.rentalDeposit) || 0;
+      if (isRent) {
+        apiData.rentalPricePerDay = parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
+        apiData.rentalDeposit = parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
+        apiData.minRentalDurationDays = parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
+        if (data.maxRentalDurationDays) {
+          apiData.maxRentalDurationDays = parseInt(data.maxRentalDurationDays, 10);
+        }
+        if (data.rentalPickupLocation) {
+          apiData.rentalPickupLocation = data.rentalPickupLocation;
+        }
+        if (data.rentalNotes) {
+          apiData.rentalNotes = data.rentalNotes;
+        }
       }
 
       // Add custom-order parameters
@@ -124,10 +134,9 @@ export default function NewListingPage() {
       // Store product & rental details in attributes
       apiData.attributes = {
         ...(data.productDetails || {}),
-        ...(isRent && data.rentalInfo ? {
-          rentalQuantity: data.rentalInfo.quantity || 1,
-          minRentalDays: data.rentalInfo.minRentalDays || '1',
-          maxRentalDays: data.rentalInfo.maxRentalDays || '30',
+        ...(isRent ? {
+          minRentalDays: data.minRentalDurationDays || '1',
+          maxRentalDays: data.maxRentalDurationDays || '30',
         } : {}),
       };
 

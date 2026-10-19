@@ -42,6 +42,14 @@ export default function EditListingPage() {
         // Map backend listing object to ListingFormData expected by ListingForm
         const formData: ListingFormData = {
           listingType: listing.availableForRent ? 'rent' : 'sale',
+          availableForPurchase: listing.availableForPurchase ?? true,
+          availableForRent: Boolean(listing.availableForRent),
+          rentalPricePerDay: listing.rentalPricePerDay != null ? String(listing.rentalPricePerDay) : '',
+          rentalDeposit: listing.rentalDeposit != null ? String(listing.rentalDeposit) : '',
+          minRentalDurationDays: listing.minRentalDurationDays != null ? String(listing.minRentalDurationDays) : '1',
+          maxRentalDurationDays: listing.maxRentalDurationDays != null ? String(listing.maxRentalDurationDays) : '',
+          rentalPickupLocation: listing.rentalPickupLocation ?? '',
+          rentalNotes: listing.rentalNotes ?? '',
           title: listing.title ?? '',
           description: listing.description ?? '',
           price: String(listing.price ?? ''),
@@ -75,8 +83,8 @@ export default function EditListingPage() {
             ? {
                 rentalPricePerDay: String(listing.rentalPricePerDay ?? ''),
                 rentalDeposit: String(listing.rentalDeposit ?? ''),
-                minRentalDays: '1',
-                maxRentalDays: '30',
+                minRentalDays: String(listing.minRentalDurationDays ?? '1'),
+                maxRentalDays: String(listing.maxRentalDurationDays ?? '30'),
               }
             : null,
           customOrderAvailable: Boolean(listing.customOrderAvailable),
@@ -153,25 +161,39 @@ export default function EditListingPage() {
         }),
       );
 
+      const isRent = Boolean(data.availableForRent);
+      const isSale = Boolean(data.availableForPurchase);
+
       // Transform form data to match API DTO
       const apiData: Record<string, unknown> = {
         title: data.title,
         description: data.description,
-        price: parseFloat(data.price) || 0,
+        price: isSale ? (parseFloat(data.price) || 0) : (parseFloat(data.rentalPricePerDay || data.price) || 0),
         categoryId: data.categoryId,
         condition: data.condition,
         city: data.city,
         contactOptions: data.contactOptions,
-        availableForPurchase: data.listingType === 'sale',
-        availableForRent: data.listingType === 'rent',
+        availableForPurchase: isSale,
+        availableForRent: isRent,
         customOrderAvailable: data.customOrderAvailable,
         images: resolvedImages,
       };
 
       // Add rental pricing if applicable
-      if (data.listingType === 'rent' && data.rentalInfo) {
-        apiData.rentalPricePerDay = parseFloat(data.rentalInfo.rentalPricePerDay) || 0;
-        apiData.rentalDeposit = parseFloat(data.rentalInfo.rentalDeposit) || 0;
+      if (isRent) {
+        apiData.rentalPricePerDay = parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
+        apiData.rentalDeposit = parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
+        apiData.minRentalDurationDays = parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
+        apiData.maxRentalDurationDays = data.maxRentalDurationDays ? parseInt(data.maxRentalDurationDays, 10) : null;
+        apiData.rentalPickupLocation = data.rentalPickupLocation || null;
+        apiData.rentalNotes = data.rentalNotes || null;
+      } else {
+        apiData.rentalPricePerDay = null;
+        apiData.rentalDeposit = null;
+        apiData.minRentalDurationDays = null;
+        apiData.maxRentalDurationDays = null;
+        apiData.rentalPickupLocation = null;
+        apiData.rentalNotes = null;
       }
 
       // Add custom order details if applicable

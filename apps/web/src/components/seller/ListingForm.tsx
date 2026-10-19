@@ -12,7 +12,15 @@ import { getApiErrorMessage } from '../../lib/api';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ListingFormData {
-  listingType: 'sale' | 'rent';
+  listingType?: 'sale' | 'rent' | undefined;
+  availableForPurchase: boolean;
+  availableForRent: boolean;
+  rentalPricePerDay?: string | undefined;
+  rentalDeposit?: string | undefined;
+  minRentalDurationDays?: string | undefined;
+  maxRentalDurationDays?: string | undefined;
+  rentalPickupLocation?: string | undefined;
+  rentalNotes?: string | undefined;
   title: string;
   description: string;
   price: string;
@@ -29,20 +37,22 @@ export interface ListingFormData {
   images: UploadedImage[];
   // Product details (dynamic based on category)
   productDetails?: {
-    size?: string;
-    color?: string;
-    material?: string;
-    gender?: string;
-    style?: string;
-  } | null;
+    size?: string | undefined;
+    color?: string | undefined;
+    material?: string | undefined;
+    gender?: string | undefined;
+    style?: string | undefined;
+  } | null | undefined;
   // Rental information (conditional)
   rentalInfo?: {
     rentalPricePerDay: string;
     rentalDeposit: string;
     minRentalDays: string;
-    maxRentalDays: string;
-    quantity?: number;
-  } | null;
+    maxRentalDays?: string | undefined;
+    pickupLocation?: string | undefined;
+    rentalNotes?: string | undefined;
+    quantity?: number | undefined;
+  } | null | undefined;
   // Custom-made option
   customOrderAvailable: boolean;
   customDetails?: {
@@ -51,8 +61,8 @@ export interface ListingFormData {
     embroidery: boolean;
     otherCustomization: string;
     additionalCustomPrice: string;
-    productionDays?: string;
-  } | null;
+    productionDays?: string | undefined;
+  } | null | undefined;
 }
 
 interface ListingFormProps {
@@ -507,7 +517,17 @@ export default function ListingForm({
   const user = useAuth((s) => s.user);
   const { data: sellerProfile } = useSellerProfile(user?.id ?? '');
 
-  // Form State
+  // Form State: Independent Sale & Rental capabilities
+  const [availableForPurchase, setAvailableForPurchase] = useState<boolean>(
+    initialData?.availableForPurchase ??
+      (initialData?.listingType ? initialData.listingType === 'sale' : true),
+  );
+  const [availableForRent, setAvailableForRent] = useState<boolean>(
+    initialData?.availableForRent ??
+      (initialData?.listingType
+        ? initialData.listingType === 'rent'
+        : Boolean(initialData?.rentalInfo?.rentalPricePerDay)),
+  );
   const [listingType, setListingType] = useState<'sale' | 'rent'>(
     initialListingType ?? initialData?.listingType ?? 'sale',
   );
@@ -547,7 +567,13 @@ export default function ListingForm({
     initialData?.rentalInfo?.minRentalDays ?? '1',
   );
   const [maxRentalDays, setMaxRentalDays] = useState(
-    initialData?.rentalInfo?.maxRentalDays ?? '30',
+    initialData?.rentalInfo?.maxRentalDays ?? '',
+  );
+  const [rentalPickupLocation, setRentalPickupLocation] = useState(
+    initialData?.rentalInfo?.pickupLocation ?? '',
+  );
+  const [rentalNotes, setRentalNotes] = useState(
+    initialData?.rentalInfo?.rentalNotes ?? '',
   );
 
   // Custom-Made Option
@@ -760,18 +786,31 @@ export default function ListingForm({
       errors.condition = 'Please select the condition.';
     }
 
-    if (listingType === 'sale') {
+    if (!availableForPurchase && !availableForRent && !customOrderAvailable) {
+      errors.availableForPurchase = 'Please enable at least one option: For Sale, Available for Rent, or Custom Made.';
+    }
+
+    if (availableForPurchase) {
       if (!price || Number(price) <= 0) {
         errors.price = 'Please enter a valid sale price in ETB.';
       }
     }
 
-    if (listingType === 'rent') {
+    if (availableForRent) {
       if (!rentalPricePerDay || Number(rentalPricePerDay) <= 0) {
-        errors.rentalPricePerDay = 'Daily rental price is required.';
+        errors.rentalPricePerDay = 'Daily rental price is required (ETB/day).';
       }
-      if (!rentalDeposit || Number(rentalDeposit) < 0) {
+      if (rentalDeposit === '' || Number(rentalDeposit) < 0) {
         errors.rentalDeposit = 'Security deposit is required.';
+      }
+      if (!minRentalDays || Number(minRentalDays) < 1) {
+        errors.minRentalDays = 'Minimum rental period must be at least 1 day.';
+      }
+      if (maxRentalDays && Number(maxRentalDays) < Number(minRentalDays)) {
+        errors.maxRentalDays = 'Maximum rental duration cannot be less than minimum rental duration.';
+      }
+      if (!rentalPickupLocation.trim() && !city.trim()) {
+        errors.rentalPickupLocation = 'Pickup location is required for rentals.';
       }
     }
 
@@ -801,10 +840,18 @@ export default function ListingForm({
     if (!validate()) return;
 
     onSubmit({
-      listingType,
+      listingType: availableForRent && !availableForPurchase ? 'rent' : 'sale',
+      availableForPurchase,
+      availableForRent,
+      rentalPricePerDay: availableForRent ? rentalPricePerDay : undefined,
+      rentalDeposit: availableForRent ? rentalDeposit : undefined,
+      minRentalDurationDays: availableForRent ? minRentalDays : undefined,
+      maxRentalDurationDays: availableForRent && maxRentalDays ? maxRentalDays : undefined,
+      rentalPickupLocation: availableForRent ? (rentalPickupLocation.trim() || city.trim()) : undefined,
+      rentalNotes: availableForRent && rentalNotes.trim() ? rentalNotes.trim() : undefined,
       title: title.trim(),
       description: description.trim(),
-      price: listingType === 'sale' ? price : (rentalPricePerDay || price || '0'),
+      price: availableForPurchase ? price : (rentalPricePerDay || '0'),
       categoryId,
       categoryName,
       city: city.trim(),
@@ -817,16 +864,17 @@ export default function ListingForm({
         style,
         gender,
       },
-      rentalInfo:
-        listingType === 'rent'
-          ? {
-              rentalPricePerDay,
-              rentalDeposit,
-              minRentalDays,
-              maxRentalDays,
-              quantity: rentalQuantity,
-            }
-          : null,
+      rentalInfo: availableForRent
+        ? {
+            rentalPricePerDay,
+            rentalDeposit,
+            minRentalDays,
+            maxRentalDays: maxRentalDays || undefined,
+            pickupLocation: rentalPickupLocation.trim() || city.trim(),
+            rentalNotes: rentalNotes.trim() || undefined,
+            quantity: rentalQuantity,
+          }
+        : null,
       customOrderAvailable,
       customDetails: customOrderAvailable
         ? {
@@ -869,11 +917,16 @@ export default function ListingForm({
 
         {/* Badges */}
         <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm ${
-            listingType === 'sale' ? 'bg-emerald-600' : 'bg-amber-600'
-          }`}>
-            {listingType === 'sale' ? 'For Sale' : 'For Rent'}
-          </span>
+          {availableForPurchase && (
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm bg-emerald-600">
+              For Sale
+            </span>
+          )}
+          {availableForRent && (
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm bg-amber-600">
+              For Rent
+            </span>
+          )}
           {customOrderAvailable && (
             <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white shadow-sm">
               Custom Made
@@ -899,16 +952,26 @@ export default function ListingForm({
         </div>
 
         {/* Price display */}
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-lg font-bold text-primary">
-            {listingType === 'sale'
-              ? (price ? `${Number(price).toLocaleString()} ETB` : 'Price in ETB')
-              : (rentalPricePerDay ? `${Number(rentalPricePerDay).toLocaleString()} ETB / day` : 'Rental rate in ETB')}
-          </span>
-          {listingType === 'rent' && rentalDeposit && (
-            <span className="text-[11px] text-muted-foreground">
-              (+{Number(rentalDeposit).toLocaleString()} deposit)
-            </span>
+        <div className="space-y-1">
+          {availableForPurchase && (
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-primary">
+                {price ? `${Number(price).toLocaleString()} ETB` : 'Price in ETB'}
+              </span>
+              <span className="text-[11px] text-muted-foreground">For Sale</span>
+            </div>
+          )}
+          {availableForRent && (
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-sm font-bold text-amber-700">
+                {rentalPricePerDay ? `${Number(rentalPricePerDay).toLocaleString()} ETB / day` : 'Rental rate in ETB'}
+              </span>
+              {rentalDeposit && (
+                <span className="text-[11px] text-muted-foreground">
+                  (Deposit: {Number(rentalDeposit).toLocaleString()} ETB)
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -1219,51 +1282,46 @@ export default function ListingForm({
             </div>
           </section>
 
-          {/* ════════ SECTION 4: LISTING TYPE & PRICING ════════ */}
-          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-5">
+          {/* ════════ SECTION 4: PRICING & RENTAL AVAILABILITY ════════ */}
+          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-6">
             <div>
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <span>💰</span> Listing Type & Pricing
+                <span>💰</span> Pricing & Availability
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Choose whether you are selling this fashion piece or offering it for temporary rental.
+                Enable selling, renting, or custom ordering for this fashion piece. Listings can support multiple capabilities simultaneously.
               </p>
+              {validationErrors.availableForPurchase && (
+                <p className="text-destructive text-xs mt-1 font-medium">{validationErrors.availableForPurchase}</p>
+              )}
             </div>
 
-            {/* Segmented Switch: Sale vs Rent */}
-            <div className="grid grid-cols-2 gap-3 p-1 rounded-xl bg-muted/50 border">
-              <button
-                type="button"
-                onClick={() => setListingType('sale')}
-                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all ${
-                  listingType === 'sale'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span>🏷️</span> For Sale
-              </button>
+            {/* Sale Capability */}
+            <div className="rounded-xl border p-4 bg-muted/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={availableForPurchase}
+                    onChange={(e) => setAvailableForPurchase(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-foreground">
+                    🏷️ Available for Sale
+                  </span>
+                </label>
+                {availableForPurchase && (
+                  <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setListingType('rent')}
-                className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all ${
-                  listingType === 'rent'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span>📅</span> For Rent
-              </button>
-            </div>
-
-            {/* Sale Fields */}
-            {listingType === 'sale' && (
-              <div id="field-price" className="space-y-4 pt-1">
-                <div className="max-w-xs">
+              {availableForPurchase && (
+                <div id="field-price" className="max-w-xs pt-1">
                   <FormInput
-                    label="Price (ETB)"
-                    placeholder="e.g. 5500"
+                    label="Sale Price (ETB)"
+                    placeholder="e.g. 3500"
                     type="number"
                     value={price}
                     onChange={(e) => {
@@ -1280,114 +1338,172 @@ export default function ListingForm({
                     {...(validationErrors.price ? { error: validationErrors.price } : {})}
                   />
                   <span className="text-[11px] text-muted-foreground block mt-1">
-                    Buyers contact you directly through chat or phone to arrange purchase.
+                    Buyers can arrange purchase with you directly.
                   </span>
                 </div>
+              )}
+            </div>
+
+            {/* Rental Capability (Progressive Disclosure) */}
+            <div className="rounded-xl border p-4 bg-muted/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    id="field-availableForRent"
+                    type="checkbox"
+                    checked={availableForRent}
+                    onChange={(e) => setAvailableForRent(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-semibold text-foreground">
+                    📅 Available for Rent
+                  </span>
+                </label>
+                {availableForRent && (
+                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
               </div>
-            )}
 
-            {/* Rental Fields */}
-            {listingType === 'rent' && (
-              <div className="space-y-4 pt-1">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div id="field-rentalPricePerDay">
-                    <FormInput
-                      label="Daily Rental Rate (ETB / day)"
-                      placeholder="e.g. 350"
-                      type="number"
-                      value={rentalPricePerDay}
-                      onChange={(e) => {
-                        setRentalPricePerDay(e.target.value);
-                        if (validationErrors.rentalPricePerDay) {
-                          setValidationErrors((prev) => {
-                            const next = { ...prev };
-                            delete next.rentalPricePerDay;
-                            return next;
-                          });
-                        }
-                      }}
-                      required
-                      {...(validationErrors.rentalPricePerDay
-                        ? { error: validationErrors.rentalPricePerDay }
-                        : {})}
-                    />
-                  </div>
+              {availableForRent && (
+                <div className="space-y-4 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    Rent out this fashion piece for ceremonies, weddings, and celebrations. Renters arrange payment, security deposit, and pickup directly with you.
+                  </p>
 
-                  <div id="field-rentalDeposit">
-                    <FormInput
-                      label="Refundable Security Deposit (ETB)"
-                      placeholder="e.g. 1000"
-                      type="number"
-                      value={rentalDeposit}
-                      onChange={(e) => {
-                        setRentalDeposit(e.target.value);
-                        if (validationErrors.rentalDeposit) {
-                          setValidationErrors((prev) => {
-                            const next = { ...prev };
-                            delete next.rentalDeposit;
-                            return next;
-                          });
-                        }
-                      }}
-                      required
-                      {...(validationErrors.rentalDeposit
-                        ? { error: validationErrors.rentalDeposit }
-                        : {})}
-                    />
-                  </div>
-                </div>
-
-                {/* Rental Copies & Duration */}
-                <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t">
-                  <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">
-                      Identical Rental Copies Available
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRentalQuantity(Math.max(1, rentalQuantity - 1))}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/30 text-foreground hover:bg-muted"
-                      >
-                        -
-                      </button>
-                      <span className="flex h-9 w-12 items-center justify-center font-semibold text-sm">
-                        {rentalQuantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setRentalQuantity(rentalQuantity + 1)}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border bg-muted/30 text-foreground hover:bg-muted"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground block mt-1">
-                      Used internally to manage multiple identical rental copies. Not displayed as bulk inventory to buyers.
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div id="field-rentalPricePerDay">
                       <FormInput
-                        label="Min Days"
+                        label="Rental Price (ETB / day) *"
+                        placeholder="e.g. 800"
                         type="number"
+                        value={rentalPricePerDay}
+                        onChange={(e) => {
+                          setRentalPricePerDay(e.target.value);
+                          if (validationErrors.rentalPricePerDay) {
+                            setValidationErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.rentalPricePerDay;
+                              return next;
+                            });
+                          }
+                        }}
+                        required
+                        {...(validationErrors.rentalPricePerDay
+                          ? { error: validationErrors.rentalPricePerDay }
+                          : {})}
+                      />
+                    </div>
+
+                    <div id="field-rentalDeposit">
+                      <FormInput
+                        label="Security Deposit (ETB) *"
+                        placeholder="e.g. 5000"
+                        type="number"
+                        value={rentalDeposit}
+                        onChange={(e) => {
+                          setRentalDeposit(e.target.value);
+                          if (validationErrors.rentalDeposit) {
+                            setValidationErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.rentalDeposit;
+                              return next;
+                            });
+                          }
+                        }}
+                        required
+                        {...(validationErrors.rentalDeposit
+                          ? { error: validationErrors.rentalDeposit }
+                          : {})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div id="field-minRentalDays">
+                      <FormInput
+                        label="Minimum Rental Period (days) *"
+                        placeholder="e.g. 1"
+                        type="number"
+                        min="1"
                         value={minRentalDays}
-                        onChange={(e) => setMinRentalDays(e.target.value)}
+                        onChange={(e) => {
+                          setMinRentalDays(e.target.value);
+                          if (validationErrors.minRentalDays) {
+                            setValidationErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.minRentalDays;
+                              return next;
+                            });
+                          }
+                        }}
+                        required
+                        {...(validationErrors.minRentalDays
+                          ? { error: validationErrors.minRentalDays }
+                          : {})}
                       />
                     </div>
-                    <div>
+
+                    <div id="field-maxRentalDays">
                       <FormInput
-                        label="Max Days"
+                        label="Maximum Rental Period (days)"
+                        placeholder="e.g. 30 (Optional)"
                         type="number"
+                        min="1"
                         value={maxRentalDays}
-                        onChange={(e) => setMaxRentalDays(e.target.value)}
+                        onChange={(e) => {
+                          setMaxRentalDays(e.target.value);
+                          if (validationErrors.maxRentalDays) {
+                            setValidationErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.maxRentalDays;
+                              return next;
+                            });
+                          }
+                        }}
+                        {...(validationErrors.maxRentalDays
+                          ? { error: validationErrors.maxRentalDays }
+                          : {})}
                       />
                     </div>
                   </div>
+
+                  <div id="field-rentalPickupLocation">
+                    <FormInput
+                      label="Pickup / Return Location or Method *"
+                      placeholder="e.g. Seller pickup at shop in Bole, Addis Ababa"
+                      type="text"
+                      value={rentalPickupLocation}
+                      onChange={(e) => {
+                        setRentalPickupLocation(e.target.value);
+                        if (validationErrors.rentalPickupLocation) {
+                          setValidationErrors((prev) => {
+                            const next = { ...prev };
+                            delete next.rentalPickupLocation;
+                            return next;
+                          });
+                        }
+                      }}
+                      required
+                      {...(validationErrors.rentalPickupLocation
+                        ? { error: validationErrors.rentalPickupLocation }
+                        : {})}
+                    />
+                  </div>
+
+                  <div>
+                    <FormTextarea
+                      label="Rental Notes / Instructions [Optional]"
+                      placeholder="e.g. Dry cleaning handled upon return. Renter must present valid ID upon pickup."
+                      rows={2}
+                      value={rentalNotes}
+                      onChange={(e) => setRentalNotes(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </section>
 
           {/* ════════ SECTION 5: CUSTOM-MADE OPTION ════════ */}

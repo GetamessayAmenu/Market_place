@@ -83,6 +83,7 @@ const IconSettings = () => (
 const sellerHubItems: SidebarItem[] = [
   { label: 'Overview', href: '/seller', icon: <IconDashboard />, section: 'Seller Hub' },
   { label: 'Listings', href: '/seller/listings', icon: <IconListings />, section: 'Seller Hub' },
+  { label: 'Rental Requests', href: '/seller/orders/rental-queue', icon: <IconRentals />, section: 'Seller Hub' },
   { label: 'Messages', href: '/seller/messages', icon: <IconMessages />, badge: 0, section: 'Seller Hub' },
   { label: 'Store & Profile', href: '/seller/store', icon: <IconStore />, section: 'Seller Hub' },
   { label: 'Insights', href: '/seller/insights', icon: <IconInsights />, section: 'Seller Hub' },
@@ -160,7 +161,7 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
       return pathname === '/seller' || pathname === '/seller/dashboard';
     }
     if (href === '/seller/listings') {
-      return pathname === '/seller/listings' || pathname.startsWith('/seller/catalog');
+      return pathname.startsWith('/seller/listings') || pathname.startsWith('/seller/catalog');
     }
     return pathname === href || pathname.startsWith(href + '/');
   };

@@ -10,28 +10,29 @@ export interface ListingCardProps {
   id: string
   title: string
   price: number
-  currency?: 'ETB' | 'USD' | 'EUR'
-  imageUrl?: string | null
-  listingType?: ListingType
-  activeMode?: 'buy' | 'rent' | 'custom'
-  designerName?: string
-  designerAvatar?: string | null
-  designerId?: string
-  location?: string | null
-  verifiedSeller?: boolean
-  rating?: number | string | null
-  status?: 'new-arrival' | 'featured' | 'sold-out'
-  isFavorited?: boolean
-  onToggleFavorite?: () => void
-  originalPrice?: number
-  discount?: number
-  className?: string
-  supportsReadyMade?: boolean
-  supportsCustomDesign?: boolean
-  customOrderAvailable?: boolean
-  startingCustomPrice?: number | null
-  availableForRent?: boolean
-  rentalPricePerDay?: number | null
+  currency?: 'ETB' | 'USD' | 'EUR' | string | undefined
+  imageUrl?: string | null | undefined
+  listingType?: ListingType | undefined
+  activeMode?: 'buy' | 'rent' | 'custom' | undefined
+  designerName?: string | undefined
+  designerAvatar?: string | null | undefined
+  designerId?: string | undefined
+  location?: string | null | undefined
+  verifiedSeller?: boolean | undefined
+  rating?: number | string | null | undefined
+  status?: 'new-arrival' | 'featured' | 'sold-out' | undefined
+  isFavorited?: boolean | undefined
+  onToggleFavorite?: (() => void) | undefined
+  originalPrice?: number | undefined
+  discount?: number | undefined
+  className?: string | undefined
+  supportsReadyMade?: boolean | undefined
+  supportsCustomDesign?: boolean | undefined
+  customOrderAvailable?: boolean | undefined
+  startingCustomPrice?: number | null | undefined
+  availableForPurchase?: boolean | undefined
+  availableForRent?: boolean | undefined
+  rentalPricePerDay?: number | null | undefined
 }
 
 export default function ListingCard({
@@ -42,12 +43,12 @@ export default function ListingCard({
   imageUrl,
   listingType: _listingType,
   activeMode,
-  designerName = 'Habesha Fashion',
+  designerName,
   designerAvatar: _designerAvatar,
   designerId: _designerId,
-  location = 'Addis Ababa',
-  verifiedSeller = true,
-  rating = '4.7',
+  location,
+  verifiedSeller = false,
+  rating,
   status,
   isFavorited: initialFavorited = false,
   onToggleFavorite,
@@ -173,32 +174,40 @@ export default function ListingCard({
           {renderPriceText()}
 
           {/* Location & Seller info */}
-          <div className="text-xs text-muted-foreground space-y-0.5">
-            <p className="flex items-center gap-1 text-muted-foreground/80">
-              <span>📍</span>
-              <span className="truncate">{location || 'Addis Ababa'}</span>
-            </p>
-            <p className="font-medium text-foreground/80 truncate">{designerName}</p>
-          </div>
+          {(location || designerName) && (
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              {location && (
+                <p className="flex items-center gap-1 text-muted-foreground/80">
+                  <span>📍</span>
+                  <span className="truncate">{location}</span>
+                </p>
+              )}
+              {designerName && (
+                <p className="font-medium text-foreground/80 truncate">{designerName}</p>
+              )}
+            </div>
+          )}
 
           {/* Verified Seller & Rating Badges */}
-          <div className="flex items-center justify-between text-xs pt-0.5">
-            {verifiedSeller && (
-              <span className="flex items-center gap-1 font-medium text-emerald-600">
-                <svg className="h-3.5 w-3.5 fill-emerald-600" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span>Verified Seller</span>
-              </span>
-            )}
+          {(verifiedSeller || rating) && (
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              {verifiedSeller ? (
+                <span className="flex items-center gap-1 font-medium text-emerald-600">
+                  <svg className="h-3.5 w-3.5 fill-emerald-600" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Verified Seller</span>
+                </span>
+              ) : <div />}
 
-            {rating && (
-              <span className="flex items-center gap-1 font-semibold text-amber-600 ml-auto">
-                <span>★</span>
-                <span>{rating}</span>
-              </span>
-            )}
-          </div>
+              {rating && (
+                <span className="flex items-center gap-1 font-semibold text-amber-600 ml-auto">
+                  <span>★</span>
+                  <span>{rating}</span>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Capability Badges at bottom */}
           <div className="flex items-center gap-1.5 pt-1">

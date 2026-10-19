@@ -112,9 +112,12 @@ export default function SellerBottomNav({ unreadMessageCount = 0, className }: S
     >
       <div className="flex items-center justify-around">
         {items.map((item) => {
-          const isActive = item.href === '/seller/orders'
-            ? pathname === '/seller/orders'
-            : pathname === item.href || pathname.startsWith(item.href + '/');
+          const isActive =
+            item.href === '/seller'
+              ? pathname === '/seller' || pathname === '/seller/dashboard'
+              : item.href === '/seller/listings'
+              ? pathname.startsWith('/seller/listings') || pathname.startsWith('/seller/catalog')
+              : pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}

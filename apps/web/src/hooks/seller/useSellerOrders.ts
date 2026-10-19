@@ -7,15 +7,39 @@ export type CustomMilestone = 'measurements_received' | 'fabric_cutting' | 'tail
 
 export interface SellerOrder {
   id: string;
-  model: OrderModel;
-  status: OrderStatus;
-  title: string;
-  customerName: string;
+  orderNumber?: string;
+  model?: OrderModel;
+  type?: string;
+  status: OrderStatus | string;
+  title?: string;
+  customerName?: string;
   price?: number;
+  agreedPrice?: number;
   deposit?: number;
+  agreedDeposit?: number | null;
   rentalDates?: { start: string; end: string };
+  rentalStartDate?: string | null;
+  rentalEndDate?: string | null;
   customMilestone?: CustomMilestone;
+  buyer?: {
+    id?: string;
+    displayName?: string;
+    email?: string;
+    phone?: string | null;
+    avatarUrl?: string | null;
+    location?: string | null;
+  };
+  product?: {
+    id?: string;
+    title?: string;
+    slug?: string;
+    price?: number;
+    currency?: string;
+    images?: any[];
+  };
+  customMeasurements?: any;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface UseSellerOrdersParams {

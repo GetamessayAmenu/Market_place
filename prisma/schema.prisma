@@ -119,6 +119,7 @@ model User {
   rentalExtensionsRequested RentalExtension[]     @relation("ExtensionRequester")
   rentalOrdersAsRenter      RentalOrder[]         @relation("RentalRenter")
   rentalOrdersAsSeller      RentalOrder[]         @relation("RentalSeller")
+  rentalHistoriesAsActor    RentalHistory[]       @relation("RentalHistoryActor")
   reportsAgainst            Report[]              @relation("ReportedUser")
   reportsFiled              Report[]              @relation("ReportsFiled")
   reportsResolved           Report[]              @relation("ReportsResolved")
@@ -257,6 +258,8 @@ model Listing {
   fabricCareTags          String[]              @default([]) @map("fabric_care_tags")
   minRentalDurationDays   Int                   @default(1) @map("min_rental_duration_days")
   maxRentalDurationDays   Int?                  @map("max_rental_duration_days")
+  rentalPickupLocation    String?               @map("rental_pickup_location") @db.VarChar(200)
+  rentalNotes             String?               @map("rental_notes")
   supportsReadyMade       Boolean               @default(true) @map("supports_ready_made")
   supportsCustomDesign    Boolean               @default(false) @map("supports_custom_design")
   startingCustomPrice     Decimal?              @map("starting_custom_price") @db.Decimal(12, 2)
@@ -1101,7 +1104,17 @@ model RentalOrder {
   depositRefunded      Boolean              @default(false) @map("deposit_refunded")
   depositRefundAmount  Float?               @map("deposit_refund_amount")
   depositRefundReason  String?              @map("deposit_refund_reason")
-  status               RentalStatus         @default(REQUESTED)
+  status               RentalStatus         @default(PENDING)
+  pickupLocation       String?              @map("pickup_location") @db.VarChar(200)
+  rentalNotes          String?              @map("rental_notes")
+  renterNotes          String?              @map("renter_notes")
+  suggestedStartDate   DateTime?            @map("suggested_start_date")
+  suggestedEndDate     DateTime?            @map("suggested_end_date")
+  suggestedBy          String?              @map("suggested_by") @db.Uuid
+  cancelledBy          String?              @map("cancelled_by") @db.Uuid
+  cancelledAt          DateTime?            @map("cancelled_at")
+  declineReason        String?              @map("decline_reason")
+  rentalDurationDays   Int?                 @map("rental_duration_days")
   preHandoverCondition String?              @map("pre_handover_condition")
   preHandoverPhotos    String[]             @default([]) @map("pre_handover_photos")
   postReturnCondition  String?              @map("post_return_condition")
@@ -1119,6 +1132,7 @@ model RentalOrder {
   pricingTierUsed       RentalPricingTier?   @map("pricing_tier_used")
   conditionLogs         RentalConditionLog[]
   extensions            RentalExtension[]
+  histories             RentalHistory[]
   conversationsAsRental Conversation[]       @relation("RentalConversations")
   listing               Listing              @relation(fields: [listingId], references: [id])
   renter               User                 @relation("RentalRenter", fields: [renterId], references: [id])
@@ -1131,6 +1145,7 @@ model RentalOrder {
   @@index([sellerId])
   @@index([listingId])
   @@index([orderNumber])
+  @@index([startDate, endDate])
   @@map("rental_orders")
 }
 
@@ -1187,6 +1202,25 @@ model RentalBlackoutDate {
   @@index([listingId, startDate])
   @@index([listingId, endDate])
   @@map("rental_blackout_dates")
+}
+
+model RentalHistory {
+  id            String       @id @default(uuid()) @db.Uuid
+  rentalOrderId String       @map("rental_order_id") @db.Uuid
+  actorId       String       @map("actor_id") @db.Uuid
+  action        String       @db.VarChar(50)
+  fromStatus    String?      @map("from_status") @db.VarChar(50)
+  toStatus      String?      @map("to_status") @db.VarChar(50)
+  notes         String?
+  metadata      Json?
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  rentalOrder   RentalOrder  @relation(fields: [rentalOrderId], references: [id], onDelete: Cascade)
+  actor         User         @relation("RentalHistoryActor", fields: [actorId], references: [id])
+
+  @@index([rentalOrderId, createdAt])
+  @@index([actorId])
+  @@map("rental_histories")
 }
 
 model RegionHub {
@@ -1383,18 +1417,22 @@ enum KycStatus {
 }
 
 enum RentalStatus {
+  PENDING
+  ACCEPTED
+  READY_FOR_PICKUP
+  ACTIVE
+  RETURN_PENDING
+  COMPLETED
+  DECLINED
+  CANCELLED
+  DISPUTED
+  EXPIRED
   REQUESTED
   APPROVED
   HANDOVER_PENDING
-  ACTIVE
   RETURN_INITIATED
   RETURNED_INSPECTED
   RETURNED_PENDING_INSPECTION
-  COMPLETED
-  DISPUTED
-  DECLINED
-  EXPIRED
-  CANCELLED
 }
 
 enum RentalPricingTier {

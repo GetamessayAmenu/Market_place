@@ -2,6 +2,7 @@ import type { AuthUser, UserRole } from '@marketplace/types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
+import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import type { AuthenticatedUserPayload } from '../../common/interfaces/authenticated-user-payload.interface';
 import { toPaginatedResponse } from '../../common/utils/pagination.util';
 import { AdminLogsService } from '../admin-logs/admin-logs.service';
@@ -229,18 +230,35 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(
+    id: string,
+    viewer?: AuthenticatedUser | { id: string; role?: string; roles?: readonly string[] | string[] },
+  ) {
     try {
       const user = await this.usersRepository.findProfileById(id);
       if (!user) throw new NotFoundException('User not found');
-      
-      // Return a simplified version to avoid circular references
+
+      const aggregates = await this.usersRepository.getSellerAggregates(id);
+
+      const isOwner = viewer?.id === user.id;
+      const isAdmin =
+        viewer?.role === 'admin' ||
+        viewer?.role === 'super_admin' ||
+        viewer?.roles?.includes('admin') ||
+        viewer?.roles?.includes('super_admin');
+      const isPrivileged = isOwner || isAdmin;
+
+      const isVerified = Boolean(
+        user.vendorKycProfile?.status === 'APPROVED' ||
+        user.isVerifiedDesigner ||
+        user.phoneVerifiedAt !== null ||
+        user.emailVerifiedAt !== null,
+      );
+
       return {
         id: user.id,
-        email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
-        phone: user.phone,
         bio: user.bio,
         location: user.location,
         sellerType: user.sellerType,
@@ -254,9 +272,27 @@ export class UsersService {
         role: user.role.slug,
         emailVerifiedAt: user.emailVerifiedAt,
         phoneVerifiedAt: user.phoneVerifiedAt,
-        lastLoginAt: user.lastLoginAt,
+        isVerifiedDesigner: user.isVerifiedDesigner,
+        isVerified,
+        verificationStatus:
+          user.vendorKycProfile?.status === 'APPROVED'
+            ? 'verified'
+            : user.isVerifiedDesigner
+              ? 'verified'
+              : 'unverified',
+        businessName: user.vendorKycProfile?.businessName ?? null,
+        rating: aggregates.averageRating,
+        reviewCount: aggregates.reviewCount,
+        listingCounts: aggregates.listingCounts,
+        followerCount: user._count?.storeFollowers ?? 0,
+        lastLoginAt: isPrivileged ? user.lastLoginAt : null,
         createdAt: user.createdAt,
-        _count: user._count || { listings: 0, storeFollowers: 0 },
+        _count: {
+          listings: aggregates.listingCounts.all,
+          storeFollowers: user._count?.storeFollowers ?? 0,
+          favorites: user._count?.favorites ?? 0,
+        },
+        ...(isPrivileged ? { email: user.email, phone: user.phone } : {}),
       };
     } catch (error) {
       console.error('Error in findOne:', error);
@@ -368,22 +404,40 @@ export class UsersService {
     }));
   }
 
-  async findUserListings(userId: string, viewer?: { id: string }) {
+  async findUserListings(
+    userId: string,
+    query?: {
+      page?: number;
+      limit?: number;
+      type?: 'all' | 'buy' | 'rent' | 'custom';
+      sortBy?: 'newest' | 'price_asc' | 'price_desc';
+    },
+    viewer?: AuthenticatedUser | { id: string },
+  ) {
     const isOwner = viewer?.id === userId;
-    const rawListings = await this.usersRepository.findUserListings(userId, isOwner);
-    const listings = rawListings.map((l) => ({
+    const result = await this.usersRepository.findUserListings(userId, {
+      ...query,
+      isOwner,
+    });
+
+    const listings = result.items.map((l) => ({
       ...l,
+      price: Number(l.price),
+      rentalPricePerDay: l.rentalPricePerDay ? Number(l.rentalPricePerDay) : null,
+      rentalDeposit: l.rentalDeposit ? Number(l.rentalDeposit) : null,
+      startingCustomPrice: l.startingCustomPrice ? Number(l.startingCustomPrice) : null,
       primaryImageUrl: l.images?.[0]?.url ?? null,
     }));
 
     return {
       success: true,
       data: listings,
+      counts: result.counts,
       meta: {
-        total: listings.length,
-        page: 1,
-        limit: 50,
-        totalPages: 1,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
       },
     };
   }

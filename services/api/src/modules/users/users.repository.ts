@@ -108,11 +108,12 @@ export class UsersRepository {
     });
   }
 
-  async findProfileById(id: string): Promise<UserWithRole & { _count: { listings: number; favorites: number; reportsFiled: number; notifications: number; storeFollowers: number } } | null> {
+  async findProfileById(id: string): Promise<UserWithRole & { vendorKycProfile: any; _count: { listings: number; favorites: number; reportsFiled: number; notifications: number; storeFollowers: number } } | null> {
     return this.prisma.user.findFirst({
       where: { id, deletedAt: null },
       include: {
         ...USER_WITH_ROLE_INCLUDE,
+        vendorKycProfile: true,
         _count: {
           select: {
             listings: true,
@@ -123,7 +124,63 @@ export class UsersRepository {
           },
         },
       },
-    });
+    }) as any;
+  }
+
+  async getSellerAggregates(userId: string) {
+    const [reviewAgg, totalActive, forSaleCount, rentalCount, customCount] = await Promise.all([
+      this.prisma.review.aggregate({
+        where: { sellerId: userId, deletedAt: null },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+      this.prisma.listing.count({
+        where: {
+          sellerId: userId,
+          status: 'active',
+          deletedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+      this.prisma.listing.count({
+        where: {
+          sellerId: userId,
+          status: 'active',
+          deletedAt: null,
+          availableForPurchase: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+      this.prisma.listing.count({
+        where: {
+          sellerId: userId,
+          status: 'active',
+          deletedAt: null,
+          availableForRent: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+      this.prisma.listing.count({
+        where: {
+          sellerId: userId,
+          status: 'active',
+          deletedAt: null,
+          customOrderAvailable: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      }),
+    ]);
+
+    return {
+      averageRating: reviewAgg._avg.rating ? Math.round(reviewAgg._avg.rating * 10) / 10 : null,
+      reviewCount: reviewAgg._count.rating || 0,
+      listingCounts: {
+        all: totalActive,
+        buy: forSaleCount,
+        rent: rentalCount,
+        custom: customCount,
+      },
+    };
   }
 
   // ─── Store Follow Feature ───────────────────────────────────────────────────
@@ -204,34 +261,101 @@ export class UsersRepository {
     });
   }
 
-  async findUserListings(userId: string, isOwner = false) {
-    return this.prisma.listing.findMany({
-      where: {
-        sellerId: userId,
-        ...(isOwner ? {} : { status: 'active' }),
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        title: true,
-        price: true,
-        condition: true,
-        city: true,
-        status: true,
-        rejectedReason: true,
-        availableForPurchase: true,
-        availableForRent: true,
-        customOrderAvailable: true,
-        rentalPricePerDay: true,
-        createdAt: true,
-        images: {
-          where: { deletedAt: null },
-          select: { url: true, isPrimary: true },
-          take: 1,
+  async findUserListings(
+    userId: string,
+    params: {
+      page?: number;
+      limit?: number;
+      type?: 'all' | 'buy' | 'rent' | 'custom';
+      sortBy?: 'newest' | 'price_asc' | 'price_desc';
+      isOwner?: boolean;
+    } = {},
+  ) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(100, Math.max(1, params.limit ?? 50));
+    const skip = (page - 1) * limit;
+
+    const baseWhere: Prisma.ListingWhereInput = {
+      sellerId: userId,
+      deletedAt: null,
+      ...(params.isOwner
+        ? {}
+        : {
+            status: 'active',
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          }),
+    };
+
+    const typeWhere: Prisma.ListingWhereInput = { ...baseWhere };
+    if (params.type === 'buy') {
+      typeWhere.availableForPurchase = true;
+    } else if (params.type === 'rent') {
+      typeWhere.availableForRent = true;
+    } else if (params.type === 'custom') {
+      typeWhere.customOrderAvailable = true;
+    }
+
+    let orderBy: Prisma.ListingOrderByWithRelationInput = { createdAt: 'desc' };
+    if (params.sortBy === 'price_asc') {
+      orderBy = { price: 'asc' };
+    } else if (params.sortBy === 'price_desc') {
+      orderBy = { price: 'desc' };
+    }
+
+    const [items, total, allCount, buyCount, rentCount, customCount] = await Promise.all([
+      this.prisma.listing.findMany({
+        where: typeWhere,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          price: true,
+          currency: true,
+          condition: true,
+          city: true,
+          state: true,
+          country: true,
+          status: true,
+          isFeatured: true,
+          rejectedReason: true,
+          availableForPurchase: true,
+          availableForRent: true,
+          customOrderAvailable: true,
+          rentalPricePerDay: true,
+          rentalDeposit: true,
+          supportsReadyMade: true,
+          supportsCustomDesign: true,
+          startingCustomPrice: true,
+          createdAt: true,
+          images: {
+            where: { deletedAt: null },
+            select: { url: true, isPrimary: true, sortOrder: true },
+            orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+          },
         },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      this.prisma.listing.count({ where: typeWhere }),
+      this.prisma.listing.count({ where: baseWhere }),
+      this.prisma.listing.count({ where: { ...baseWhere, availableForPurchase: true } }),
+      this.prisma.listing.count({ where: { ...baseWhere, availableForRent: true } }),
+      this.prisma.listing.count({ where: { ...baseWhere, customOrderAvailable: true } }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      counts: {
+        all: allCount,
+        buy: buyCount,
+        rent: rentCount,
+        custom: customCount,
       },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+    };
   }
 }

@@ -48,8 +48,17 @@ export async function serverGet<T = unknown>(path: string, options?: ServerGetOp
 
   const res = await fetch(url, fetchOpts)
   if (!res.ok) throw new Error(`Failed to fetch ${path}: ${String(res.status)}`)
-  const body = (await res.json()) as { data: T }
-  return body.data
+  const body = (await res.json()) as any
+  if (body && typeof body === 'object') {
+    if (body.data !== undefined) {
+      if (Array.isArray(body.data)) {
+        if (body.meta !== undefined) (body.data as any).meta = body.meta
+        if (body.counts !== undefined) (body.data as any).counts = body.counts
+      }
+      return body.data as T
+    }
+  }
+  return body as T
 }
 
 export async function serverPost<T = unknown>(path: string, body: unknown, options?: ServerPostOptions) {

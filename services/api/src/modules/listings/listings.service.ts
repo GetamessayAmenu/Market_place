@@ -121,6 +121,18 @@ export class ListingsService {
       ...(dto.rentalDeposit !== undefined
         ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }
         : {}),
+      ...(dto.minRentalDurationDays !== undefined
+        ? { minRentalDurationDays: dto.minRentalDurationDays }
+        : {}),
+      ...(dto.maxRentalDurationDays !== undefined
+        ? { maxRentalDurationDays: dto.maxRentalDurationDays }
+        : {}),
+      ...(dto.rentalPickupLocation !== undefined
+        ? { rentalPickupLocation: dto.rentalPickupLocation }
+        : {}),
+      ...(dto.rentalNotes !== undefined
+        ? { rentalNotes: dto.rentalNotes }
+        : {}),
       ...(dto.attributes !== undefined
         ? { attributes: dto.attributes as Prisma.InputJsonValue }
         : {}),
@@ -447,6 +459,18 @@ export class ListingsService {
         : {}),
       ...(dto.rentalDeposit !== undefined
         ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }
+        : {}),
+      ...(dto.minRentalDurationDays !== undefined
+        ? { minRentalDurationDays: dto.minRentalDurationDays }
+        : {}),
+      ...(dto.maxRentalDurationDays !== undefined
+        ? { maxRentalDurationDays: dto.maxRentalDurationDays }
+        : {}),
+      ...(dto.rentalPickupLocation !== undefined
+        ? { rentalPickupLocation: dto.rentalPickupLocation }
+        : {}),
+      ...(dto.rentalNotes !== undefined
+        ? { rentalNotes: dto.rentalNotes }
         : {}),
       ...(dto.attributes !== undefined
         ? { attributes: dto.attributes as Prisma.InputJsonValue }

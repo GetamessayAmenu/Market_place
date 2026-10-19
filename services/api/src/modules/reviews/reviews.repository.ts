@@ -11,6 +11,7 @@ import type { ReviewWithRelations } from './serializers/review.serializer';
 
 const reviewInclude = {
   reviewer: { select: { id: true, displayName: true, avatarUrl: true } },
+  listing: { select: { id: true, title: true, slug: true } },
 } satisfies Prisma.ReviewInclude;
 
 @Injectable()
@@ -104,6 +105,27 @@ export class ReviewsRepository extends BaseRepository<Review> {
       this.prisma.review.groupBy({
         by: ['rating'],
         where: { listingId, deletedAt: null },
+        _count: true,
+      }),
+    ]);
+
+    return {
+      ratings,
+      distribution: distribution.map((d) => ({ rating: d.rating, _count: d._count })),
+    };
+  }
+
+  async getSellerRatingSummary(
+    sellerId: string,
+  ): Promise<{ ratings: { rating: number }[]; distribution: { rating: number; _count: number }[] }> {
+    const [ratings, distribution] = await Promise.all([
+      this.prisma.review.findMany({
+        where: { sellerId, deletedAt: null },
+        select: { rating: true },
+      }),
+      this.prisma.review.groupBy({
+        by: ['rating'],
+        where: { sellerId, deletedAt: null },
         _count: true,
       }),
     ]);

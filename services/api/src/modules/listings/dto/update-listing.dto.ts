@@ -169,6 +169,30 @@ export class UpdateListingDto {
   rentalDeposit?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  minRentalDurationDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  maxRentalDurationDays?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  rentalPickupLocation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  rentalNotes?: string;
+
+  @IsOptional()
   @IsObject()
   attributes?: Record<string, unknown>;
 
