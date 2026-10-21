@@ -103,15 +103,32 @@ export class NotificationsService {
       return;
     }
 
+    const mergedData: Record<string, unknown> = { ...(data || {}) };
+    if (!mergedData.actionUrl) {
+      if (mergedData.rentalOrderId) {
+        mergedData.actionUrl = mergedData.isSeller
+          ? `/seller/orders/rental-queue?orderId=${mergedData.rentalOrderId}`
+          : `/dashboard/rentals?orderId=${mergedData.rentalOrderId}`;
+      } else if (mergedData.conversationId) {
+        mergedData.actionUrl = `/dashboard/messages?conversationId=${mergedData.conversationId}`;
+      } else if (mergedData.orderId) {
+        mergedData.actionUrl = mergedData.isSeller
+          ? `/seller/orders/${mergedData.orderId}`
+          : `/dashboard/orders/${mergedData.orderId}`;
+      } else if (mergedData.customOrderId) {
+        mergedData.actionUrl = `/dashboard/custom-orders?orderId=${mergedData.customOrderId}`;
+      } else if (mergedData.listingId) {
+        mergedData.actionUrl = `/products/${mergedData.listingId}`;
+      }
+    }
+
     const payload: NotificationPayload = {
       userId,
       type,
       title,
       body: body ?? null,
+      data: mergedData,
     };
-    if (data) {
-      payload.data = data;
-    }
 
     await this.inAppChannel.send(payload);
   }

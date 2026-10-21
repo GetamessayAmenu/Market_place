@@ -5,7 +5,7 @@ import type { ChatConversation } from '../../../lib/chatApi';
 import { serverGet } from '../../../lib/serverApi';
 
 interface Props {
-  searchParams: { conversation?: string; listing?: string; seller?: string };
+  searchParams: { conversation?: string; conversationId?: string; listing?: string; seller?: string };
 }
 
 export const metadata = { title: 'Messages — Marketplace' };
@@ -22,12 +22,14 @@ export default async function MessagesPage({ searchParams }: Props) {
     conversations = [];
   }
 
+  const selectedId = searchParams.conversation || searchParams.conversationId;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col bg-background">
       <ChatWorkspace
         conversations={conversations}
         currentUserId={user.id}
-        {...(searchParams.conversation ? { initialSelectedId: searchParams.conversation } : {})}
+        {...(selectedId ? { initialSelectedId: selectedId } : {})}
       />
     </div>
   );

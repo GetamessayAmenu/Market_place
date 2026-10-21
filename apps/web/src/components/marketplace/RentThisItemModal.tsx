@@ -16,6 +16,8 @@ export interface RentThisItemModalProps {
     currency?: string | undefined;
     rentalPricePerDay?: number | null | undefined;
     rentalDeposit?: number | null | undefined;
+    rentalThreeDayRate?: number | null | undefined;
+    rentalWeeklyRate?: number | null | undefined;
     minRentalDurationDays?: number | null | undefined;
     maxRentalDurationDays?: number | null | undefined;
     rentalPickupLocation?: string | null | undefined;
@@ -42,6 +44,8 @@ export default function RentThisItemModal({
   const currency = listing.currency || 'ETB';
   const pricePerDay = Number(listing.rentalPricePerDay || 0);
   const deposit = Number(listing.rentalDeposit || 0);
+  const threeDayRate = listing.rentalThreeDayRate ? Number(listing.rentalThreeDayRate) : null;
+  const weeklyRate = listing.rentalWeeklyRate ? Number(listing.rentalWeeklyRate) : null;
   const minDays = Math.max(1, Number(listing.minRentalDurationDays || 1));
   const maxDays = listing.maxRentalDurationDays ? Number(listing.maxRentalDurationDays) : null;
   const pickupLocation = listing.rentalPickupLocation || listing.city || 'Direct pickup from seller';
@@ -89,7 +93,42 @@ export default function RentThisItemModal({
     return diff > 0 ? diff : 0;
   }, [startDate, endDate]);
 
-  const totalRentalFee = durationDays * pricePerDay;
+  // Multi-day package tier rate calculation
+  const { totalRentalFee, activeTier, tierDiscount } = useMemo(() => {
+    if (durationDays <= 0 || pricePerDay <= 0) {
+      return { totalRentalFee: 0, activeTier: 'DAILY' as const, tierDiscount: 0 };
+    }
+
+    const standardTotal = durationDays * pricePerDay;
+
+    if (durationDays >= 7 && weeklyRate) {
+      // Weekly package applies + extra days at daily rate
+      const total = durationDays === 7 ? weeklyRate : weeklyRate + (durationDays - 7) * pricePerDay;
+      const discount = Math.max(0, standardTotal - total);
+      return {
+        totalRentalFee: total,
+        activeTier: 'WEEKLY' as const,
+        tierDiscount: discount,
+      };
+    }
+
+    if (durationDays >= 3 && threeDayRate) {
+      // 3-day event package applies + extra days at daily rate
+      const total = durationDays === 3 ? threeDayRate : threeDayRate + (durationDays - 3) * pricePerDay;
+      const discount = Math.max(0, standardTotal - total);
+      return {
+        totalRentalFee: total,
+        activeTier: 'THREE_DAY_EVENT' as const,
+        tierDiscount: discount,
+      };
+    }
+
+    return {
+      totalRentalFee: standardTotal,
+      activeTier: 'DAILY' as const,
+      tierDiscount: 0,
+    };
+  }, [durationDays, pricePerDay, threeDayRate, weeklyRate]);
 
   // Real-time server availability check whenever dates change
   useEffect(() => {
@@ -174,6 +213,7 @@ export default function RentThisItemModal({
         listingId: listing.id,
         startDate,
         endDate,
+        pricingTier: activeTier,
         renterNotes: renterNotes.trim() || undefined,
       });
 
@@ -232,6 +272,16 @@ export default function RentThisItemModal({
                 <Badge variant="secondary">
                   Min: {minDays} day{minDays > 1 ? 's' : ''}
                 </Badge>
+                {threeDayRate && (
+                  <Badge variant="outline" className="border-amber-500/30 text-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                    🎉 3-Day Event: {currency} {threeDayRate.toLocaleString()}
+                  </Badge>
+                )}
+                {weeklyRate && (
+                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30">
+                    🌟 7-Day Weekly: {currency} {weeklyRate.toLocaleString()}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -310,15 +360,55 @@ export default function RentThisItemModal({
 
           {/* Live Price Summary */}
           {durationDays > 0 && (
-            <div className="rounded-lg border bg-card p-3.5 space-y-2 text-xs">
+            <div className="rounded-lg border bg-card p-3.5 space-y-2.5 text-xs">
               <div className="flex justify-between text-muted-foreground">
                 <span>Rental Duration</span>
                 <span className="font-medium text-foreground">{durationDays} day{durationDays !== 1 ? 's' : ''}</span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Rental Fee ({currency} {pricePerDay.toLocaleString()} × {durationDays}d)</span>
-                <span className="font-semibold text-foreground">{currency} {totalRentalFee.toLocaleString()}</span>
-              </div>
+
+              {activeTier === 'WEEKLY' && weeklyRate ? (
+                <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-emerald-800 dark:text-emerald-300 space-y-1">
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>🌟 7-Day Weekly Package Applied</span>
+                    <span>{currency} {weeklyRate.toLocaleString()}</span>
+                  </div>
+                  {durationDays > 7 && (
+                    <div className="flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-400">
+                      <span>+ {durationDays - 7} extra day{durationDays - 7 > 1 ? 's' : ''} ({currency} {pricePerDay.toLocaleString()}/day)</span>
+                      <span>{currency} {((durationDays - 7) * pricePerDay).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {tierDiscount > 0 && (
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium pt-0.5">
+                      🎉 You saved {currency} {tierDiscount.toLocaleString()} compared to standard daily rate!
+                    </p>
+                  )}
+                </div>
+              ) : activeTier === 'THREE_DAY_EVENT' && threeDayRate ? (
+                <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-2.5 text-amber-800 dark:text-amber-300 space-y-1">
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>🎉 3-Day Event Package Applied</span>
+                    <span>{currency} {threeDayRate.toLocaleString()}</span>
+                  </div>
+                  {durationDays > 3 && (
+                    <div className="flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-400">
+                      <span>+ {durationDays - 3} extra day{durationDays - 3 > 1 ? 's' : ''} ({currency} {pricePerDay.toLocaleString()}/day)</span>
+                      <span>{currency} {((durationDays - 3) * pricePerDay).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {tierDiscount > 0 && (
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium pt-0.5">
+                      🎉 You saved {currency} {tierDiscount.toLocaleString()} compared to standard daily rate!
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Rental Fee ({currency} {pricePerDay.toLocaleString()} × {durationDays}d)</span>
+                  <span className="font-semibold text-foreground">{currency} {totalRentalFee.toLocaleString()}</span>
+                </div>
+              )}
+
               {deposit > 0 && (
                 <div className="flex justify-between text-muted-foreground">
                   <span>Security Deposit (Refundable upon return)</span>

@@ -2,7 +2,8 @@ import React from 'react';
 
 import type { AuthUser } from '../../hooks/useAuth';
 import Header from '../navigation/Header';
-import Sidebar from '../navigation/Sidebar';
+import SellerSidebar from '../seller/SellerSidebar';
+import SellerBottomNav from '../seller/SellerBottomNav';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ export default function DashboardLayout({ children, user, hideWelcome, hideHeade
       {/* ── Sidebar + Main Content ──────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar: hidden on mobile/tablet, visible on lg+ */}
-        <Sidebar />
+        <SellerSidebar />
 
         {/* Main scrollable area */}
         <main
@@ -46,6 +47,9 @@ export default function DashboardLayout({ children, user, hideWelcome, hideHeade
           </div>
         </main>
       </div>
+
+      {/* Bottom Navigation (Mobile) */}
+      <SellerBottomNav />
     </div>
   );
 }

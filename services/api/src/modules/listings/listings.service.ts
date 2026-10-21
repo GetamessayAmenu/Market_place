@@ -118,6 +118,12 @@ export class ListingsService {
       ...(dto.rentalPricePerDay !== undefined
         ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
         : {}),
+      ...(dto.rentalThreeDayRate !== undefined
+        ? { rentalThreeDayRate: new Prisma.Decimal(dto.rentalThreeDayRate) }
+        : {}),
+      ...(dto.rentalWeeklyRate !== undefined
+        ? { rentalWeeklyRate: new Prisma.Decimal(dto.rentalWeeklyRate) }
+        : {}),
       ...(dto.rentalDeposit !== undefined
         ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }
         : {}),
@@ -456,6 +462,12 @@ export class ListingsService {
         : {}),
       ...(dto.rentalPricePerDay !== undefined
         ? { rentalPricePerDay: new Prisma.Decimal(dto.rentalPricePerDay) }
+        : {}),
+      ...(dto.rentalThreeDayRate !== undefined
+        ? { rentalThreeDayRate: dto.rentalThreeDayRate ? new Prisma.Decimal(dto.rentalThreeDayRate) : null }
+        : {}),
+      ...(dto.rentalWeeklyRate !== undefined
+        ? { rentalWeeklyRate: dto.rentalWeeklyRate ? new Prisma.Decimal(dto.rentalWeeklyRate) : null }
         : {}),
       ...(dto.rentalDeposit !== undefined
         ? { rentalDeposit: new Prisma.Decimal(dto.rentalDeposit) }

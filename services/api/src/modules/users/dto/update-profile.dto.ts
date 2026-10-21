@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsEnum, IsObject } from 'class-validator';
+import { SellerType } from '@prisma/client';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -15,4 +16,23 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(20)
   readonly phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  readonly bio?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  readonly location?: string;
+
+  @IsOptional()
+  @IsEnum(SellerType)
+  readonly sellerType?: SellerType;
+
+  @IsOptional()
+  @IsObject()
+  readonly socialLinks?: Record<string, any>;
 }
+

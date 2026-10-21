@@ -1,6 +1,6 @@
 import type { AuthUser } from '../hooks/useAuth'
 
-import { apiGet, apiPatch, apiPost } from './api'
+import { apiGet, apiPatch, apiPost, apiDelete } from './api'
 
 interface AuthResponse {
   user: AuthUser
@@ -66,6 +66,10 @@ export async function updateProfile(data: {
   displayName?: string
   avatarUrl?: string
   phone?: string
+  bio?: string
+  location?: string
+  sellerType?: string
+  socialLinks?: Record<string, any>
 }): Promise<AuthUser> {
   return apiPatch<AuthUser>('/users/me', data)
 }
@@ -74,4 +78,13 @@ export async function resendVerificationEmail(email?: string): Promise<SuccessRe
   return apiPost<SuccessResponse>('/auth/verify/resend', email != null ? { email } : {})
 }
 
-export default { login, register, logout, me, forgotPassword, resetPassword, changePassword, updateProfile, resendVerificationEmail }
+export async function deleteAccount(): Promise<{ deleted: true }> {
+  const res = await apiDelete<{ deleted: true }>('/users/me')
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('token')
+  }
+  return res
+}
+
+export default { login, register, logout, me, forgotPassword, resetPassword, changePassword, updateProfile, resendVerificationEmail, deleteAccount }

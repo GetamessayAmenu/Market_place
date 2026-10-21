@@ -147,6 +147,12 @@ export default function ListingReviewSummary({ data }: ListingReviewSummaryProps
         {data.listingType === 'rent' && data.pricing.rentalPricePerDay && (
           <Row label="Per day" value={'$' + Number(data.pricing.rentalPricePerDay).toLocaleString() + '/day'} />
         )}
+        {data.listingType === 'rent' && data.pricing.rentalThreeDayRate && (
+          <Row label="3-day event" value={'$' + Number(data.pricing.rentalThreeDayRate).toLocaleString()} />
+        )}
+        {data.listingType === 'rent' && data.pricing.rentalWeeklyRate && (
+          <Row label="Weekly" value={'$' + Number(data.pricing.rentalWeeklyRate).toLocaleString()} />
+        )}
         {data.listingType === 'rent' && data.pricing.rentalDeposit && (
           <Row label="Deposit" value={'$' + Number(data.pricing.rentalDeposit).toLocaleString()} />
         )}

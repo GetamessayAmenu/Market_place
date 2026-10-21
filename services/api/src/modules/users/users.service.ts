@@ -1,5 +1,5 @@
 import type { AuthUser, UserRole } from '@marketplace/types';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -115,6 +115,11 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
       emailVerified: user.emailVerifiedAt !== null,
       phoneVerified: user.phoneVerifiedAt !== null,
+      phone: user.phone,
+      bio: user.bio,
+      location: user.location,
+      sellerType: user.sellerType,
+      socialLinks: (user.socialLinks as Record<string, any>) || null,
     };
   }
 
@@ -324,10 +329,17 @@ export class UsersService {
     const user = await this.usersRepository.findActiveById(userId);
     if (!user) throw new NotFoundException('User not found');
 
-    const data: Record<string, string> = {};
+    const data: Record<string, any> = {};
     if (dto.displayName !== undefined) data.displayName = dto.displayName;
     if (dto.avatarUrl !== undefined) data.avatarUrl = dto.avatarUrl;
     if (dto.phone !== undefined) data.phone = dto.phone;
+    if (dto.bio !== undefined) data.bio = dto.bio;
+    if (dto.location !== undefined) data.location = dto.location;
+    if (dto.sellerType !== undefined) data.sellerType = dto.sellerType;
+    if (dto.socialLinks !== undefined) {
+      const existingSocial = (user.socialLinks as Record<string, any>) || {};
+      data.socialLinks = { ...existingSocial, ...dto.socialLinks };
+    }
 
     if (Object.keys(data).length === 0) {
       return this.toAuthUser(user);
@@ -340,6 +352,14 @@ export class UsersService {
   async deleteSelf(userId: string): Promise<{ readonly deleted: true }> {
     const user = await this.usersRepository.findActiveById(userId);
     if (!user) throw new NotFoundException('User not found');
+
+    const activeRentals = await this.usersRepository.countActiveRentals(userId);
+    if (activeRentals > 0) {
+      throw new BadRequestException(
+        `Cannot delete account with ${activeRentals} active or pending rental order(s). Please complete ongoing rentals and settle collateral deposits first.`,
+      );
+    }
+
     await this.usersRepository.softDeleteSelf(userId);
     try {
       await this.adminLogsService.createLog({

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Modal, Button, Alert, Spinner, cn } from '@marketplace/ui';
 import { apiGet, apiPost, getApiErrorMessage } from '../../lib/api';
 import { findOrCreateConversation } from '../../lib/chatApi';
@@ -25,7 +25,7 @@ export interface RentalExtensionItem {
   requestedEndDate: string;
   additionalDays: number;
   additionalFee: number;
-  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
+  status: 'PENDING' | 'REQUESTED' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
   reason?: string | null;
   createdAt: string;
 }
@@ -71,6 +71,14 @@ export interface SellerRentalOrder {
   histories?: RentalHistoryItem[];
   extensions?: RentalExtensionItem[];
   createdAt: string;
+  isOverdue?: boolean;
+  overdueDays?: number;
+  penaltyDays?: number;
+  penaltyFee?: number;
+  dailyLateRate?: number;
+  penaltyPaid?: boolean;
+  penaltyPaidAt?: string | null;
+  penaltyNotes?: string | null;
 }
 
 type TabType = 'all' | 'PENDING' | 'ACCEPTED' | 'ACTIVE' | 'RETURN_PENDING' | 'COMPLETED' | 'DECLINED_CANCELLED';
@@ -105,6 +113,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function SellerRentalQueue() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetOrderId = searchParams.get('orderId') || searchParams.get('rentalId') || searchParams.get('id');
+
   const [orders, setOrders] = useState<SellerRentalOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('all');
@@ -129,6 +140,12 @@ export default function SellerRentalQueue() {
   // Cancel modal
   const [cancelModalOrder, setCancelModalOrder] = useState<SellerRentalOrder | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // Confirm Return & Penalty Verification modal
+  const [confirmReturnModalOrder, setConfirmReturnModalOrder] = useState<SellerRentalOrder | null>(null);
+  const [penaltyVerified, setPenaltyVerified] = useState(false);
+  const [settlementMethod, setSettlementMethod] = useState<'direct_cash' | 'deducted_from_deposit' | 'waived'>('direct_cash');
+  const [penaltyNotes, setPenaltyNotes] = useState('');
 
   const loadOrders = useCallback(async () => {
     try {
@@ -158,7 +175,7 @@ export default function SellerRentalQueue() {
         },
         startDate: item.startDate ? item.startDate.split('T')[0] : '',
         endDate: item.endDate ? item.endDate.split('T')[0] : '',
-        rentalDurationDays: item.rentalDurationDays || 1,
+        rentalDurationDays: item.rentalDurationDays || (item.startDate && item.endDate ? Math.max(1, Math.round((new Date(item.endDate).getTime() - new Date(item.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 1),
         totalAmount: Number(item.rentalFee || item.totalAmount || 0),
         securityDeposit: Number(item.securityDeposit || 0),
         dailyRate: Number(item.dailyRate || 0),
@@ -173,8 +190,25 @@ export default function SellerRentalQueue() {
         cancelledBy: item.cancelledBy,
         cancelledAt: item.cancelledAt,
         histories: item.histories || [],
-        extensions: item.extensions || [],
+        extensions: (item.extensions || []).map((ext: any) => ({
+          id: ext.id,
+          previousEndDate: ext.previousEndDate || item.endDate,
+          requestedEndDate: ext.newEndDate ? ext.newEndDate.split('T')[0] : (ext.requestedEndDate || ''),
+          additionalDays: ext.additionalDays,
+          additionalFee: Number(ext.additionalCost ?? ext.additionalFee ?? 0),
+          status: ext.status,
+          reason: ext.reason,
+          createdAt: ext.createdAt,
+        })),
         createdAt: item.createdAt || new Date().toISOString(),
+        isOverdue: item.isOverdue,
+        overdueDays: item.overdueDays,
+        penaltyDays: item.penaltyDays || item.overdueDays,
+        penaltyFee: Number(item.penaltyFee || 0),
+        dailyLateRate: Number(item.dailyLateRate || item.dailyRate || item.listing?.rentalPricePerDay || 0),
+        penaltyPaid: Boolean(item.penaltyPaid),
+        penaltyPaidAt: item.penaltyPaidAt,
+        penaltyNotes: item.penaltyNotes,
       }));
       setOrders(mapped);
     } catch (error) {
@@ -188,6 +222,16 @@ export default function SellerRentalQueue() {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  // Auto-select and open order modal if orderId is provided in URL query params
+  useEffect(() => {
+    if (!targetOrderId || orders.length === 0) return;
+    const match = orders.find((o) => o.id === targetOrderId || o.orderNumber === targetOrderId);
+    if (match) {
+      setSelectedOrder(match);
+      setActiveTab('all');
+    }
+  }, [targetOrderId, orders]);
 
   // Tab filtering
   const filterByTab = (order: SellerRentalOrder, tab: TabType) => {
@@ -292,16 +336,57 @@ export default function SellerRentalQueue() {
     }
   };
 
-  const handleConfirmReturn = async (orderId: string) => {
+  const openConfirmReturnModal = (order: SellerRentalOrder) => {
+    setConfirmReturnModalOrder(order);
+    setPenaltyVerified(false);
+    setSettlementMethod('direct_cash');
+    setPenaltyNotes('');
+    setActionError(null);
+  };
+
+  const submitConfirmReturn = async () => {
+    if (!confirmReturnModalOrder) return;
+
+    const daysLeft =
+      confirmReturnModalOrder.endDate && !isNaN(new Date(confirmReturnModalOrder.endDate).getTime())
+        ? Math.ceil(
+            (new Date(confirmReturnModalOrder.endDate).getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24),
+          )
+        : null;
+
+    const isOverdue = daysLeft !== null && daysLeft < 0;
+    const overdueDays = isOverdue ? Math.abs(daysLeft) : 0;
+    const dailyRate =
+      confirmReturnModalOrder.dailyLateRate ||
+      confirmReturnModalOrder.dailyRate ||
+      (confirmReturnModalOrder.listing.rentalPricePerDay ? Number(confirmReturnModalOrder.listing.rentalPricePerDay) : 0);
+    const penaltyFee =
+      confirmReturnModalOrder.penaltyFee && confirmReturnModalOrder.penaltyFee > 0
+        ? confirmReturnModalOrder.penaltyFee
+        : overdueDays * dailyRate;
+
+    if (isOverdue && penaltyFee > 0 && !penaltyVerified) {
+      setActionError('You must verify that the tenant has paid or settled the penalty fee before confirming return.');
+      return;
+    }
+
     setActionLoading(true);
+    setActionError(null);
     try {
-      await apiPost(`/rentals/${orderId}/confirm-return`);
+      await apiPost(`/rentals/${confirmReturnModalOrder.id}/confirm-return`, {
+        penaltyPaid: isOverdue ? penaltyVerified : false,
+        penaltyAmount: isOverdue ? penaltyFee : 0,
+        settlementMethod: isOverdue ? settlementMethod : undefined,
+        penaltyNotes: penaltyNotes.trim() || undefined,
+      });
       await loadOrders();
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder((prev) => (prev ? { ...prev, status: 'COMPLETED' } : null));
+      if (selectedOrder?.id === confirmReturnModalOrder.id) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: 'COMPLETED', penaltyPaid: true, penaltyFee } : null));
       }
+      setConfirmReturnModalOrder(null);
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Failed to confirm return.'));
+      setActionError(getApiErrorMessage(err, 'Failed to confirm return.'));
     } finally {
       setActionLoading(false);
     }
@@ -485,7 +570,7 @@ export default function SellerRentalQueue() {
             const isActive = order.status === 'ACTIVE';
             const isReturnPending = order.status === 'RETURN_PENDING' || order.status === 'RETURN_INITIATED' || order.status === 'RETURNED_PENDING_INSPECTION';
             const daysLeft = isActive ? getDaysUntil(order.endDate) : null;
-            const hasPendingExtension = order.extensions?.find((e) => e.status === 'PENDING');
+            const hasPendingExtension = order.extensions?.find((e) => e.status === 'PENDING' || e.status === 'REQUESTED');
 
             return (
               <div
@@ -540,10 +625,50 @@ export default function SellerRentalQueue() {
                         </div>
                       )}
 
-                      {/* Active return countdown */}
-                      {isActive && daysLeft !== null && (
-                        <p className={cn('text-xs font-semibold', daysLeft < 0 ? 'text-destructive' : daysLeft <= 2 ? 'text-amber-600' : 'text-emerald-600')}>
-                          {daysLeft < 0 ? `⚠️ Overdue by ${Math.abs(daysLeft)} day(s)` : daysLeft === 0 ? 'Due return today' : `Return in ${daysLeft} day(s)`}
+                      {/* Active return countdown and penalty display */}
+                      {isActive && daysLeft !== null && (() => {
+                        const isOverdue = daysLeft < 0;
+                        const overdueDays = Math.abs(daysLeft);
+                        const dailyRate =
+                          order.dailyLateRate ||
+                          order.dailyRate ||
+                          (order.listing.rentalPricePerDay ? Number(order.listing.rentalPricePerDay) : 0);
+                        const penaltyFee =
+                          order.penaltyFee && order.penaltyFee > 0
+                            ? order.penaltyFee
+                            : overdueDays * dailyRate;
+
+                        if (isOverdue) {
+                          return (
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-destructive flex flex-wrap items-center gap-1.5">
+                                <span>⚠️ Overdue by {overdueDays} day(s)</span>
+                                <span className="text-muted-foreground font-normal">·</span>
+                                <span className="text-amber-700 dark:text-amber-400 font-bold">
+                                  Penalty Fee: {penaltyFee.toLocaleString()} ETB
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-normal">
+                                  ({overdueDays}d × {dailyRate.toLocaleString()} ETB/day)
+                                </span>
+                              </p>
+                              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                                Verify tenant penalty payment upon return confirmation.
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <p className={cn('text-xs font-semibold', daysLeft <= 2 ? 'text-amber-600' : 'text-emerald-600')}>
+                            {daysLeft === 0 ? 'Due return today' : `Return in ${daysLeft} day(s)`}
+                          </p>
+                        );
+                      })()}
+
+                      {/* Completed with settled penalty indicator */}
+                      {order.status === 'COMPLETED' && order.penaltyFee && order.penaltyFee > 0 && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ Return completed · Penalty settled: {order.penaltyFee.toLocaleString()} ETB ({order.penaltyDays || 1}d)
                         </p>
                       )}
 
@@ -618,7 +743,7 @@ export default function SellerRentalQueue() {
                     )}
 
                     {(isActive || isReturnPending) && (
-                      <Button size="sm" onClick={() => handleConfirmReturn(order.id)}>
+                      <Button size="sm" onClick={() => openConfirmReturnModal(order)}>
                         Confirm Return
                       </Button>
                     )}
@@ -712,6 +837,44 @@ export default function SellerRentalQueue() {
                 ⚠️ All payments and deposits are handled directly between you and the renter off-platform.
               </p>
             </div>
+
+            {/* Overdue & Penalty Breakdown if applicable */}
+            {(Boolean(selectedOrder.penaltyFee && selectedOrder.penaltyFee > 0) || (selectedOrder.endDate && new Date(selectedOrder.endDate).getTime() < Date.now() && (selectedOrder.status === 'ACTIVE' || selectedOrder.status === 'RETURN_PENDING'))) && (() => {
+              const daysLeft = Math.ceil((new Date(selectedOrder.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              const overdueDays = daysLeft < 0 ? Math.abs(daysLeft) : (selectedOrder.penaltyDays || 1);
+              const dailyRate = selectedOrder.dailyLateRate || selectedOrder.dailyRate || (selectedOrder.listing.rentalPricePerDay ? Number(selectedOrder.listing.rentalPricePerDay) : 0);
+              const penaltyFee = selectedOrder.penaltyFee && selectedOrder.penaltyFee > 0 ? selectedOrder.penaltyFee : overdueDays * dailyRate;
+
+              return (
+                <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-semibold text-destructive text-xs uppercase tracking-wide flex items-center gap-1.5">
+                      <span>⚠️ Overdue Penalty Terms</span>
+                    </h5>
+                    <span className="font-bold text-destructive text-sm">{penaltyFee.toLocaleString()} ETB</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-background/60 p-2 rounded border border-border/50">
+                    <div>
+                      <span className="text-muted-foreground">Days Overdue:</span>
+                      <p className="font-medium text-foreground">{overdueDays} day(s)</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Daily Late Rate:</span>
+                      <p className="font-medium text-foreground">{dailyRate.toLocaleString()} ETB/day</p>
+                    </div>
+                    <div className="col-span-2 pt-1 border-t flex justify-between items-center">
+                      <span className="text-muted-foreground">Payment Status:</span>
+                      <span className={cn('font-semibold', selectedOrder.penaltyPaid ? 'text-emerald-600' : 'text-amber-600')}>
+                        {selectedOrder.penaltyPaid ? '✓ Verified Paid & Settled' : '⚠️ Pending Settlement at Return'}
+                      </span>
+                    </div>
+                    {selectedOrder.penaltyNotes && (
+                      <p className="col-span-2 text-[11px] text-muted-foreground italic">Note: {selectedOrder.penaltyNotes}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Decline / Cancellation Reason if any */}
             {selectedOrder.declineReason && (
@@ -899,6 +1062,193 @@ export default function SellerRentalQueue() {
           </form>
         </Modal>
       )}
+
+      {/* Confirm Return & Penalty Verification Modal */}
+      {confirmReturnModalOrder && (() => {
+        const daysLeft =
+          confirmReturnModalOrder.endDate && !isNaN(new Date(confirmReturnModalOrder.endDate).getTime())
+            ? Math.ceil(
+                (new Date(confirmReturnModalOrder.endDate).getTime() - new Date().getTime()) /
+                  (1000 * 60 * 60 * 24),
+              )
+            : null;
+        const isOverdue = daysLeft !== null && daysLeft < 0;
+        const overdueDays = isOverdue ? Math.abs(daysLeft) : 0;
+        const dailyRate =
+          confirmReturnModalOrder.dailyLateRate ||
+          confirmReturnModalOrder.dailyRate ||
+          (confirmReturnModalOrder.listing.rentalPricePerDay ? Number(confirmReturnModalOrder.listing.rentalPricePerDay) : 0);
+        const penaltyFee =
+          confirmReturnModalOrder.penaltyFee && confirmReturnModalOrder.penaltyFee > 0
+            ? confirmReturnModalOrder.penaltyFee
+            : overdueDays * dailyRate;
+
+        return (
+          <Modal
+            open={Boolean(confirmReturnModalOrder)}
+            onClose={() => {
+              if (!actionLoading) setConfirmReturnModalOrder(null);
+            }}
+            title={isOverdue ? "Verify Penalty & Confirm Return" : "Confirm Item Return"}
+            size="md"
+          >
+            <div className="space-y-4 text-xs">
+              {actionError && (
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
+                  {actionError}
+                </div>
+              )}
+
+              {/* Order preview */}
+              <div className="flex gap-3 p-3 rounded-lg border bg-muted/20">
+                <img
+                  src={confirmReturnModalOrder.listing.images[0] || '/placeholder.png'}
+                  alt={confirmReturnModalOrder.listing.title}
+                  className="h-14 w-14 rounded-md object-cover border"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-sm text-foreground truncate">{confirmReturnModalOrder.listing.title}</h4>
+                  <p className="text-muted-foreground">Order: {confirmReturnModalOrder.orderNumber} · Renter: <span className="font-medium text-foreground">{confirmReturnModalOrder.renter.displayName}</span></p>
+                  <p className="text-muted-foreground">Rental Period: {confirmReturnModalOrder.startDate} → {confirmReturnModalOrder.endDate}</p>
+                </div>
+              </div>
+
+              {/* Overdue alert and breakdown if overdue */}
+              {isOverdue && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-destructive text-sm flex items-center gap-1.5">
+                      <span>⚠️ Overdue by {overdueDays} day(s)</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-destructive/20 text-destructive font-bold text-xs">
+                      {penaltyFee.toLocaleString()} ETB Penalty
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-background/60 p-2.5 rounded border border-border/50">
+                    <div>
+                      <span className="text-muted-foreground">Daily Late Rate:</span>
+                      <p className="font-semibold text-foreground">{dailyRate.toLocaleString()} ETB / day</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Security Deposit Held:</span>
+                      <p className="font-semibold text-foreground">{confirmReturnModalOrder.securityDeposit.toLocaleString()} ETB</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Overdue Days:</span>
+                      <p className="font-semibold text-foreground">{overdueDays} day(s)</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total Accrued Penalty:</span>
+                      <p className="font-bold text-amber-700 dark:text-amber-400">{penaltyFee.toLocaleString()} ETB</p>
+                    </div>
+                  </div>
+
+                  {/* Settlement method */}
+                  <div className="space-y-1.5">
+                    <label className="font-semibold text-foreground text-xs block">
+                      Penalty Settlement Method:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSettlementMethod('direct_cash')}
+                        className={cn(
+                          'p-2 rounded-md border text-left text-[11px] transition-colors',
+                          settlementMethod === 'direct_cash'
+                            ? 'border-primary bg-primary/10 font-semibold text-primary'
+                            : 'border-border bg-card hover:bg-muted/50'
+                        )}
+                      >
+                        💵 Direct Cash / Transfer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettlementMethod('deducted_from_deposit')}
+                        className={cn(
+                          'p-2 rounded-md border text-left text-[11px] transition-colors',
+                          settlementMethod === 'deducted_from_deposit'
+                            ? 'border-primary bg-primary/10 font-semibold text-primary'
+                            : 'border-border bg-card hover:bg-muted/50'
+                        )}
+                      >
+                        🔒 Deduct from Deposit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettlementMethod('waived')}
+                        className={cn(
+                          'p-2 rounded-md border text-left text-[11px] transition-colors',
+                          settlementMethod === 'waived'
+                            ? 'border-primary bg-primary/10 font-semibold text-primary'
+                            : 'border-border bg-card hover:bg-muted/50'
+                        )}
+                      >
+                        🤝 Waived by Seller
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Verification checkbox */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={penaltyVerified}
+                      onChange={(e) => setPenaltyVerified(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-amber-500 text-primary focus:ring-primary"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-amber-900 dark:text-amber-200">
+                        I verify tenant penalty payment / settlement
+                      </p>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                        I confirm that the {penaltyFee.toLocaleString()} ETB overdue penalty has been received, deducted from deposit, or resolved.
+                      </p>
+                    </div>
+                  </label>
+
+                  <div>
+                    <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                      Settlement Notes (optional):
+                    </label>
+                    <input
+                      type="text"
+                      value={penaltyNotes}
+                      onChange={(e) => setPenaltyNotes(e.target.value)}
+                      placeholder="e.g. Received via CBE / Telebirr, or deposit adjusted"
+                      className="w-full text-xs rounded-md border border-input bg-background px-3 py-1.5"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!isOverdue && (
+                <div className="p-3 rounded-lg border bg-muted/20 text-muted-foreground text-xs">
+                  Confirm that the item has been returned by <span className="font-semibold text-foreground">{confirmReturnModalOrder.renter.displayName}</span> in good condition. The rental status will change to <strong>COMPLETED</strong> and the renter will be prompted to leave a review.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConfirmReturnModalOrder(null)}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitConfirmReturn}
+                  disabled={actionLoading || (isOverdue && penaltyFee > 0 && !penaltyVerified)}
+                >
+                  {actionLoading ? 'Processing...' : isOverdue ? 'Verify & Confirm Return' : 'Confirm Return'}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

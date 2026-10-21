@@ -101,11 +101,27 @@ export class UsersRepository {
     });
   }
 
-  async softDeleteSelf(id: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: 'suspended' },
+  async countActiveRentals(userId: string): Promise<number> {
+    return this.prisma.rentalOrder.count({
+      where: {
+        OR: [{ renterId: userId }, { sellerId: userId }],
+        status: { in: ['ACTIVE', 'RETURN_PENDING', 'ACCEPTED', 'READY_FOR_PICKUP'] },
+      },
     });
+  }
+
+  async softDeleteSelf(id: string): Promise<void> {
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id },
+        data: { deletedAt: now, status: 'suspended' },
+      }),
+      this.prisma.listing.updateMany({
+        where: { sellerId: id, deletedAt: null },
+        data: { deletedAt: now, status: 'archived' },
+      }),
+    ]);
   }
 
   async findProfileById(id: string): Promise<UserWithRole & { vendorKycProfile: any; _count: { listings: number; favorites: number; reportsFiled: number; notifications: number; storeFollowers: number } } | null> {

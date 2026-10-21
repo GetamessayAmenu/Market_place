@@ -14,6 +14,8 @@ export interface PricingData {
   // Rent-specific
   rentalPricePerDay: string;
   rentalDeposit: string;
+  rentalThreeDayRate?: string;
+  rentalWeeklyRate?: string;
   minimumRentalDays: string;
   // Custom-specific
   startingCustomPrice: string;
@@ -27,7 +29,9 @@ export const DEFAULT_PRICING: PricingData = {
   sku: '',
   rentalPricePerDay: '',
   rentalDeposit: '',
-  minimumRentalDays: '1',
+  rentalThreeDayRate: '',
+  rentalWeeklyRate: '',
+  minimumRentalDays: '3',
   startingCustomPrice: '',
   estimatedProductionDays: '14',
   customizationNotes: '',
@@ -113,9 +117,31 @@ export default function PricingSection({ listingType, data, onChange, errors }: 
           <FormInput
             label="Minimum Rental Days"
             type="number"
-            placeholder="1"
+            placeholder="3"
             value={data.minimumRentalDays}
             onChange={(e) => { update('minimumRentalDays', e.target.value); }}
+          />
+        )}
+
+        {/* Rent: 3-day event package */}
+        {listingType === 'rent' && (
+          <FormInput
+            label="3-Day Event / Weekend Rate ($)"
+            type="number"
+            placeholder="0.00"
+            value={data.rentalThreeDayRate ?? ''}
+            onChange={(e) => { update('rentalThreeDayRate', e.target.value); }}
+          />
+        )}
+
+        {/* Rent: weekly package */}
+        {listingType === 'rent' && (
+          <FormInput
+            label="7-Day Weekly Package ($)"
+            type="number"
+            placeholder="0.00"
+            value={data.rentalWeeklyRate ?? ''}
+            onChange={(e) => { update('rentalWeeklyRate', e.target.value); }}
           />
         )}
 

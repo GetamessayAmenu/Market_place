@@ -90,7 +90,16 @@ export class RentalRemindersProcessor extends WorkerHost {
   private async handleOverdueReminder(data: RentalReminderJobData): Promise<void> {
     const rental = await this.prisma.rentalOrder.findUnique({
       where: { id: data.rentalOrderId },
-      select: { status: true, endDate: true },
+      include: {
+        listing: {
+          select: {
+            id: true,
+            title: true,
+            rentalPricePerDay: true,
+            attributes: true,
+          },
+        },
+      },
     });
 
     if (!rental) {
@@ -98,36 +107,64 @@ export class RentalRemindersProcessor extends WorkerHost {
       return;
     }
 
-    if (rental.status !== 'ACTIVE') {
-      this.logger.log(`Rental ${data.rentalOrderId} is not active, skipping overdue reminder`);
+    if (rental.status !== 'ACTIVE' && rental.status !== 'RETURN_PENDING' && rental.status !== 'RETURN_INITIATED') {
+      this.logger.log(`Rental ${data.rentalOrderId} is not in an active returnable state, skipping overdue reminder`);
       return;
     }
 
-    // Update rental status to indicate overdue
+    const now = new Date();
+    const overdueDays = Math.max(1, Math.ceil((now.getTime() - rental.endDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const dailyLateRate = Number(
+      (rental.listing?.attributes as any)?.lateFeePerDay ??
+      rental.dailyRate ??
+      (rental.listing?.rentalPricePerDay ? Number(rental.listing.rentalPricePerDay) : 0)
+    );
+    const penaltyFee = overdueDays * dailyLateRate;
+
+    // Update rental with latest calculated penalty
     await this.prisma.rentalOrder.update({
       where: { id: data.rentalOrderId },
-      data: { status: 'RETURN_INITIATED' },
+      data: {
+        penaltyFee,
+        penaltyDays: overdueDays,
+      },
     });
 
-    // Notify renter about overdue item
+    // Notify renter (lessee) about overdue item and accrued penalty fee
     await this.notificationsService.createCustomNotification(
       data.renterId,
-      'rental_overdue',
-      'Rental Overdue',
-      'Your rental is overdue. Please return the item immediately.',
-      { rentalOrderId: data.rentalOrderId },
+      'rental_status_changed',
+      'Rental Overdue — Penalty Fee Accruing',
+      `Your rental #${rental.orderNumber} ("${rental.listing.title}") is overdue by ${overdueDays} day(s). Late penalty fee accrued: ${penaltyFee.toLocaleString()} ETB (${overdueDays}d × ${dailyLateRate.toLocaleString()} ETB/day). Please return the item immediately.`,
+      {
+        rentalOrderId: data.rentalOrderId,
+        orderNumber: rental.orderNumber,
+        daysOverdue: overdueDays,
+        penaltyFee,
+        dailyLateRate,
+        listingId: rental.listingId,
+        isOverdue: true,
+      },
     );
 
-    // Notify seller about overdue item
+    // Notify seller (lender) about overdue item and penalty fee
     await this.notificationsService.createCustomNotification(
       data.sellerId,
-      'rental_overdue_seller',
-      'Rental Overdue',
-      'A rental is overdue. Contact the renter for return.',
-      { rentalOrderId: data.rentalOrderId },
+      'rental_status_changed',
+      'Rental Overdue Notice',
+      `Rental #${rental.orderNumber} ("${rental.listing.title}") is overdue by ${overdueDays} day(s). Accrued penalty fee: ${penaltyFee.toLocaleString()} ETB (${overdueDays}d × ${dailyLateRate.toLocaleString()} ETB/day). Contact renter to coordinate return.`,
+      {
+        rentalOrderId: data.rentalOrderId,
+        orderNumber: rental.orderNumber,
+        daysOverdue: overdueDays,
+        penaltyFee,
+        dailyLateRate,
+        listingId: rental.listingId,
+        isOverdue: true,
+      },
     );
 
-    this.logger.log(`Overdue reminder sent and status updated for rental ${data.rentalOrderId}`);
+    this.logger.log(`Overdue reminder sent with penalty ${penaltyFee} ETB for rental ${data.rentalOrderId}`);
   }
 
   private async handleReturnInitiated(data: RentalReminderJobData): Promise<void> {

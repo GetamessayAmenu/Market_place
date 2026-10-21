@@ -262,11 +262,37 @@ export class SellerController {
       type: 'held' | 'refunded';
       amount: number;
       customerName: string;
-      relatedOrder: string;
+      relatedOrder?: string;
       notes?: string;
+      paymentMethod?: string;
+      refundAmount?: number;
+      refundReason?: string;
     },
   ) {
     return this.sellerService.addDeposit(user.id, data);
+  }
+
+  @Post('deposits/:id/refund')
+  refundDeposit(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() data: {
+      refundAmount?: number;
+      deductionAmount?: number;
+      deductionReason?: string;
+      paymentMethod?: string;
+      notes?: string;
+    },
+  ) {
+    return this.sellerService.refundDeposit(user.id, id, data);
+  }
+
+  @Delete('deposits/:id')
+  deleteDeposit(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.sellerService.deleteDeposit(user.id, id);
   }
 
   @Get('reviews')

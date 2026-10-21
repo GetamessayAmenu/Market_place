@@ -1188,24 +1188,60 @@ export class SellerService {
   }
 
   async getDeposits(sellerId: string) {
-    const rentalOrders = await this.prisma.rentalOrder.findMany({
-      where: { sellerId, securityDeposit: { gt: 0 } },
-      include: {
-        renter: { select: { displayName: true } },
-        listing: { select: { title: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [rentalOrders, offlineEvents] = await Promise.all([
+      this.prisma.rentalOrder.findMany({
+        where: { sellerId, securityDeposit: { gt: 0 } },
+        include: {
+          renter: { select: { displayName: true } },
+          listing: { select: { title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.analyticsEvent.findMany({
+        where: { sellerId, eventType: 'OFFLINE_DEPOSIT_LOG' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
-    return rentalOrders.map((r) => ({
+    const rentalDeposits = rentalOrders.map((r) => ({
       id: r.id,
       type: r.depositRefunded ? ('refunded' as const) : ('held' as const),
       amount: r.securityDeposit,
       customerName: r.renter?.displayName || 'Customer',
       relatedOrder: r.orderNumber,
+      rentalOrderId: r.id,
+      listingTitle: r.listing?.title || undefined,
       date: r.createdAt.toISOString().slice(0, 10),
-      notes: r.depositRefundReason || (r.depositRefunded ? 'Refunded' : 'Held for active rental'),
+      notes: r.depositRefundReason || (r.depositRefunded ? 'Deposit Refunded' : 'Held for active rental'),
+      refundAmount: r.depositRefundAmount ?? (r.depositRefunded ? r.securityDeposit : null),
+      refundReason: r.depositRefundReason || null,
+      refundDate: r.depositRefunded ? (r.returnedAt ? r.returnedAt.toISOString().slice(0, 10) : r.updatedAt.toISOString().slice(0, 10)) : null,
+      paymentMethod: r.offlineDepositStatus || null,
+      isManual: false,
     }));
+
+    const manualDeposits = offlineEvents.map((ev) => {
+      const meta = (ev.metadata as any) || {};
+      return {
+        id: ev.id,
+        type: meta.type === 'refunded' ? ('refunded' as const) : ('held' as const),
+        amount: Number(meta.amount || 0),
+        customerName: String(meta.customerName || 'Offline Customer'),
+        relatedOrder: meta.relatedOrder || 'Offline Rental',
+        rentalOrderId: null,
+        listingTitle: meta.listingTitle || undefined,
+        date: meta.date || ev.createdAt.toISOString().slice(0, 10),
+        notes: meta.notes || (meta.type === 'refunded' ? 'Refunded' : 'Offline Deposit Held'),
+        refundAmount: meta.refundAmount != null ? Number(meta.refundAmount) : (meta.type === 'refunded' ? Number(meta.amount || 0) : null),
+        refundReason: meta.refundReason || null,
+        refundDate: meta.refundDate || (meta.type === 'refunded' ? ev.createdAt.toISOString().slice(0, 10) : null),
+        paymentMethod: meta.paymentMethod || null,
+        isManual: true,
+      };
+    });
+
+    const combined = [...rentalDeposits, ...manualDeposits].sort((a, b) => b.date.localeCompare(a.date));
+    return combined;
   }
 
   async addDeposit(
@@ -1214,38 +1250,154 @@ export class SellerService {
       type: 'held' | 'refunded';
       amount: number;
       customerName: string;
-      relatedOrder: string;
+      relatedOrder?: string;
+      notes?: string;
+      paymentMethod?: string;
+      refundAmount?: number;
+      refundReason?: string;
+    },
+  ) {
+    // If relatedOrder matches an existing rental order
+    if (data.relatedOrder) {
+      const rental = await this.prisma.rentalOrder.findFirst({
+        where: { sellerId, orderNumber: data.relatedOrder },
+      });
+      if (rental) {
+        await this.prisma.rentalOrder.update({
+          where: { id: rental.id },
+          data: {
+            depositRefunded: data.type === 'refunded',
+            depositRefundAmount: data.type === 'refunded' ? (data.refundAmount ?? data.amount) : null,
+            depositRefundReason: data.notes || data.refundReason || null,
+            offlineDepositStatus: data.paymentMethod || rental.offlineDepositStatus,
+          },
+        });
+        return { success: true, message: 'Rental deposit updated', id: rental.id };
+      }
+    }
+
+    // Persist offline deposit log using AnalyticsEvent
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const newLog = await this.prisma.analyticsEvent.create({
+      data: {
+        eventType: 'OFFLINE_DEPOSIT_LOG',
+        sellerId,
+        metadata: {
+          type: data.type,
+          amount: data.amount,
+          customerName: data.customerName,
+          relatedOrder: data.relatedOrder || 'Offline Rental',
+          paymentMethod: data.paymentMethod || undefined,
+          notes: data.notes || (data.type === 'refunded' ? 'Deposit Refunded' : 'Held for offline rental'),
+          refundAmount: data.type === 'refunded' ? (data.refundAmount ?? data.amount) : null,
+          refundReason: data.refundReason || null,
+          refundDate: data.type === 'refunded' ? todayStr : null,
+          date: todayStr,
+        },
+      },
+    });
+
+    return { success: true, message: 'Deposit recorded successfully', id: newLog.id };
+  }
+
+  async refundDeposit(
+    sellerId: string,
+    depositId: string,
+    data: {
+      refundAmount?: number;
+      deductionAmount?: number;
+      deductionReason?: string;
+      paymentMethod?: string;
       notes?: string;
     },
   ) {
+    // 1. Check if depositId is a RentalOrder
     const rental = await this.prisma.rentalOrder.findFirst({
-      where: { sellerId, orderNumber: data.relatedOrder },
+      where: { id: depositId, sellerId },
+    });
+    if (rental) {
+      const deduction = Number(data.deductionAmount || 0);
+      const refundAmt = data.refundAmount !== undefined ? Number(data.refundAmount) : Math.max(0, rental.securityDeposit - deduction);
+
+      const parts: string[] = [];
+      if (data.notes) parts.push(data.notes);
+      if (deduction > 0) parts.push(`Deducted ${deduction.toLocaleString()} ETB: ${data.deductionReason || 'Damage/Penalty'}`);
+      if (data.paymentMethod) parts.push(`Method: ${data.paymentMethod}`);
+
+      await this.prisma.rentalOrder.update({
+        where: { id: rental.id },
+        data: {
+          depositRefunded: true,
+          depositRefundAmount: refundAmt,
+          depositRefundReason: parts.join(' | ') || 'Deposit Refunded',
+          offlineDepositStatus: data.paymentMethod || rental.offlineDepositStatus,
+        },
+      });
+      return { success: true, message: 'Rental deposit marked as refunded' };
+    }
+
+    // 2. Check if depositId is an offline AnalyticsEvent
+    const offlineEvent = await this.prisma.analyticsEvent.findFirst({
+      where: { id: depositId, sellerId, eventType: 'OFFLINE_DEPOSIT_LOG' },
+    });
+    if (offlineEvent) {
+      const existingMeta = (offlineEvent.metadata as any) || {};
+      const originalAmount = Number(existingMeta.amount || 0);
+      const deduction = Number(data.deductionAmount || 0);
+      const refundAmt = data.refundAmount !== undefined ? Number(data.refundAmount) : Math.max(0, originalAmount - deduction);
+
+      const parts: string[] = [];
+      if (data.notes) parts.push(data.notes);
+      if (deduction > 0) parts.push(`Deducted ${deduction.toLocaleString()} ETB: ${data.deductionReason || 'Damage/Penalty'}`);
+      if (data.paymentMethod) parts.push(`Method: ${data.paymentMethod}`);
+
+      await this.prisma.analyticsEvent.update({
+        where: { id: offlineEvent.id },
+        data: {
+          metadata: {
+            ...existingMeta,
+            type: 'refunded',
+            refundAmount: refundAmt,
+            refundReason: parts.join(' | ') || 'Deposit Refunded',
+            refundDate: new Date().toISOString().slice(0, 10),
+            notes: parts.join(' | ') || 'Deposit Refunded',
+            paymentMethod: data.paymentMethod || existingMeta.paymentMethod,
+          },
+        },
+      });
+      return { success: true, message: 'Offline deposit marked as refunded' };
+    }
+
+    throw new NotFoundException('Deposit record not found');
+  }
+
+  async deleteDeposit(sellerId: string, depositId: string) {
+    const offlineEvent = await this.prisma.analyticsEvent.findFirst({
+      where: { id: depositId, sellerId, eventType: 'OFFLINE_DEPOSIT_LOG' },
+    });
+    if (offlineEvent) {
+      await this.prisma.analyticsEvent.delete({
+        where: { id: offlineEvent.id },
+      });
+      return { success: true, message: 'Deposit log removed' };
+    }
+
+    const rental = await this.prisma.rentalOrder.findFirst({
+      where: { id: depositId, sellerId },
     });
     if (rental) {
       await this.prisma.rentalOrder.update({
         where: { id: rental.id },
         data: {
-          depositRefunded: data.type === 'refunded',
-          depositRefundReason: data.notes || null,
+          depositRefunded: false,
+          depositRefundAmount: null,
+          depositRefundReason: null,
         },
       });
-      return { success: true };
+      return { success: true, message: 'Rental deposit reset to held' };
     }
 
-    const order = await this.prisma.order.findFirst({
-      where: { sellerId, orderNumber: data.relatedOrder },
-    });
-    if (order) {
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: {
-          offline_deposit_refunded: data.type === 'refunded',
-        },
-      });
-      return { success: true };
-    }
-
-    return { success: true, message: 'Deposit recorded' };
+    throw new NotFoundException('Deposit record not found');
   }
 
   async getReviews(sellerId: string, filters: { rating?: number; listingId?: string }) {

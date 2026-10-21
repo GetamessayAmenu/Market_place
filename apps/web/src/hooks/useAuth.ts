@@ -4,12 +4,16 @@ export interface AuthUser {
   id: string
   email: string
   role: string
-  roles?: string[]
+  roles?: string[] | undefined
   displayName: string
   avatarUrl: string | null
   emailVerified: boolean
   phoneVerified: boolean
-  phone?: string
+  phone?: string | undefined
+  bio?: string | null | undefined
+  location?: string | null | undefined
+  sellerType?: string | null | undefined
+  socialLinks?: Record<string, any> | null | undefined
 }
 
 interface AuthState {

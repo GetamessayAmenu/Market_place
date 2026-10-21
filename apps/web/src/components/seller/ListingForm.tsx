@@ -17,6 +17,8 @@ export interface ListingFormData {
   availableForRent: boolean;
   rentalPricePerDay?: string | undefined;
   rentalDeposit?: string | undefined;
+  rentalThreeDayRate?: string | undefined;
+  rentalWeeklyRate?: string | undefined;
   minRentalDurationDays?: string | undefined;
   maxRentalDurationDays?: string | undefined;
   rentalPickupLocation?: string | undefined;
@@ -47,6 +49,8 @@ export interface ListingFormData {
   rentalInfo?: {
     rentalPricePerDay: string;
     rentalDeposit: string;
+    rentalThreeDayRate?: string | undefined;
+    rentalWeeklyRate?: string | undefined;
     minRentalDays: string;
     maxRentalDays?: string | undefined;
     pickupLocation?: string | undefined;
@@ -555,25 +559,31 @@ export default function ListingForm({
 
   // Rental Settings
   const [rentalPricePerDay, setRentalPricePerDay] = useState(
-    initialData?.rentalInfo?.rentalPricePerDay ?? '',
+    initialData?.rentalPricePerDay ?? initialData?.rentalInfo?.rentalPricePerDay ?? '',
   );
   const [rentalDeposit, setRentalDeposit] = useState(
-    initialData?.rentalInfo?.rentalDeposit ?? '',
+    initialData?.rentalDeposit ?? initialData?.rentalInfo?.rentalDeposit ?? '',
+  );
+  const [rentalThreeDayRate, setRentalThreeDayRate] = useState(
+    initialData?.rentalThreeDayRate ?? initialData?.rentalInfo?.rentalThreeDayRate ?? '',
+  );
+  const [rentalWeeklyRate, setRentalWeeklyRate] = useState(
+    initialData?.rentalWeeklyRate ?? initialData?.rentalInfo?.rentalWeeklyRate ?? '',
   );
   const [rentalQuantity, setRentalQuantity] = useState<number>(
     initialData?.rentalInfo?.quantity ?? 1,
   );
   const [minRentalDays, setMinRentalDays] = useState(
-    initialData?.rentalInfo?.minRentalDays ?? '1',
+    initialData?.minRentalDurationDays ?? initialData?.rentalInfo?.minRentalDays ?? '3',
   );
   const [maxRentalDays, setMaxRentalDays] = useState(
-    initialData?.rentalInfo?.maxRentalDays ?? '',
+    initialData?.maxRentalDurationDays ?? initialData?.rentalInfo?.maxRentalDays ?? '',
   );
   const [rentalPickupLocation, setRentalPickupLocation] = useState(
-    initialData?.rentalInfo?.pickupLocation ?? '',
+    initialData?.rentalPickupLocation ?? initialData?.rentalInfo?.pickupLocation ?? '',
   );
   const [rentalNotes, setRentalNotes] = useState(
-    initialData?.rentalInfo?.rentalNotes ?? '',
+    initialData?.rentalNotes ?? initialData?.rentalInfo?.rentalNotes ?? '',
   );
 
   // Custom-Made Option
@@ -655,7 +665,17 @@ export default function ListingForm({
           condition,
           images,
           productDetails: { size, color, material, style, gender },
-          rentalInfo: { rentalPricePerDay, rentalDeposit, minRentalDays, maxRentalDays, quantity: rentalQuantity },
+          rentalInfo: {
+            rentalPricePerDay,
+            rentalDeposit,
+            rentalThreeDayRate,
+            rentalWeeklyRate,
+            minRentalDays,
+            maxRentalDays,
+            pickupLocation: rentalPickupLocation,
+            rentalNotes,
+            quantity: rentalQuantity,
+          },
           customOrderAvailable,
           customDetails: { sizeAdjustments, colorFabricChanges, embroidery, otherCustomization, additionalCustomPrice, productionDays },
           contactOptions: { inAppMessaging, showPhone, whatsapp, telegram },
@@ -687,8 +707,12 @@ export default function ListingForm({
     gender,
     rentalPricePerDay,
     rentalDeposit,
+    rentalThreeDayRate,
+    rentalWeeklyRate,
     minRentalDays,
     maxRentalDays,
+    rentalPickupLocation,
+    rentalNotes,
     rentalQuantity,
     customOrderAvailable,
     sizeAdjustments,
@@ -727,8 +751,12 @@ export default function ListingForm({
       if (d.rentalInfo) {
         if (d.rentalInfo.rentalPricePerDay) setRentalPricePerDay(d.rentalInfo.rentalPricePerDay);
         if (d.rentalInfo.rentalDeposit) setRentalDeposit(d.rentalInfo.rentalDeposit);
+        if (d.rentalInfo.rentalThreeDayRate) setRentalThreeDayRate(d.rentalInfo.rentalThreeDayRate);
+        if (d.rentalInfo.rentalWeeklyRate) setRentalWeeklyRate(d.rentalInfo.rentalWeeklyRate);
         if (d.rentalInfo.minRentalDays) setMinRentalDays(d.rentalInfo.minRentalDays);
         if (d.rentalInfo.maxRentalDays) setMaxRentalDays(d.rentalInfo.maxRentalDays);
+        if (d.rentalInfo.pickupLocation) setRentalPickupLocation(d.rentalInfo.pickupLocation);
+        if (d.rentalInfo.rentalNotes) setRentalNotes(d.rentalInfo.rentalNotes);
         if (d.rentalInfo.quantity) setRentalQuantity(d.rentalInfo.quantity);
       }
       if (d.customOrderAvailable !== undefined) setCustomOrderAvailable(d.customOrderAvailable);
@@ -845,6 +873,8 @@ export default function ListingForm({
       availableForRent,
       rentalPricePerDay: availableForRent ? rentalPricePerDay : undefined,
       rentalDeposit: availableForRent ? rentalDeposit : undefined,
+      rentalThreeDayRate: availableForRent && rentalThreeDayRate ? rentalThreeDayRate : undefined,
+      rentalWeeklyRate: availableForRent && rentalWeeklyRate ? rentalWeeklyRate : undefined,
       minRentalDurationDays: availableForRent ? minRentalDays : undefined,
       maxRentalDurationDays: availableForRent && maxRentalDays ? maxRentalDays : undefined,
       rentalPickupLocation: availableForRent ? (rentalPickupLocation.trim() || city.trim()) : undefined,
@@ -868,6 +898,8 @@ export default function ListingForm({
         ? {
             rentalPricePerDay,
             rentalDeposit,
+            rentalThreeDayRate: rentalThreeDayRate || undefined,
+            rentalWeeklyRate: rentalWeeklyRate || undefined,
             minRentalDays,
             maxRentalDays: maxRentalDays || undefined,
             pickupLocation: rentalPickupLocation.trim() || city.trim(),
@@ -969,6 +1001,20 @@ export default function ListingForm({
               {rentalDeposit && (
                 <span className="text-[11px] text-muted-foreground">
                   (Deposit: {Number(rentalDeposit).toLocaleString()} ETB)
+                </span>
+              )}
+            </div>
+          )}
+          {availableForRent && (rentalThreeDayRate || rentalWeeklyRate) && (
+            <div className="flex flex-wrap gap-1.5 pt-0.5 text-[11px]">
+              {rentalThreeDayRate && (
+                <span className="rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 font-medium px-2 py-0.5 border border-amber-500/20">
+                  🎉 3-Day Event: {Number(rentalThreeDayRate).toLocaleString()} ETB
+                </span>
+              )}
+              {rentalWeeklyRate && (
+                <span className="rounded bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-medium px-2 py-0.5 border border-emerald-500/20">
+                  🌟 Weekly: {Number(rentalWeeklyRate).toLocaleString()} ETB
                 </span>
               )}
             </div>
@@ -1424,7 +1470,7 @@ export default function ListingForm({
                     <div id="field-minRentalDays">
                       <FormInput
                         label="Minimum Rental Period (days) *"
-                        placeholder="e.g. 1"
+                        placeholder="e.g. 3"
                         type="number"
                         min="1"
                         value={minRentalDays}
@@ -1466,6 +1512,45 @@ export default function ListingForm({
                           ? { error: validationErrors.maxRentalDays }
                           : {})}
                       />
+                    </div>
+                  </div>
+
+                  {/* Multi-Day Package Deals (Ethiopian Ceremony & Wedding Best Practices) */}
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">✨</span>
+                        <h4 className="text-xs font-semibold text-foreground">
+                          Special Multi-Day Package Rates (Optional & Recommended)
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Traditional Habesha attire (Kemis, Kabas) has a natural 3-day rhythm (Pickup/Fitting, Event day, Return). Offering bundled package rates attracts wedding guests and reduces turnover stress.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div id="field-rentalThreeDayRate">
+                        <FormInput
+                          label="3-Day Event / Weekend Package (ETB)"
+                          placeholder={rentalPricePerDay ? String(Math.round(Number(rentalPricePerDay) * 2.5)) : 'e.g. 2200'}
+                          type="number"
+                          value={rentalThreeDayRate}
+                          onChange={(e) => setRentalThreeDayRate(e.target.value)}
+                          helperText="Discounted flat rate for 3-day event rentals"
+                        />
+                      </div>
+
+                      <div id="field-rentalWeeklyRate">
+                        <FormInput
+                          label="7-Day Weekly / Holiday Package (ETB)"
+                          placeholder={rentalPricePerDay ? String(Math.round(Number(rentalPricePerDay) * 5)) : 'e.g. 4500'}
+                          type="number"
+                          value={rentalWeeklyRate}
+                          onChange={(e) => setRentalWeeklyRate(e.target.value)}
+                          helperText="Flat rate for holidays (Timkat, Enkutatash) or destination events"
+                        />
+                      </div>
                     </div>
                   </div>
 

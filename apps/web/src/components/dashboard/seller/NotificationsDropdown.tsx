@@ -1,12 +1,14 @@
 'use client';
 
 import { cn } from '@marketplace/ui';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 
 import type { Notification } from '../../../lib/dashboardApi';
 import { formatRelativeTime } from '../../../lib/formatters';
 import type { Lang } from '../../../lib/i18n';
 import { t } from '../../../lib/i18n';
+import { getNotificationActionUrl } from '../../../lib/notificationRoutes';
 
 interface NotificationsDropdownProps {
   notifications: Notification[] | undefined;
@@ -63,6 +65,7 @@ export default function NotificationsDropdown({
   onMarkUnread,
   onMarkAllRead,
 }: NotificationsDropdownProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -142,7 +145,8 @@ export default function NotificationsDropdown({
                   )}
                   onClick={() => {
                     if (!notif.isRead) onMarkRead(notif.id);
-                    if (notif.linkUrl) window.location.href = notif.linkUrl;
+                    const targetUrl = notif.linkUrl || getNotificationActionUrl(notif as any, true);
+                    if (targetUrl) router.push(targetUrl);
                     setOpen(false);
                   }}
                   role="button"

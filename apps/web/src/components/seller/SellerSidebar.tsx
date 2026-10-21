@@ -35,11 +35,6 @@ const IconMessages = () => (
   </svg>
 );
 
-const IconStore = () => (
-  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.25A2.25 2.25 0 010 18.75V10.5m18 10.5h3.75A2.25 2.25 0 0024 18.75V10.5M3 9l9-6 9 6m-9 1v2" />
-  </svg>
-);
 
 const IconInsights = () => (
   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
@@ -85,7 +80,6 @@ const sellerHubItems: SidebarItem[] = [
   { label: 'Listings', href: '/seller/listings', icon: <IconListings />, section: 'Seller Hub' },
   { label: 'Rental Requests', href: '/seller/orders/rental-queue', icon: <IconRentals />, section: 'Seller Hub' },
   { label: 'Messages', href: '/seller/messages', icon: <IconMessages />, badge: 0, section: 'Seller Hub' },
-  { label: 'Store & Profile', href: '/seller/store', icon: <IconStore />, section: 'Seller Hub' },
   { label: 'Insights', href: '/seller/insights', icon: <IconInsights />, section: 'Seller Hub' },
 ];
 
@@ -158,10 +152,13 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
 
   const checkIsActive = (href: string) => {
     if (href === '/seller') {
-      return pathname === '/seller' || pathname === '/seller/dashboard';
+      return pathname === '/seller' || pathname === '/seller/dashboard' || pathname === '/dashboard';
     }
     if (href === '/seller/listings') {
       return pathname.startsWith('/seller/listings') || pathname.startsWith('/seller/catalog');
+    }
+    if (href === '/seller/settings') {
+      return pathname.startsWith('/seller/settings') || pathname.startsWith('/dashboard/settings');
     }
     return pathname === href || pathname.startsWith(href + '/');
   };
@@ -254,3 +251,6 @@ export default function SellerSidebar({ unreadMessageCount = 0, className }: Sel
     </aside>
   );
 }
+
+export type { SidebarItem, SellerSidebarProps, SellerSidebarProps as SidebarProps };
+

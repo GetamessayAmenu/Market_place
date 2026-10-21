@@ -26,6 +26,8 @@ import type { SuggestDatesDto } from './dto/suggest-dates.dto';
 import type { RespondDatesDto } from './dto/respond-dates.dto';
 import type { DeclineRentalDto } from './dto/decline-rental.dto';
 import type { CancelRentalDto } from './dto/cancel-rental.dto';
+import type { ConfirmReturnDto } from './dto/confirm-return.dto';
+import type { InitiateReturnDto } from './dto/initiate-return.dto';
 
 @Controller('rentals')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -162,21 +164,33 @@ export class RentalsController {
   // Renter or seller initiates return -> RETURN_PENDING
   @Post(':id/return')
   @Roles('buyer', 'seller')
-  initiateReturn(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.rentalsService.initiateReturn(id, user);
+  initiateReturn(
+    @Param('id') id: string,
+    @Body() dto: InitiateReturnDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rentalsService.initiateReturn(id, user, dto);
   }
 
   // Seller confirms return -> COMPLETED
   @Post(':id/confirm-return')
   @Roles('seller', 'admin')
-  confirmReturn(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.rentalsService.confirmReturn(id, user);
+  confirmReturn(
+    @Param('id') id: string,
+    @Body() dto: ConfirmReturnDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rentalsService.confirmReturn(id, user, dto);
   }
 
   @Post(':id/complete')
   @Roles('seller', 'admin')
-  complete(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.rentalsService.confirmReturn(id, user);
+  complete(
+    @Param('id') id: string,
+    @Body() dto: ConfirmReturnDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.rentalsService.confirmReturn(id, user, dto);
   }
 
   // Rental extensions

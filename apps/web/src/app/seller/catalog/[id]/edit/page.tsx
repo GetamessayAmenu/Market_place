@@ -46,7 +46,9 @@ export default function EditListingPage() {
           availableForRent: Boolean(listing.availableForRent),
           rentalPricePerDay: listing.rentalPricePerDay != null ? String(listing.rentalPricePerDay) : '',
           rentalDeposit: listing.rentalDeposit != null ? String(listing.rentalDeposit) : '',
-          minRentalDurationDays: listing.minRentalDurationDays != null ? String(listing.minRentalDurationDays) : '1',
+          rentalThreeDayRate: listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
+          rentalWeeklyRate: listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
+          minRentalDurationDays: listing.minRentalDurationDays != null ? String(listing.minRentalDurationDays) : '3',
           maxRentalDurationDays: listing.maxRentalDurationDays != null ? String(listing.maxRentalDurationDays) : '',
           rentalPickupLocation: listing.rentalPickupLocation ?? '',
           rentalNotes: listing.rentalNotes ?? '',
@@ -83,7 +85,9 @@ export default function EditListingPage() {
             ? {
                 rentalPricePerDay: String(listing.rentalPricePerDay ?? ''),
                 rentalDeposit: String(listing.rentalDeposit ?? ''),
-                minRentalDays: String(listing.minRentalDurationDays ?? '1'),
+                rentalThreeDayRate: listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
+                rentalWeeklyRate: listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
+                minRentalDays: String(listing.minRentalDurationDays ?? '3'),
                 maxRentalDays: String(listing.maxRentalDurationDays ?? '30'),
               }
             : null,
@@ -183,6 +187,10 @@ export default function EditListingPage() {
       if (isRent) {
         apiData.rentalPricePerDay = parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
         apiData.rentalDeposit = parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
+        const threeDayVal = data.rentalThreeDayRate || data.rentalInfo?.rentalThreeDayRate;
+        apiData.rentalThreeDayRate = threeDayVal ? (parseFloat(threeDayVal) || null) : null;
+        const weeklyVal = data.rentalWeeklyRate || data.rentalInfo?.rentalWeeklyRate;
+        apiData.rentalWeeklyRate = weeklyVal ? (parseFloat(weeklyVal) || null) : null;
         apiData.minRentalDurationDays = parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
         apiData.maxRentalDurationDays = data.maxRentalDurationDays ? parseInt(data.maxRentalDurationDays, 10) : null;
         apiData.rentalPickupLocation = data.rentalPickupLocation || null;
@@ -190,6 +198,8 @@ export default function EditListingPage() {
       } else {
         apiData.rentalPricePerDay = null;
         apiData.rentalDeposit = null;
+        apiData.rentalThreeDayRate = null;
+        apiData.rentalWeeklyRate = null;
         apiData.minRentalDurationDays = null;
         apiData.maxRentalDurationDays = null;
         apiData.rentalPickupLocation = null;

@@ -135,6 +135,8 @@ export const listingCreateSchema = z.object({
   customOrderAvailable: z.boolean().optional(),
   rentalPricePerDay: z.coerce.number().min(0).max(9999999).optional(),
   rentalDeposit: z.coerce.number().min(0).max(9999999).optional(),
+  rentalThreeDayRate: z.coerce.number().min(0).max(9999999).optional(),
+  rentalWeeklyRate: z.coerce.number().min(0).max(9999999).optional(),
   attributes: z.record(z.unknown()).optional(),
 });
 
@@ -155,6 +157,8 @@ export const listingUpdateSchema = z.object({
   customOrderAvailable: z.boolean().optional(),
   rentalPricePerDay: z.coerce.number().min(0).max(9999999).optional(),
   rentalDeposit: z.coerce.number().min(0).max(9999999).optional(),
+  rentalThreeDayRate: z.coerce.number().min(0).max(9999999).optional(),
+  rentalWeeklyRate: z.coerce.number().min(0).max(9999999).optional(),
   attributes: z.record(z.unknown()).optional(),
 });
 

@@ -1129,6 +1129,11 @@ model RentalOrder {
   pickupHub            String?              @map("pickup_hub") @db.VarChar(100)
   cancellationReason   String?              @map("cancellation_reason")
   offlineDepositStatus String?              @map("offline_deposit_status") @db.VarChar(50)
+  penaltyFee           Float?               @map("penalty_fee")
+  penaltyDays          Int?                 @map("penalty_days")
+  penaltyPaid          Boolean              @default(false) @map("penalty_paid")
+  penaltyPaidAt        DateTime?            @map("penalty_paid_at")
+  penaltyNotes         String?              @map("penalty_notes")
   pricingTierUsed       RentalPricingTier?   @map("pricing_tier_used")
   conditionLogs         RentalConditionLog[]
   extensions            RentalExtension[]

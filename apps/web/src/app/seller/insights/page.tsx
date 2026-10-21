@@ -11,9 +11,12 @@ import {
   useAnalytics, 
   useDeposits, 
   useAddDeposit, 
+  useRefundDeposit,
+  useDeleteDeposit,
   useSellerReviews, 
   useRespondToReview, 
   useCustomers,
+  type DepositLog,
   type ReviewItem
 } from '../../../hooks/seller/useAnalytics';
 
@@ -165,13 +168,26 @@ export default function InsightsPage() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [followerCount, setFollowerCount] = useState(0);
   const [showAddDepositModal, setShowAddDepositModal] = useState(false);
+  const [depositFilter, setDepositFilter] = useState<'all' | 'held' | 'refunded'>('all');
+  const [depositSearch, setDepositSearch] = useState('');
 
-  // Deposit Form State
+  // Deposit Form State (Add)
   const [depositType, setDepositType] = useState<'held' | 'refunded'>('held');
   const [depositAmount, setDepositAmount] = useState('');
   const [depositCustomer, setDepositCustomer] = useState('');
   const [depositOrder, setDepositOrder] = useState('');
   const [depositNotes, setDepositNotes] = useState('');
+  const [depositPaymentMethod, setDepositPaymentMethod] = useState('Telebirr');
+  const [selectedRentalOrderId, setSelectedRentalOrderId] = useState<string>('manual');
+  const [sellerRentalOrders, setSellerRentalOrders] = useState<any[]>([]);
+
+  // Refund Modal State
+  const [selectedDepositForRefund, setSelectedDepositForRefund] = useState<DepositLog | null>(null);
+  const [refundMode, setRefundMode] = useState<'full' | 'partial' | 'forfeit'>('full');
+  const [deductionAmount, setDeductionAmount] = useState('');
+  const [deductionReason, setDeductionReason] = useState('Late Return Penalty');
+  const [refundPaymentMethod, setRefundPaymentMethod] = useState('Telebirr');
+  const [refundNotes, setRefundNotes] = useState('');
 
   // Real backend queries
   const { data: analytics, isLoading: isLoadingAnalytics } = useAnalytics(sellerId, period);
@@ -179,8 +195,10 @@ export default function InsightsPage() {
   const { data: reviewsData, isLoading: isLoadingReviews } = useSellerReviews(sellerId);
   const { data: customers = [], isLoading: isLoadingCustomers } = useCustomers(sellerId);
   const addDepositMutation = useAddDeposit();
+  const refundDepositMutation = useRefundDeposit();
+  const deleteDepositMutation = useDeleteDeposit();
 
-  // Fetch followers count
+  // Fetch followers count and active seller rental orders
   useEffect(() => {
     if (sellerId) {
       apiGet<{ _count: { storeFollowers: number } }>(`/users/${sellerId}`)
@@ -190,6 +208,13 @@ export default function InsightsPage() {
         .catch(() => {
           setFollowerCount(0);
         });
+
+      apiGet<any>('/rentals/seller')
+        .then((res) => {
+          const raw = Array.isArray(res) ? res : res?.data || res?.items || [];
+          setSellerRentalOrders(raw);
+        })
+        .catch(() => {});
     }
   }, [sellerId]);
 
@@ -201,6 +226,23 @@ export default function InsightsPage() {
     );
   }
 
+  const handleSelectRentalOrder = (orderId: string) => {
+    setSelectedRentalOrderId(orderId);
+    if (orderId === 'manual') {
+      setDepositCustomer('');
+      setDepositOrder('');
+      setDepositAmount('');
+      return;
+    }
+    const order = sellerRentalOrders.find((o) => o.id === orderId);
+    if (order) {
+      setDepositCustomer(order.renter?.displayName || 'Customer');
+      setDepositOrder(order.orderNumber || `RNT-${order.id.slice(0, 8)}`);
+      setDepositAmount(String(order.securityDeposit || ''));
+      setDepositNotes(order.listing?.title ? `Deposit for ${order.listing.title}` : '');
+    }
+  };
+
   const handleCreateDeposit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!depositAmount || !depositCustomer) return;
@@ -208,9 +250,10 @@ export default function InsightsPage() {
       {
         type: depositType,
         amount: parseFloat(depositAmount),
-        customerName: depositCustomer,
-        relatedOrder: depositOrder || undefined,
-        notes: depositNotes || undefined,
+        customerName: depositCustomer.trim(),
+        relatedOrder: depositOrder.trim() || undefined,
+        paymentMethod: depositPaymentMethod,
+        notes: depositNotes.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -219,10 +262,84 @@ export default function InsightsPage() {
           setDepositCustomer('');
           setDepositOrder('');
           setDepositNotes('');
+          setSelectedRentalOrderId('manual');
         },
       }
     );
   };
+
+  const handleOpenRefundModal = (deposit: DepositLog) => {
+    setSelectedDepositForRefund(deposit);
+    setRefundMode('full');
+    setDeductionAmount('');
+    setDeductionReason('Late Return Penalty');
+    setRefundPaymentMethod(deposit.paymentMethod || 'Telebirr');
+    setRefundNotes('');
+  };
+
+  const handleProcessRefund = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDepositForRefund) return;
+
+    let finalRefundAmount = selectedDepositForRefund.amount;
+    let finalDeductionAmount = 0;
+
+    if (refundMode === 'partial') {
+      finalDeductionAmount = parseFloat(deductionAmount) || 0;
+      finalRefundAmount = Math.max(0, selectedDepositForRefund.amount - finalDeductionAmount);
+    } else if (refundMode === 'forfeit') {
+      finalDeductionAmount = selectedDepositForRefund.amount;
+      finalRefundAmount = 0;
+    }
+
+    refundDepositMutation.mutate(
+      {
+        id: selectedDepositForRefund.id,
+        refundAmount: finalRefundAmount,
+        deductionAmount: finalDeductionAmount,
+        deductionReason: refundMode !== 'full' ? deductionReason : undefined,
+        paymentMethod: refundPaymentMethod,
+        notes: refundNotes.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setSelectedDepositForRefund(null);
+        },
+      }
+    );
+  };
+
+  const handleDeleteDeposit = (id: string) => {
+    if (confirm('Are you sure you want to remove this deposit record?')) {
+      deleteDepositMutation.mutate(id);
+    }
+  };
+
+  // Deposit Ledger Summary Calculations
+  const heldDeposits = deposits.filter((d) => d.type === 'held');
+  const refundedDeposits = deposits.filter((d) => d.type === 'refunded');
+
+  const totalHeldAmount = heldDeposits.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+  const totalRefundedAmount = refundedDeposits.reduce((acc, d) => acc + (Number(d.refundAmount ?? d.amount) || 0), 0);
+  const totalDeductionsAmount = refundedDeposits.reduce((acc, d) => {
+    const orig = Number(d.amount) || 0;
+    const ref = d.refundAmount != null ? Number(d.refundAmount) : orig;
+    return acc + Math.max(0, orig - ref);
+  }, 0);
+
+  const filteredDeposits = deposits.filter((d) => {
+    if (depositFilter === 'held' && d.type !== 'held') return false;
+    if (depositFilter === 'refunded' && d.type !== 'refunded') return false;
+    if (depositSearch.trim()) {
+      const q = depositSearch.toLowerCase();
+      const matchName = d.customerName.toLowerCase().includes(q);
+      const matchOrder = (d.relatedOrder || '').toLowerCase().includes(q);
+      const matchNotes = (d.notes || '').toLowerCase().includes(q);
+      const matchMethod = (d.paymentMethod || '').toLowerCase().includes(q);
+      return matchName || matchOrder || matchNotes || matchMethod;
+    }
+    return true;
+  });
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -367,13 +484,68 @@ export default function InsightsPage() {
       {/* ── 2. Deposits Tab ──────────────────────────────────────────────── */}
       {activeTab === 'deposits' && (
         <div className="space-y-6">
+          {/* Summary KPIs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Card className="border-amber-500/20 bg-amber-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-amber-800 dark:text-amber-300">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Active Collateral Held</p>
+                  <span className="text-base">🔒</span>
+                </div>
+                <p className="text-2xl font-bold mt-2 text-amber-700 dark:text-amber-400">
+                  {isLoadingDeposits ? '...' : totalHeldAmount.toLocaleString()} <span className="text-xs font-normal">ETB</span>
+                </p>
+                <p className="text-3xs text-muted-foreground mt-1">
+                  {heldDeposits.length} garment{heldDeposits.length !== 1 ? 's' : ''} currently rented out
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-emerald-500/20 bg-emerald-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Total Refunded</p>
+                  <span className="text-base">✓</span>
+                </div>
+                <p className="text-2xl font-bold mt-2 text-emerald-700 dark:text-emerald-400">
+                  {isLoadingDeposits ? '...' : totalRefundedAmount.toLocaleString()} <span className="text-xs font-normal">ETB</span>
+                </p>
+                <p className="text-3xs text-muted-foreground mt-1">Returned after inspection</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-rose-500/20 bg-rose-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-rose-800 dark:text-rose-300">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Retained / Deductions</p>
+                  <span className="text-base">⚠️</span>
+                </div>
+                <p className="text-2xl font-bold mt-2 text-rose-700 dark:text-rose-400">
+                  {isLoadingDeposits ? '...' : totalDeductionsAmount.toLocaleString()} <span className="text-xs font-normal">ETB</span>
+                </p>
+                <p className="text-3xs text-muted-foreground mt-1">For late fees or damage repairs</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Total Transactions</p>
+                  <span className="text-base">📋</span>
+                </div>
+                <p className="text-2xl font-bold mt-2">{deposits.length}</p>
+                <p className="text-3xs text-muted-foreground mt-1">Active + settled deposit logs</p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h3 className="text-base font-semibold">Rental Security Deposit Ledger</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Log and track offline security deposits held for rental garments (cash, CBE, Telebirr) and record returns.
+                    Track offline collateral (Telebirr, CBE, cash) collected for bridal, Habesha kemis, and ceremonial attire.
                   </p>
                 </div>
                 <Button size="sm" onClick={() => setShowAddDepositModal(true)}>
@@ -381,44 +553,222 @@ export default function InsightsPage() {
                 </Button>
               </div>
 
+              {/* Filters & Search Toolbar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1 border-t">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setDepositFilter('all')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      depositFilter === 'all'
+                        ? 'bg-primary text-primary-foreground font-semibold'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    All ({deposits.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositFilter('held')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      depositFilter === 'held'
+                        ? 'bg-amber-600 text-white font-semibold'
+                        : 'bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    Active Holds ({heldDeposits.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositFilter('refunded')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      depositFilter === 'refunded'
+                        ? 'bg-emerald-600 text-white font-semibold'
+                        : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/20'
+                    }`}
+                  >
+                    Refunded ({refundedDeposits.length})
+                  </button>
+                </div>
+
+                <div className="w-full sm:w-64">
+                  <Input
+                    placeholder="Search customer, order, notes..."
+                    value={depositSearch}
+                    onChange={(e) => setDepositSearch(e.target.value)}
+                    className="text-xs h-8"
+                  />
+                </div>
+              </div>
+
               {isLoadingDeposits ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">Loading deposits...</p>
-              ) : deposits.length === 0 ? (
-                <div className="text-center py-10 border rounded-lg bg-muted/20">
-                  <p className="text-sm text-muted-foreground">No deposits currently logged.</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    When renting out items, you can record customer security deposits here to keep your offline accounts balanced.
+                <p className="text-sm text-muted-foreground py-8 text-center">Loading deposits ledger...</p>
+              ) : filteredDeposits.length === 0 ? (
+                <div className="text-center py-12 border rounded-lg bg-muted/10 space-y-2">
+                  <p className="text-sm font-medium text-foreground">No deposit entries found.</p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    {depositSearch
+                      ? 'No deposit logs match your search. Try a different search term or clear filters.'
+                      : 'When renting out fashion items, log cash, Telebirr, or CBE security deposits here to track active collateral and record return refunds.'}
                   </p>
+                  {!depositSearch && (
+                    <Button size="sm" variant="outline" className="mt-2 text-xs" onClick={() => setShowAddDepositModal(true)}>
+                      + Log First Deposit
+                    </Button>
+                  )}
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Amount (ETB)</TableHead>
-                      <TableHead>Order Ref</TableHead>
-                      <TableHead>Notes</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deposits.map((deposit) => (
-                      <TableRow key={deposit.id}>
-                        <TableCell className="text-xs">{deposit.date}</TableCell>
-                        <TableCell>
-                          <Badge variant={deposit.type === 'held' ? 'warning' : 'success'} className="text-2xs">
-                            {deposit.type === 'held' ? 'Held' : 'Refunded'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs font-medium">{deposit.customerName}</TableCell>
-                        <TableCell className="text-xs font-semibold">{deposit.amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{deposit.relatedOrder || '—'}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{deposit.notes || '—'}</TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-24">Date</TableHead>
+                        <TableHead className="w-28">Status</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Order / Garment</TableHead>
+                        <TableHead>Deposit Held</TableHead>
+                        <TableHead>Settlement / Return</TableHead>
+                        <TableHead>Method & Notes</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDeposits.map((deposit) => {
+                        const isHeld = deposit.type === 'held';
+                        const origAmount = Number(deposit.amount) || 0;
+                        const refundedAmt = deposit.refundAmount != null ? Number(deposit.refundAmount) : origAmount;
+                        const hasDeduction = !isHeld && refundedAmt < origAmount;
+                        const deduction = origAmount - refundedAmt;
+
+                        return (
+                          <TableRow key={deposit.id} className="hover:bg-muted/40 transition-colors">
+                            <TableCell className="text-xs font-mono text-muted-foreground">
+                              {deposit.date}
+                            </TableCell>
+
+                            <TableCell>
+                              {isHeld ? (
+                                <Badge variant="warning" className="text-2xs font-semibold gap-1">
+                                  <span>🔒</span> Held
+                                </Badge>
+                              ) : hasDeduction ? (
+                                <Badge variant="outline" className="text-2xs font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20 gap-1">
+                                  <span>⚠️</span> Deducted
+                                </Badge>
+                              ) : (
+                                <Badge variant="success" className="text-2xs font-semibold gap-1">
+                                  <span>✓</span> Refunded
+                                </Badge>
+                              )}
+                            </TableCell>
+
+                            <TableCell>
+                              <div className="font-semibold text-xs text-foreground">
+                                {deposit.customerName}
+                              </div>
+                              <div className="text-3xs text-muted-foreground">
+                                {deposit.isManual ? 'Walk-in / Offline' : 'Marketplace Renter'}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-xs">
+                              {deposit.relatedOrder && (
+                                <span className="font-mono text-xs font-medium text-primary">
+                                  {deposit.relatedOrder}
+                                </span>
+                              )}
+                              {deposit.listingTitle && (
+                                <p className="text-3xs text-muted-foreground truncate max-w-[150px]">
+                                  {deposit.listingTitle}
+                                </p>
+                              )}
+                              {!deposit.relatedOrder && !deposit.listingTitle && (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+
+                            <TableCell className="text-xs font-bold text-foreground">
+                              {origAmount.toLocaleString()} <span className="text-3xs font-normal text-muted-foreground">ETB</span>
+                            </TableCell>
+
+                            <TableCell className="text-xs">
+                              {isHeld ? (
+                                <span className="text-muted-foreground text-3xs italic">
+                                  Collateral active (pending return)
+                                </span>
+                              ) : hasDeduction ? (
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                    Refunded: {refundedAmt.toLocaleString()} ETB
+                                  </p>
+                                  <p className="text-3xs text-rose-600 dark:text-rose-400 font-medium">
+                                    Deducted: -{deduction.toLocaleString()} ETB {deposit.refundReason ? `(${deposit.refundReason})` : ''}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                    Full refund: {refundedAmt.toLocaleString()} ETB
+                                  </p>
+                                  {deposit.refundDate && (
+                                    <p className="text-3xs text-muted-foreground">on {deposit.refundDate}</p>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+
+                            <TableCell className="text-xs">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {deposit.paymentMethod && (
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-semibold text-foreground border">
+                                    {deposit.paymentMethod}
+                                  </span>
+                                )}
+                                {deposit.notes && (
+                                  <span className="text-3xs text-muted-foreground truncate max-w-[140px]" title={deposit.notes}>
+                                    {deposit.notes}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {isHeld ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs h-7 px-2.5 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 font-semibold"
+                                    onClick={() => handleOpenRefundModal(deposit)}
+                                  >
+                                    Refund Deposit
+                                  </Button>
+                                ) : (
+                                  <span className="text-3xs text-emerald-600 dark:text-emerald-400 font-medium px-2 py-1">
+                                    Settled ✓
+                                  </span>
+                                )}
+
+                                {deposit.isManual && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDeposit(deposit.id)}
+                                    title="Delete deposit entry"
+                                    className="p-1 rounded text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -568,6 +918,30 @@ export default function InsightsPage() {
               </div>
 
               <div>
+                <label className="text-xs font-medium mb-1 block">Link to Rental Order (Optional)</label>
+                <select
+                  value={selectedRentalOrderId}
+                  onChange={(e) => handleSelectRentalOrder(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="manual">Walk-in / Offline Customer (Manual Record)</option>
+                  {sellerRentalOrders.map((order) => {
+                    const orderNumber = order.orderNumber || `RNT-${order.id.slice(0, 8)}`;
+                    const renterName = order.renter?.displayName || 'Customer';
+                    const listingTitle = order.listing?.title || 'Rental Garment';
+                    return (
+                      <option key={order.id} value={order.id}>
+                        {orderNumber} — {listingTitle} ({renterName})
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-3xs text-muted-foreground mt-1">
+                  Selecting an active rental auto-fills customer details and order reference.
+                </p>
+              </div>
+
+              <div>
                 <label className="text-xs font-medium mb-1 block">Customer Name *</label>
                 <input
                   required
@@ -593,6 +967,26 @@ export default function InsightsPage() {
               </div>
 
               <div>
+                <label className="text-xs font-medium mb-1 block">Payment Method</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Telebirr', 'CBE', 'Cash', 'Bank Transfer', 'Other'].map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setDepositPaymentMethod(method)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        depositPaymentMethod === method
+                          ? 'bg-primary text-primary-foreground border-primary font-semibold'
+                          : 'bg-muted/40 hover:bg-muted text-foreground border-border'
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <label className="text-xs font-medium mb-1 block">Order / Garment Reference (Optional)</label>
                 <input
                   placeholder="e.g., Traditional Habesha Kemis Rental"
@@ -603,7 +997,7 @@ export default function InsightsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium mb-1 block">Notes / Method (Optional)</label>
+                <label className="text-xs font-medium mb-1 block">Notes / Reference (Optional)</label>
                 <input
                   placeholder="e.g., Received via CBE / Item returned in good condition"
                   value={depositNotes}
@@ -627,6 +1021,262 @@ export default function InsightsPage() {
                   disabled={addDepositMutation.isPending}
                 >
                   {addDepositMutation.isPending ? 'Saving...' : 'Save Deposit Entry'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Refund Deposit Modal ─────────────────────────────────────────── */}
+      {selectedDepositForRefund && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-background rounded-xl border max-w-lg w-full p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-semibold text-base">Refund Security Deposit</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Process collateral settlement for {selectedDepositForRefund.customerName}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedDepositForRefund(null)}
+                className="text-muted-foreground hover:text-foreground text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Held Deposit Summary */}
+            <div className="p-3 rounded-lg bg-muted/40 border flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Original Held Collateral</p>
+                <p className="text-xs font-mono font-medium text-foreground">
+                  {selectedDepositForRefund.relatedOrder || selectedDepositForRefund.listingTitle || 'Rental Garment'}
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono text-base">
+                  {Number(selectedDepositForRefund.amount).toLocaleString()} ETB
+                </span>
+                <p className="text-3xs text-muted-foreground">
+                  via {selectedDepositForRefund.paymentMethod || 'Cash/Transfer'}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleProcessRefund} className="space-y-4">
+              {/* Refund Resolution Type */}
+              <div>
+                <label className="text-xs font-medium mb-1 block">Settlement Resolution</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('full');
+                      setDeductionAmount('');
+                    }}
+                    className={`py-2 px-2 text-xs font-semibold rounded-md border text-center transition-colors ${
+                      refundMode === 'full' 
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                        : 'bg-muted/40 hover:bg-muted text-foreground'
+                    }`}
+                  >
+                    Full Refund (100%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('partial');
+                      if (!deductionAmount) setDeductionAmount('100');
+                    }}
+                    className={`py-2 px-2 text-xs font-semibold rounded-md border text-center transition-colors ${
+                      refundMode === 'partial' 
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm' 
+                        : 'bg-muted/40 hover:bg-muted text-foreground'
+                    }`}
+                  >
+                    Partial (Deduction)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRefundMode('forfeit');
+                      setDeductionAmount(String(selectedDepositForRefund.amount));
+                    }}
+                    className={`py-2 px-2 text-xs font-semibold rounded-md border text-center transition-colors ${
+                      refundMode === 'forfeit' 
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm' 
+                        : 'bg-muted/40 hover:bg-muted text-foreground'
+                    }`}
+                  >
+                    Forfeit Deposit
+                  </button>
+                </div>
+              </div>
+
+              {/* Partial Deduction Options */}
+              {refundMode === 'partial' && (
+                <div className="space-y-3 p-3.5 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                  <div>
+                    <label className="text-xs font-medium mb-1 block text-amber-900 dark:text-amber-300">
+                      Reason for Penalty / Deduction
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {[
+                        'Late Return Penalty',
+                        'Stain / Dry Cleaning Fee',
+                        'Tilet / Embroidery Repair',
+                        'Minor Fabric Tear',
+                        'Missing Accessory',
+                      ].map((reason) => (
+                        <button
+                          key={reason}
+                          type="button"
+                          onClick={() => setDeductionReason(reason)}
+                          className={`px-2.5 py-1 text-2xs rounded-full border transition-colors ${
+                            deductionReason === reason
+                              ? 'bg-amber-600 text-white border-amber-600 font-semibold'
+                              : 'bg-background hover:bg-muted text-foreground border-border'
+                          }`}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      placeholder="Or enter custom deduction reason..."
+                      value={deductionReason}
+                      onChange={(e) => setDeductionReason(e.target.value)}
+                      className="w-full rounded-md border bg-background px-3 py-1.5 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Deduction Amount (ETB) *</label>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      max={selectedDepositForRefund.amount}
+                      step="50"
+                      placeholder="e.g., 200"
+                      value={deductionAmount}
+                      onChange={(e) => setDeductionAmount(e.target.value)}
+                      className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    />
+                    <p className="text-3xs text-muted-foreground mt-1">
+                      Max deduction: {Number(selectedDepositForRefund.amount).toLocaleString()} ETB
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Forfeit warning */}
+              {refundMode === 'forfeit' && (
+                <div className="p-3.5 rounded-lg border border-rose-500/30 bg-rose-500/10 space-y-2">
+                  <p className="text-xs font-semibold text-rose-700 dark:text-rose-300">
+                    ⚠️ Garment Irreparable or Lost
+                  </p>
+                  <p className="text-2xs text-muted-foreground">
+                    The entire collateral deposit of {Number(selectedDepositForRefund.amount).toLocaleString()} ETB will be retained by the seller as compensation. Net refund to renter will be 0 ETB.
+                  </p>
+                  <div>
+                    <label className="text-2xs font-medium block mb-1">Forfeiture Reason</label>
+                    <input
+                      placeholder="e.g. Unreturned garment / severe burn / ruined fabric"
+                      value={deductionReason}
+                      onChange={(e) => setDeductionReason(e.target.value)}
+                      className="w-full rounded-md border bg-background px-3 py-1.5 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Settlement Net Calculation Summary */}
+              {(() => {
+                const orig = Number(selectedDepositForRefund.amount) || 0;
+                let deduct = 0;
+                let netRefund = orig;
+
+                if (refundMode === 'partial') {
+                  deduct = Math.min(orig, Math.max(0, parseFloat(deductionAmount) || 0));
+                  netRefund = orig - deduct;
+                } else if (refundMode === 'forfeit') {
+                  deduct = orig;
+                  netRefund = 0;
+                }
+
+                return (
+                  <div className="p-3 rounded-lg border bg-muted/20 space-y-1.5">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Held Collateral:</span>
+                      <span>{orig.toLocaleString()} ETB</span>
+                    </div>
+                    {deduct > 0 && (
+                      <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400 font-medium">
+                        <span>Seller Deduction / Penalty:</span>
+                        <span>- {deduct.toLocaleString()} ETB</span>
+                      </div>
+                    )}
+                    <div className="border-t pt-1.5 flex justify-between text-sm font-bold text-foreground">
+                      <span>Net Refund to Customer:</span>
+                      <span className={netRefund > 0 ? "text-emerald-600 dark:text-emerald-400 font-mono" : "text-muted-foreground font-mono"}>
+                        {netRefund.toLocaleString()} ETB
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Return Payment Method */}
+              <div>
+                <label className="text-xs font-medium mb-1 block">Return Payment Method</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Telebirr', 'CBE', 'Cash', 'Bank Transfer', 'Other'].map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setRefundPaymentMethod(method)}
+                      className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                        refundPaymentMethod === method
+                          ? 'bg-primary text-primary-foreground border-primary font-semibold'
+                          : 'bg-muted/40 hover:bg-muted text-foreground border-border'
+                      }`}
+                    >
+                      {method}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Refund Notes / Slip Reference */}
+              <div>
+                <label className="text-xs font-medium mb-1 block">Payment Reference / Notes (Optional)</label>
+                <input
+                  placeholder="e.g., Telebirr Ref #TB123456 or Item returned clean"
+                  value={refundNotes}
+                  onChange={(e) => setRefundNotes(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 justify-end">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedDepositForRefund(null)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  disabled={refundDepositMutation.isPending}
+                >
+                  {refundDepositMutation.isPending ? 'Processing...' : 'Confirm & Complete Refund'}
                 </Button>
               </div>
             </form>

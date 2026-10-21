@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Modal, Button, Alert, Spinner, Rating, cn } from '@marketplace/ui';
 import { apiGet, apiPost, getApiErrorMessage } from '../../../lib/api';
@@ -23,7 +23,7 @@ interface RentalExtensionItem {
   requestedEndDate: string;
   additionalDays: number;
   additionalFee: number;
-  status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
+  status: 'PENDING' | 'REQUESTED' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
   reason?: string | null;
   createdAt: string;
 }
@@ -67,6 +67,14 @@ interface RenterRentalOrder {
   histories?: RentalHistoryItem[];
   extensions?: RentalExtensionItem[];
   createdAt: string;
+  isOverdue?: boolean;
+  overdueDays?: number;
+  penaltyDays?: number;
+  penaltyFee?: number;
+  dailyLateRate?: number;
+  penaltyPaid?: boolean;
+  penaltyPaidAt?: string | null;
+  penaltyNotes?: string | null;
 }
 
 type TabType = 'all' | 'PENDING' | 'ACCEPTED' | 'ACTIVE' | 'RETURN_PENDING' | 'COMPLETED' | 'CANCELLED_DECLINED';
@@ -97,8 +105,11 @@ const STATUS_COLORS: Record<string, string> = {
   DISPUTED: 'bg-rose-200 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
 };
 
-export default function RenterRentalsPage() {
+function RenterRentalsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetOrderId = searchParams.get('orderId') || searchParams.get('rentalId') || searchParams.get('id');
+
   const [rentals, setRentals] = useState<RenterRentalOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('all');
@@ -107,6 +118,11 @@ export default function RenterRentalsPage() {
   const [selectedRental, setSelectedRental] = useState<RenterRentalOrder | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Return Modal State
+  const [returnModalOrder, setReturnModalOrder] = useState<RenterRentalOrder | null>(null);
+  const [returnNotes, setReturnNotes] = useState('');
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   // Extension Modal State
   const [extensionModalOrder, setExtensionModalOrder] = useState<RenterRentalOrder | null>(null);
@@ -152,7 +168,7 @@ export default function RenterRentalsPage() {
         },
         startDate: item.startDate ? item.startDate.split('T')[0] : '',
         endDate: item.endDate ? item.endDate.split('T')[0] : '',
-        rentalDurationDays: item.rentalDurationDays || 1,
+        rentalDurationDays: item.rentalDurationDays || (item.startDate && item.endDate ? Math.max(1, Math.round((new Date(item.endDate).getTime() - new Date(item.startDate).getTime()) / (1000 * 60 * 60 * 24))) : 1),
         totalAmount: Number(item.rentalFee || item.totalAmount || 0),
         securityDeposit: Number(item.securityDeposit || 0),
         dailyRate: Number(item.dailyRate || 0),
@@ -167,8 +183,25 @@ export default function RenterRentalsPage() {
         cancelledBy: item.cancelledBy,
         cancelledAt: item.cancelledAt,
         histories: item.histories || [],
-        extensions: item.extensions || [],
+        extensions: (item.extensions || []).map((ext: any) => ({
+          id: ext.id,
+          previousEndDate: ext.previousEndDate || item.endDate,
+          requestedEndDate: ext.newEndDate ? ext.newEndDate.split('T')[0] : (ext.requestedEndDate || ''),
+          additionalDays: ext.additionalDays,
+          additionalFee: Number(ext.additionalCost ?? ext.additionalFee ?? 0),
+          status: ext.status,
+          reason: ext.reason,
+          createdAt: ext.createdAt,
+        })),
         createdAt: item.createdAt || new Date().toISOString(),
+        isOverdue: item.isOverdue,
+        overdueDays: item.overdueDays,
+        penaltyDays: item.penaltyDays || item.overdueDays,
+        penaltyFee: Number(item.penaltyFee || 0),
+        dailyLateRate: Number(item.dailyLateRate || item.dailyRate || item.listing?.rentalPricePerDay || 0),
+        penaltyPaid: Boolean(item.penaltyPaid),
+        penaltyPaidAt: item.penaltyPaidAt,
+        penaltyNotes: item.penaltyNotes,
       }));
       setRentals(mapped);
     } catch (err) {
@@ -182,6 +215,16 @@ export default function RenterRentalsPage() {
   useEffect(() => {
     void loadRentals();
   }, [loadRentals]);
+
+  // Auto-select and open rental details when orderId is provided in URL params
+  useEffect(() => {
+    if (!targetOrderId || rentals.length === 0) return;
+    const match = rentals.find((r) => r.id === targetOrderId || r.orderNumber === targetOrderId);
+    if (match) {
+      setSelectedRental(match);
+      setActiveTab('all');
+    }
+  }, [targetOrderId, rentals]);
 
   const filterByTab = (r: RenterRentalOrder, tab: TabType) => {
     if (tab === 'all') return true;
@@ -246,18 +289,30 @@ export default function RenterRentalsPage() {
     }
   };
 
-  const handleReturnItem = async (rentalId: string) => {
-    setActionLoading(true);
+  const openReturnModal = (rental: RenterRentalOrder) => {
+    setReturnModalOrder(rental);
+    setReturnNotes('');
+  };
+
+  const submitReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnModalOrder) return;
+    setReturnSubmitting(true);
     try {
-      await apiPost(`/rentals/${rentalId}/return`);
+      await apiPost(`/rentals/${returnModalOrder.id}/return`, {
+        notes: returnNotes.trim() || undefined,
+      });
+      const orderId = returnModalOrder.id;
+      setReturnModalOrder(null);
       await loadRentals();
-      if (selectedRental?.id === rentalId) {
+      if (selectedRental?.id === orderId) {
         setSelectedRental((prev) => (prev ? { ...prev, status: 'RETURN_PENDING' } : null));
       }
+      alert('Return recorded successfully! The seller has been notified to inspect the item and finalize deposit refund.');
     } catch (err) {
-      alert(getApiErrorMessage(err, 'Failed to initiate return.'));
+      alert(getApiErrorMessage(err, 'Failed to report return.'));
     } finally {
-      setActionLoading(false);
+      setReturnSubmitting(false);
     }
   };
 
@@ -283,13 +338,19 @@ export default function RenterRentalsPage() {
     if (!extensionModalOrder || !newExtensionDate) return;
     setActionLoading(true);
     try {
+      const currentEnd = new Date(extensionModalOrder.endDate);
+      const newEnd = new Date(newExtensionDate);
+      const additionalDays = Math.max(1, Math.ceil((newEnd.getTime() - currentEnd.getTime()) / (1000 * 60 * 60 * 24)));
+
       await apiPost(`/rentals/${extensionModalOrder.id}/extensions`, {
+        newEndDate: newExtensionDate,
         requestedEndDate: newExtensionDate,
+        additionalDays,
         reason: extensionReason.trim() || undefined,
       });
       setExtensionModalOrder(null);
       await loadRentals();
-      alert('Extension request sent to seller!');
+      alert('Extension request sent to seller! You will be notified when the seller responds.');
     } catch (err) {
       alert(getApiErrorMessage(err, 'Failed to request extension.'));
     } finally {
@@ -338,7 +399,7 @@ export default function RenterRentalsPage() {
           </p>
         </div>
         <Link
-          href="/products"
+          href="/search?type=rent"
           className="text-xs font-medium text-primary hover:underline self-start sm:self-auto"
         >
           Browse more items →
@@ -433,7 +494,7 @@ export default function RenterRentalsPage() {
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             {searchQuery ? 'No rental orders matched your search.' : 'You have not made any rental requests yet.'}
           </p>
-          <Link href="/products">
+          <Link href="/search?type=rent">
             <Button size="sm" variant="outline" className="mt-2">
               Browse Rentable Outfits
             </Button>
@@ -449,7 +510,7 @@ export default function RenterRentalsPage() {
             const isReturnPending = rental.status === 'RETURN_PENDING' || rental.status === 'RETURN_INITIATED';
             const isCompleted = rental.status === 'COMPLETED';
             const daysLeft = isActive ? getDaysUntil(rental.endDate) : null;
-            const hasPendingExtension = rental.extensions?.find((e) => e.status === 'PENDING');
+            const hasPendingExtension = rental.extensions?.find((e) => e.status === 'PENDING' || e.status === 'REQUESTED');
 
             return (
               <div
@@ -528,15 +589,53 @@ export default function RenterRentalsPage() {
                         </div>
                       )}
 
-                      {/* Active Return Countdown */}
-                      {isActive && daysLeft !== null && (
-                        <div className={cn('text-xs font-semibold mt-1', daysLeft < 0 ? 'text-destructive' : daysLeft <= 2 ? 'text-amber-600' : 'text-emerald-600')}>
-                          {daysLeft < 0
-                            ? `⚠️ Overdue by ${Math.abs(daysLeft)} day(s)! Please coordinate return with seller immediately.`
-                            : daysLeft === 0
-                            ? 'Your rental ends today! Please return to seller.'
-                            : `Your rental ends in ${daysLeft} day(s) on ${rental.endDate}.`}
-                        </div>
+                      {/* Active Return Countdown and Penalty display */}
+                      {isActive && daysLeft !== null && (() => {
+                        const isOverdue = daysLeft < 0;
+                        const overdueDays = Math.abs(daysLeft);
+                        const dailyRate =
+                          rental.dailyLateRate ||
+                          rental.dailyRate ||
+                          (rental.listing.rentalPricePerDay ? Number(rental.listing.rentalPricePerDay) : 0);
+                        const penaltyFee =
+                          rental.penaltyFee && rental.penaltyFee > 0
+                            ? rental.penaltyFee
+                            : overdueDays * dailyRate;
+
+                        if (isOverdue) {
+                          return (
+                            <div className="rounded-md bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive space-y-1 mt-1">
+                              <div className="font-semibold flex flex-wrap items-center gap-1.5">
+                                <span>⚠️ Overdue by {overdueDays} day(s)!</span>
+                                <span className="text-foreground/80 font-normal">Late Penalty Fee:</span>
+                                <span className="font-bold underline decoration-destructive/40 text-amber-800 dark:text-amber-300">
+                                  {penaltyFee.toLocaleString()} ETB
+                                </span>
+                                <span className="text-[11px] font-normal text-muted-foreground">
+                                  ({overdueDays}d × {dailyRate.toLocaleString()} ETB/day)
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-destructive/90">
+                                According to rental terms, an overdue penalty is charged daily. Please coordinate return and settle the accrued penalty with the seller immediately.
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className={cn('text-xs font-semibold mt-1', daysLeft <= 2 ? 'text-amber-600' : 'text-emerald-600')}>
+                            {daysLeft === 0
+                              ? 'Your rental ends today! Please return to seller.'
+                              : `Your rental ends in ${daysLeft} day(s) on ${rental.endDate}.`}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Completed with settled penalty indicator */}
+                      {rental.status === 'COMPLETED' && rental.penaltyFee && rental.penaltyFee > 0 && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                          ✓ Rental completed · Late penalty settled: {rental.penaltyFee.toLocaleString()} ETB ({rental.penaltyDays || 1}d)
+                        </p>
                       )}
 
                       {/* Return pending indicator */}
@@ -587,20 +686,22 @@ export default function RenterRentalsPage() {
 
                     {isActive && (
                       <>
-                        <Button size="sm" onClick={() => handleReturnItem(rental.id)}>
+                        <Button size="sm" onClick={() => openReturnModal(rental)}>
                           I Have Returned the Item
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setExtensionModalOrder(rental);
-                            setNewExtensionDate('');
-                            setExtensionReason('');
-                          }}
-                        >
-                          Request Extension
-                        </Button>
+                        {!hasPendingExtension && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setExtensionModalOrder(rental);
+                              setNewExtensionDate('');
+                              setExtensionReason('');
+                            }}
+                          >
+                            Request Extension
+                          </Button>
+                        )}
                       </>
                     )}
 
@@ -703,6 +804,49 @@ export default function RenterRentalsPage() {
               </p>
             </div>
 
+            {/* Overdue & Penalty Breakdown if applicable */}
+            {(Boolean(selectedRental.penaltyFee && selectedRental.penaltyFee > 0) || (selectedRental.endDate && new Date(selectedRental.endDate).getTime() < Date.now() && (selectedRental.status === 'ACTIVE' || selectedRental.status === 'RETURN_PENDING'))) && (() => {
+              const daysLeft = Math.ceil((new Date(selectedRental.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+              const overdueDays = daysLeft < 0 ? Math.abs(daysLeft) : (selectedRental.penaltyDays || 1);
+              const dailyRate = selectedRental.dailyLateRate || selectedRental.dailyRate || (selectedRental.listing.rentalPricePerDay ? Number(selectedRental.listing.rentalPricePerDay) : 0);
+              const penaltyFee = selectedRental.penaltyFee && selectedRental.penaltyFee > 0 ? selectedRental.penaltyFee : overdueDays * dailyRate;
+
+              return (
+                <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-semibold text-destructive text-xs uppercase tracking-wide flex items-center gap-1.5">
+                      <span>⚠️ Overdue Penalty Terms</span>
+                    </h5>
+                    <span className="font-bold text-destructive text-sm">{penaltyFee.toLocaleString()} ETB</span>
+                  </div>
+                  <div className="space-y-1.5 text-xs bg-background/60 p-2.5 rounded border border-border/50">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Days Overdue:</span>
+                        <p className="font-medium text-foreground">{overdueDays} day(s)</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Daily Late Rate:</span>
+                        <p className="font-medium text-foreground">{dailyRate.toLocaleString()} ETB / day</p>
+                      </div>
+                    </div>
+                    <div className="pt-1.5 border-t flex justify-between items-center">
+                      <span className="text-muted-foreground">Settlement Status:</span>
+                      <span className={cn('font-semibold', selectedRental.penaltyPaid ? 'text-emerald-600' : 'text-amber-600')}>
+                        {selectedRental.penaltyPaid ? '✓ Paid & Verified by Seller' : '⚠️ Pending Settlement with Seller'}
+                      </span>
+                    </div>
+                    {selectedRental.penaltyNotes && (
+                      <p className="text-[11px] text-muted-foreground italic">Note: {selectedRental.penaltyNotes}</p>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-destructive/80">
+                    Please coordinate return with the seller and settle the accrued late penalty fee upon item handover.
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* Status History */}
             {selectedRental.histories && selectedRental.histories.length > 0 && (
               <div className="p-3 rounded-lg border bg-card space-y-2">
@@ -728,62 +872,247 @@ export default function RenterRentalsPage() {
               <Button size="sm" variant="outline" onClick={() => handleOpenChat(selectedRental)}>
                 Open Chat
               </Button>
+              {selectedRental.status === 'ACTIVE' && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const toReturn = selectedRental;
+                    setSelectedRental(null);
+                    openReturnModal(toReturn);
+                  }}
+                >
+                  Return Item
+                </Button>
+              )}
             </div>
           </div>
         </Modal>
       )}
 
       {/* Extension Modal */}
-      {extensionModalOrder && (
-        <Modal
-          open={Boolean(extensionModalOrder)}
-          onClose={() => setExtensionModalOrder(null)}
-          title="Request Rental Extension"
-          size="md"
-        >
-          <form onSubmit={submitExtension} className="space-y-4 text-xs">
-            <p className="text-muted-foreground">
-              Request to extend your rental of <span className="font-semibold text-foreground">{extensionModalOrder.listing.title}</span> beyond {extensionModalOrder.endDate}.
-            </p>
+      {extensionModalOrder && (() => {
+        const currentEnd = new Date(extensionModalOrder.endDate);
+        const minDateStr = new Date(
+          Math.max(currentEnd.getTime() + 86400000, Date.now() + 86400000)
+        ).toISOString().split('T')[0];
+        const newEnd = newExtensionDate ? new Date(newExtensionDate) : null;
+        const additionalDays = newEnd && !isNaN(newEnd.getTime())
+          ? Math.max(1, Math.ceil((newEnd.getTime() - currentEnd.getTime()) / (1000 * 60 * 60 * 24)))
+          : 0;
+        const dailyRate = Number(
+          extensionModalOrder.dailyRate ||
+          extensionModalOrder.listing.rentalPricePerDay ||
+          0
+        );
+        const additionalFee = additionalDays * dailyRate;
 
-            <div>
-              <label className="block text-xs font-medium mb-1">New Requested Return Date</label>
-              <input
-                type="date"
-                min={extensionModalOrder.endDate}
-                value={newExtensionDate}
-                onChange={(e) => setNewExtensionDate(e.target.value)}
-                required
-                className="w-full rounded border px-3 py-1.5 text-xs bg-background"
-              />
-            </div>
+        return (
+          <Modal
+            open={Boolean(extensionModalOrder)}
+            onClose={() => setExtensionModalOrder(null)}
+            title="Request Rental Extension"
+            size="md"
+          >
+            <form onSubmit={submitExtension} className="space-y-4 text-xs">
+              <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                <img
+                  src={extensionModalOrder.listing.images[0] || '/placeholder.png'}
+                  alt={extensionModalOrder.listing.title}
+                  className="w-12 h-12 rounded object-cover border"
+                />
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-foreground text-sm truncate">{extensionModalOrder.listing.title}</h4>
+                  <p className="text-muted-foreground text-xs">
+                    Current scheduled return: <span className="font-medium text-foreground">{extensionModalOrder.endDate}</span>
+                  </p>
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-xs font-medium mb-1">Reason for Extension (Optional)</label>
-              <textarea
-                value={extensionReason}
-                onChange={(e) => setExtensionReason(e.target.value)}
-                placeholder="e.g., Event was rescheduled..."
-                rows={2}
-                className="w-full rounded border px-3 py-1.5 text-xs bg-background"
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">New Requested Return Date</label>
+                <input
+                  type="date"
+                  min={minDateStr}
+                  value={newExtensionDate}
+                  onChange={(e) => setNewExtensionDate(e.target.value)}
+                  required
+                  className="w-full rounded border px-3 py-2 text-xs bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Must be after your current return date ({extensionModalOrder.endDate}).
+                </p>
+              </div>
 
-            <p className="text-[11px] text-muted-foreground">
-              Additional rental fee will be calculated at {extensionModalOrder.dailyRate || extensionModalOrder.listing.rentalPricePerDay} ETB/day and paid directly to the seller.
-            </p>
+              {newExtensionDate && additionalDays > 0 && (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Additional rental duration:</span>
+                    <span className="font-semibold text-foreground">+{additionalDays} day(s)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Daily rental rate:</span>
+                    <span className="font-semibold text-foreground">{dailyRate.toLocaleString()} ETB / day</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pt-1.5 border-t border-primary/20">
+                    <span className="font-medium text-foreground">Estimated Additional Fee:</span>
+                    <span className="font-bold text-primary text-sm">+{additionalFee.toLocaleString()} ETB</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    Once accepted by the seller, your booking return date is extended and this additional fee is payable directly to the seller upon return.
+                  </p>
+                </div>
+              )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button type="button" size="sm" variant="outline" onClick={() => setExtensionModalOrder(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={actionLoading}>
-                {actionLoading ? 'Sending...' : 'Request Extension'}
-              </Button>
-            </div>
-          </form>
-        </Modal>
-      )}
+              <div>
+                <label className="block text-xs font-medium mb-1">Reason for Extension (Optional)</label>
+                <textarea
+                  value={extensionReason}
+                  onChange={(e) => setExtensionReason(e.target.value)}
+                  placeholder="e.g., Event was rescheduled, need the outfit for a couple more days..."
+                  rows={2}
+                  className="w-full rounded border px-3 py-2 text-xs bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button type="button" size="sm" variant="outline" onClick={() => setExtensionModalOrder(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={actionLoading || !newExtensionDate}>
+                  {actionLoading ? 'Submitting...' : 'Send Extension Request'}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
+
+      {/* Return Item / Penalty Modal */}
+      {returnModalOrder && (() => {
+        const daysLeft = returnModalOrder.endDate
+          ? Math.ceil((new Date(returnModalOrder.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : null;
+        const isOverdue = daysLeft !== null && daysLeft < 0;
+        const overdueDays = isOverdue ? Math.abs(daysLeft) : 0;
+        const dailyLateRate = Number(
+          returnModalOrder.dailyLateRate ||
+          returnModalOrder.dailyRate ||
+          returnModalOrder.listing?.rentalPricePerDay ||
+          0
+        );
+        const calculatedPenalty = returnModalOrder.penaltyFee && returnModalOrder.penaltyFee > 0
+          ? returnModalOrder.penaltyFee
+          : overdueDays * dailyLateRate;
+
+        return (
+          <Modal
+            open={Boolean(returnModalOrder)}
+            onClose={() => setReturnModalOrder(null)}
+            title={isOverdue ? '⚠️ Return Overdue Rental & Review Penalty' : 'Confirm Rental Return Handover'}
+            size="md"
+          >
+            <form onSubmit={submitReturn} className="space-y-4 text-xs">
+              {/* Item Summary */}
+              <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border">
+                <img
+                  src={returnModalOrder.listing.images[0] || '/placeholder.png'}
+                  alt={returnModalOrder.listing.title}
+                  className="w-12 h-12 rounded object-cover border"
+                />
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-foreground text-sm truncate">{returnModalOrder.listing.title}</h4>
+                  <div className="flex flex-wrap gap-x-3 text-muted-foreground text-[11px] mt-0.5">
+                    <span>Seller: <strong className="text-foreground">{returnModalOrder.seller.displayName}</strong></span>
+                    <span>Order: <strong className="font-mono text-foreground">{returnModalOrder.orderNumber}</strong></span>
+                    <span>Scheduled Return: <strong className="text-foreground">{returnModalOrder.endDate}</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overdue Breakdown Banner */}
+              {isOverdue ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-destructive flex items-center gap-1.5 text-xs">
+                      <span>⚠️</span> Overdue by {overdueDays} Day(s)
+                    </span>
+                    <span className="font-bold text-destructive text-sm">
+                      {calculatedPenalty.toLocaleString()} ETB Penalty
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-muted-foreground bg-background/60 p-2.5 rounded border border-destructive/20">
+                    <div className="flex justify-between">
+                      <span>Scheduled Return Date:</span>
+                      <span className="font-medium text-foreground">{returnModalOrder.endDate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Overdue Duration:</span>
+                      <span className="font-medium text-destructive">{overdueDays} day(s) late</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Late Penalty Rate:</span>
+                      <span className="font-medium text-foreground">{dailyLateRate.toLocaleString()} ETB / day</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-destructive/20 font-semibold text-foreground">
+                      <span>Total Accrued Penalty:</span>
+                      <span className="text-destructive font-bold">{calculatedPenalty.toLocaleString()} ETB</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-destructive/90 space-y-1 bg-destructive/10 p-2 rounded">
+                    <p className="font-semibold">Direct Settlement Obligation:</p>
+                    <p>
+                      According to marketplace rental terms, this late penalty must be paid directly to {returnModalOrder.seller.displayName} upon handover (via cash, Telebirr, or CBE) or deducted from your {returnModalOrder.securityDeposit.toLocaleString()} ETB security deposit.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-900 dark:text-emerald-300 space-y-1.5">
+                  <p className="font-semibold flex items-center gap-1">
+                    <span>✓</span> On-Time Return
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Please ensure the item is in good condition with all parts and accessories included. The seller will inspect the item and finalize release of your <strong>{returnModalOrder.securityDeposit.toLocaleString()} ETB</strong> deposit.
+                  </p>
+                </div>
+              )}
+
+              {/* Handover Notes */}
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  Handover Notes / Return Condition (Optional)
+                </label>
+                <textarea
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
+                  placeholder="e.g. Handed over directly at the seller's boutique in Bole. Clean condition with all original tags/accessories."
+                  rows={2}
+                  className="w-full rounded border px-3 py-2 text-xs bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button type="button" size="sm" variant="outline" onClick={() => setReturnModalOrder(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className={isOverdue ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                  disabled={returnSubmitting}
+                >
+                  {returnSubmitting
+                    ? 'Submitting...'
+                    : isOverdue
+                    ? `Confirm Return & Acknowledge ${calculatedPenalty.toLocaleString()} ETB Penalty`
+                    : 'Confirm Item Returned'}
+                </Button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
 
       {/* Cancel Request Modal */}
       {cancelModalOrder && (
@@ -883,5 +1212,13 @@ export default function RenterRentalsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function RenterRentalsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading rentals...</div>}>
+      <RenterRentalsContent />
+    </Suspense>
   );
 }

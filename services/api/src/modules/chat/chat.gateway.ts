@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -21,6 +23,8 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
   namespace: '/chat',
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(ChatGateway.name);
+
   @WebSocketServer()
   server!: Server;
 
@@ -37,10 +41,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.replace('Bearer ', '');
-      
+      const auth = client.handshake.auth as { token?: string } | undefined;
+      const headerAuth = typeof client.handshake.headers?.authorization === 'string'
+        ? client.handshake.headers.authorization.replace('Bearer ', '')
+        : undefined;
+      const queryToken = typeof client.handshake.query?.token === 'string'
+        ? client.handshake.query.token
+        : undefined;
+      const token = auth?.token || headerAuth || queryToken;
+
       if (!token) {
-        client.disconnect();
+        client.disconnect(true);
         return;
       }
 
@@ -259,5 +270,131 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   isUserOnline(userId: string): boolean {
     return this.userSockets.has(userId) && (this.userSockets.get(userId)?.size || 0) > 0;
+  }
+
+  // ─── Realtime Event Broadcast Handlers ──────────────────────────────────────
+
+  @OnEvent('realtime.notification')
+  handleRealtimeNotification(payload: {
+    userId: string;
+    notification: {
+      id: string;
+      type: string;
+      title: string;
+      body?: string | null;
+      data?: Record<string, unknown> | null;
+      readAt?: Date | null;
+      createdAt?: Date;
+      isRead?: boolean;
+    };
+    unreadCount?: number;
+  }): void {
+    try {
+      if (!this.server || !payload?.userId) return;
+      const room = `user:${payload.userId}`;
+      this.server.to(room).emit('notifications:new', {
+        ...payload.notification,
+        timestamp: payload.notification.createdAt || new Date(),
+      });
+      if (typeof payload.unreadCount === 'number') {
+        this.server.to(room).emit('notifications:unread_count', {
+          unreadCount: payload.unreadCount,
+        });
+      }
+      this.logger.log(`Dispatched real-time notification to user ${payload.userId}`);
+    } catch (err: any) {
+      this.logger.error(`Failed to broadcast real-time notification to user ${payload?.userId}: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.status_updated')
+  handleOrderStatusUpdated(event: any): void {
+    try {
+      if (!this.server) return;
+      if (event.buyerId) this.server.to(`user:${event.buyerId}`).emit('order:status_updated', event);
+      if (event.sellerId) this.server.to(`user:${event.sellerId}`).emit('order:status_updated', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:status_updated: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.quote_proposed')
+  handleQuoteProposed(event: any): void {
+    try {
+      if (!this.server || !event?.buyerId) return;
+      this.server.to(`user:${event.buyerId}`).emit('order:quote_proposed', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:quote_proposed: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.quote_accepted')
+  handleQuoteAccepted(event: any): void {
+    try {
+      if (!this.server || !event?.sellerId) return;
+      this.server.to(`user:${event.sellerId}`).emit('order:quote_accepted', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:quote_accepted: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.declined')
+  handleOrderDeclined(event: any): void {
+    try {
+      if (!this.server || !event?.buyerId) return;
+      this.server.to(`user:${event.buyerId}`).emit('order:declined', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:declined: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.alternative_dates_proposed')
+  handleAlternativeDates(event: any): void {
+    try {
+      if (!this.server || !event?.buyerId) return;
+      this.server.to(`user:${event.buyerId}`).emit('order:alternative_dates_proposed', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:alternative_dates_proposed: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.tailoring_milestone_updated')
+  handleMilestoneUpdated(event: any): void {
+    try {
+      if (!this.server || !event?.buyerId) return;
+      this.server.to(`user:${event.buyerId}`).emit('order:tailoring_milestone_updated', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:tailoring_milestone_updated: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.extension_requested')
+  handleExtensionRequested(event: any): void {
+    try {
+      if (!this.server || !event?.sellerId) return;
+      this.server.to(`user:${event.sellerId}`).emit('order:extension_requested', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:extension_requested: ${err.message}`);
+    }
+  }
+
+  @OnEvent('order.extension_responded')
+  handleExtensionResponded(event: any): void {
+    try {
+      if (!this.server || !event?.buyerId) return;
+      this.server.to(`user:${event.buyerId}`).emit('order:extension_responded', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit order:extension_responded: ${err.message}`);
+    }
+  }
+
+  @OnEvent('listing.moderated')
+  handleListingModerated(event: any): void {
+    try {
+      if (!this.server || !event?.sellerId) return;
+      this.server.to(`user:${event.sellerId}`).emit('listing:moderated', event);
+    } catch (err: any) {
+      this.logger.error(`Failed to emit listing:moderated: ${err.message}`);
+    }
   }
 }

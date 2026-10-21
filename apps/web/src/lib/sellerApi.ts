@@ -43,6 +43,8 @@ export interface SellerListing {
   customOrderAvailable?: boolean | null;
   rentalPricePerDay?: number | null;
   rentalDeposit?: number | null;
+  rentalThreeDayRate?: number | null;
+  rentalWeeklyRate?: number | null;
   attributes?: Record<string, unknown> | null;
   _count?: {
     favorites: number;

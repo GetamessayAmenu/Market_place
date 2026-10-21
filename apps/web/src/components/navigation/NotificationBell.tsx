@@ -2,11 +2,13 @@
 
 import { cn } from '@marketplace/ui'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import React, { useEffect, useRef, useState } from 'react'
 import useAuth from '../../hooks/useAuth'
 import { useSocket } from '../../hooks/useSocket'
 import { apiGet, apiPatch } from '../../lib/api'
 import { formatRelativeTime } from '../../lib/formatters'
+import { getNotificationActionUrl } from '../../lib/notificationRoutes'
 
 interface NotificationItem {
   id: string
@@ -18,17 +20,8 @@ interface NotificationItem {
   isRead: boolean
 }
 
-function getActionUrl(n: NotificationItem): string {
-  if (n.data?.actionUrl) return n.data.actionUrl as string
-  if (n.data?.conversationId) return `/dashboard/messages?conversationId=${n.data.conversationId as string}`
-  if (n.data?.orderId) return `/dashboard/orders/${n.data.orderId as string}`
-  if (n.data?.rentalOrderId) return `/dashboard/rentals/${n.data.rentalOrderId as string}`
-  if (n.data?.customOrderId) return `/dashboard/custom-orders/${n.data.customOrderId as string}`
-  if (n.data?.listingId) return `/listings/${n.data.listingId as string}`
-  return '/dashboard/notifications'
-}
-
 export default function NotificationBell() {
+  const router = useRouter()
   const user = useAuth((s) => s.user)
   const socketRef = useSocket()
 
@@ -128,7 +121,7 @@ export default function NotificationBell() {
       // Ignore error and navigate anyway
     }
     setOpen(false)
-    window.location.href = actionUrl
+    router.push(actionUrl)
   }
 
   const handleMarkAllRead = async () => {
@@ -209,7 +202,10 @@ export default function NotificationBell() {
               </div>
             ) : (
               recentNotifications.map((notif) => {
-                const actionUrl = getActionUrl(notif)
+                const isSellerContext =
+                  (typeof window !== 'undefined' && window.location.pathname.startsWith('/seller')) ||
+                  user?.role === 'seller';
+                const actionUrl = getNotificationActionUrl(notif, isSellerContext);
                 return (
                   <div
                     key={notif.id}

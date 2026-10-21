@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiDelete, apiGet, apiPost } from '../../lib/api';
 
 export interface Analytics {
   listingViews: number;
@@ -16,9 +16,16 @@ export interface DepositLog {
   type: 'held' | 'refunded';
   amount: number;
   customerName: string;
-  relatedOrder: string;
+  relatedOrder?: string;
+  rentalOrderId?: string | null;
+  listingTitle?: string;
   date: string;
   notes?: string;
+  refundAmount?: number | null;
+  refundReason?: string | null;
+  refundDate?: string | null;
+  paymentMethod?: string | null;
+  isManual?: boolean;
 }
 
 export interface ReviewItem {
@@ -72,8 +79,46 @@ export function useDeposits(sellerId: string) {
 export function useAddDeposit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { type: 'held' | 'refunded'; amount: number; customerName: string; relatedOrder?: string | undefined; notes?: string | undefined }) =>
-      apiPost('/seller/deposits', data),
+    mutationFn: (data: {
+      type: 'held' | 'refunded';
+      amount: number;
+      customerName: string;
+      relatedOrder?: string | undefined;
+      notes?: string | undefined;
+      paymentMethod?: string | undefined;
+      refundAmount?: number | undefined;
+      refundReason?: string | undefined;
+    }) => apiPost('/seller/deposits', data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['seller-deposits'] });
+    },
+  });
+}
+
+export function useRefundDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      refundAmount?: number | undefined;
+      deductionAmount?: number | undefined;
+      deductionReason?: string | undefined;
+      paymentMethod?: string | undefined;
+      notes?: string | undefined;
+    }) => apiPost(`/seller/deposits/${id}/refund`, data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['seller-deposits'] });
+    },
+  });
+}
+
+export function useDeleteDeposit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete(`/seller/deposits/${id}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['seller-deposits'] });
     },

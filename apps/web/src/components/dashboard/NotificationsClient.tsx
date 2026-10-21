@@ -1,10 +1,13 @@
 "use client"
 import { Alert, Button, Spinner } from '@marketplace/ui'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
+import useAuth from '../../hooks/useAuth'
 import { useSocket } from '../../hooks/useSocket'
 import { apiDelete, apiGet, apiPatch } from '../../lib/api'
 import { formatRelativeTime } from '../../lib/formatters'
+import { getNotificationActionUrl } from '../../lib/notificationRoutes'
 
 export interface NotificationItem {
   id: string
@@ -96,17 +99,9 @@ const TYPE_ICONS: Record<string, { icon: React.ReactNode; bg: string; text: stri
   },
 }
 
-function getActionUrl(n: NotificationItem): string | null {
-  if (n.data?.actionUrl) return n.data.actionUrl as string
-  if (n.data?.conversationId) return `/dashboard/messages?conversationId=${n.data.conversationId as string}`
-  if (n.data?.orderId) return `/dashboard/orders/${n.data.orderId as string}`
-  if (n.data?.rentalOrderId) return `/dashboard/rentals/${n.data.rentalOrderId as string}`
-  if (n.data?.customOrderId) return `/dashboard/custom-orders/${n.data.customOrderId as string}`
-  if (n.data?.listingId) return `/listings/${n.data.listingId as string}`
-  return null
-}
-
 export default function NotificationsClient({ initialNotifications = [] }: NotificationsClientProps) {
+  const router = useRouter()
+  const user = useAuth((s) => s.user)
   const socketRef = useSocket()
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications)
   const [filterTab, setFilterTab] = useState<'all' | 'unread'>('all')
@@ -283,7 +278,10 @@ export default function NotificationsClient({ initialNotifications = [] }: Notif
         )}
 
         {filteredNotifications.map((n) => {
-          const actionUrl = getActionUrl(n)
+          const isSellerContext =
+            (typeof window !== 'undefined' && window.location.pathname.startsWith('/seller')) ||
+            user?.role === 'seller';
+          const actionUrl = getNotificationActionUrl(n, isSellerContext);
           const style = TYPE_ICONS[n.type] || {
             bg: 'bg-muted',
             text: 'text-foreground',
@@ -299,7 +297,7 @@ export default function NotificationsClient({ initialNotifications = [] }: Notif
               key={n.id}
               onClick={() => {
                 if (!n.isRead) void handleMarkAsRead(n.id)
-                if (actionUrl) window.location.href = actionUrl
+                if (actionUrl) router.push(actionUrl)
               }}
               className={`group flex cursor-pointer items-start gap-4 rounded-xl border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-sm ${
                 !n.isRead ? 'border-l-4 border-l-primary bg-primary/3' : 'opacity-90'

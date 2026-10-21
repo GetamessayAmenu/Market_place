@@ -70,6 +70,8 @@ interface ListingData {
   customOrderAvailable?: boolean
   rentalPricePerDay?: number | null
   rentalDeposit?: number | null
+  rentalThreeDayRate?: number | null
+  rentalWeeklyRate?: number | null
   minRentalDurationDays?: number | null
   maxRentalDurationDays?: number | null
   rentalPickupLocation?: string | null
@@ -321,6 +323,20 @@ export default async function ListingPage({ params }: Props) {
                         <span>Pickup: {listing.rentalPickupLocation || listing.city}</span>
                       )}
                     </div>
+                    {(listing.rentalThreeDayRate || listing.rentalWeeklyRate) && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {listing.rentalThreeDayRate != null && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300 border border-amber-500/20">
+                            🎉 3-Day Event Deal: {listing.currency}{Number(listing.rentalThreeDayRate).toLocaleString()}
+                          </span>
+                        )}
+                        {listing.rentalWeeklyRate != null && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 border border-emerald-500/20">
+                            🌟 Weekly Deal: {listing.currency}{Number(listing.rentalWeeklyRate).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

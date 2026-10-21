@@ -399,9 +399,9 @@ export default function SellerOverviewPage() {
           />
           <QuickActionCard
             icon={<IconStore />}
-            label="Store & Profile"
+            label="Store & Brand Settings"
             description="Branding, location & KYC"
-            href="/seller/store"
+            href="/seller/settings?tab=store"
           />
         </div>
       </div>

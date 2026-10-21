@@ -469,8 +469,14 @@ export default function SellerOrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 gap-4">
         <Alert variant="error">{error || 'Order not found'}</Alert>
+        <button
+          onClick={() => router.push('/seller/orders')}
+          className="px-4 py-2 bg-brand-wine text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+        >
+          Back to Orders
+        </button>
       </div>
     );
   }

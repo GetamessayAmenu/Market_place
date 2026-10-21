@@ -73,6 +73,10 @@ export class OrdersRepository extends BaseRepository<any> {
   }
 
   async findById(id: string): Promise<any | null> {
+    if (!id || typeof id !== 'string') return null;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUuid) return null;
+
     return (this.prisma as any).order.findUnique({
       where: { id },
       include: {

@@ -72,6 +72,10 @@ export class RentalsRepository {
   }
 
   async findById(id: string) {
+    if (!id || typeof id !== 'string') return null;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUuid) return null;
+
     return this.prisma.rentalOrder.findUnique({
       where: { id },
       include: {
@@ -341,6 +345,7 @@ export class RentalsRepository {
             rentalDeposit: true,
             rentalPickupLocation: true,
             rentalNotes: true,
+            attributes: true,
             images: {
               where: { deletedAt: null },
               orderBy: { sortOrder: 'asc' },
@@ -352,6 +357,7 @@ export class RentalsRepository {
             id: true,
             displayName: true,
             email: true,
+            phone: true,
             avatarUrl: true,
           },
         },
@@ -360,6 +366,7 @@ export class RentalsRepository {
             id: true,
             displayName: true,
             email: true,
+            phone: true,
             avatarUrl: true,
           },
         },

@@ -56,6 +56,8 @@ export interface SerializedListing {
   readonly startingCustomPrice: number | null;
   readonly estimatedProductionDays: number | null;
   readonly rentalPricePerDay: number | null;
+  readonly rentalThreeDayRate: number | null;
+  readonly rentalWeeklyRate: number | null;
   readonly rentalDeposit: number | null;
   readonly attributes: Record<string, unknown> | null;
   readonly publishedAt: string | null;
@@ -118,6 +120,8 @@ export function serializeListing(
     startingCustomPrice: decimalToNumber(listing.startingCustomPrice),
     estimatedProductionDays: listing.estimatedProductionDays,
     rentalPricePerDay: decimalToNumber(listing.rentalPricePerDay),
+    rentalThreeDayRate: decimalToNumber(listing.rentalThreeDayRate),
+    rentalWeeklyRate: decimalToNumber(listing.rentalWeeklyRate),
     rentalDeposit: decimalToNumber(listing.rentalDeposit),
     attributes: parseAttributes(listing.attributes),
     publishedAt: listing.publishedAt?.toISOString() ?? null,

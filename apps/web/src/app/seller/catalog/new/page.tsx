@@ -98,6 +98,14 @@ export default function NewListingPage() {
       if (isRent) {
         apiData.rentalPricePerDay = parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
         apiData.rentalDeposit = parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
+        const threeDayVal = data.rentalThreeDayRate || data.rentalInfo?.rentalThreeDayRate;
+        if (threeDayVal) {
+          apiData.rentalThreeDayRate = parseFloat(threeDayVal) || undefined;
+        }
+        const weeklyVal = data.rentalWeeklyRate || data.rentalInfo?.rentalWeeklyRate;
+        if (weeklyVal) {
+          apiData.rentalWeeklyRate = parseFloat(weeklyVal) || undefined;
+        }
         apiData.minRentalDurationDays = parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
         if (data.maxRentalDurationDays) {
           apiData.maxRentalDurationDays = parseInt(data.maxRentalDurationDays, 10);

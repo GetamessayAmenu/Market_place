@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { useAuth } from '../../../hooks/useAuth';
 import { formatRelativeTime } from '../../../lib/formatters';
@@ -179,7 +180,8 @@ interface Order {
   customData?: CustomOrderData;
 }
 
-export default function OrderManagementPage() {
+function OrderManagementContent() {
+  const searchParams = useSearchParams();
   const user = useAuth((s) => s.user);
   const [selectedOrderType, setSelectedOrderType] = useState<OrderType>('all');
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>('all');
@@ -363,6 +365,19 @@ export default function OrderManagementPage() {
       updatedAt: '2026-07-01T07:00:00Z',
     },
   ];
+
+  // Auto-select order when orderId is provided in URL search parameters (deep-linked from notifications)
+  useEffect(() => {
+    const orderId = searchParams.get('orderId');
+    if (orderId) {
+      const match = orders.find(
+        (o) => o.id === orderId || o.orderNumber === orderId
+      );
+      if (match) {
+        setSelectedOrder(match);
+      }
+    }
+  }, [searchParams]);
 
   // Filter orders
   const filteredOrders = orders.filter((order) => {
@@ -2966,5 +2981,13 @@ function WorkflowStep({
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
+  );
+}
+
+export default function OrderManagementPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center p-8 text-muted-foreground">Loading orders...</div>}>
+      <OrderManagementContent />
+    </Suspense>
   );
 }

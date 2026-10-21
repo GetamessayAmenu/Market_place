@@ -64,7 +64,12 @@ function OrdersContent() {
     if (success) {
       setSuccessMessage(`Order ${success} placed successfully!`);
     }
-  }, [searchParams]);
+
+    const orderId = searchParams.get('orderId');
+    if (orderId) {
+      router.push(`/dashboard/orders/${orderId}`);
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (!user) return;

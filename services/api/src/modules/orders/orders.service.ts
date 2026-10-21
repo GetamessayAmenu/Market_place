@@ -115,9 +115,13 @@ export class OrdersService {
   }
 
   async findOne(id: string): Promise<SerializedOrder> {
-    const order = await this.ordersRepository.findById(id);
+    let order = await this.ordersRepository.findById(id);
     if (!order) {
-      throw new Error('Order not found');
+      // Fallback in case id was passed as orderNumber
+      order = await this.ordersRepository.findByOrderNumber(id);
+    }
+    if (!order) {
+      throw new NotFoundException(`Order '${id}' not found`);
     }
     return this.serializeOrder(order);
   }
@@ -125,7 +129,7 @@ export class OrdersService {
   async findByOrderNumber(orderNumber: string): Promise<SerializedOrder> {
     const order = await this.ordersRepository.findByOrderNumber(orderNumber);
     if (!order) {
-      throw new Error('Order not found');
+      throw new NotFoundException(`Order '${orderNumber}' not found`);
     }
     return this.serializeOrder(order);
   }
@@ -811,10 +815,10 @@ export class OrdersService {
     // Notify seller
     await this.notificationsService.createCustomNotification(
       order.sellerId,
-      'new_order',
+      'rental_status_changed',
       `Extension requested for order ${order.orderNumber}`,
       `Buyer requested ${dto.extensionDays} day extension${dto.reason ? `: ${dto.reason}` : ''}`,
-      { orderId: order.id, extensionDays: dto.extensionDays }
+      { orderId: order.id, rentalOrderId: order.id, extensionDays: dto.extensionDays, isSeller: true }
     );
 
     // Emit Socket.IO event
@@ -870,12 +874,12 @@ export class OrdersService {
     // Notify buyer
     await this.notificationsService.createCustomNotification(
       order.buyerId,
-      'new_order',
+      'rental_status_changed',
       `Extension ${dto.approved ? 'approved' : 'declined'} for order ${order.orderNumber}`,
       dto.approved
         ? `Seller approved your ${order.extensionDaysRequested} day extension`
         : `Seller declined your extension request${dto.reason ? `: ${dto.reason}` : ''}`,
-      { orderId: order.id, approved: dto.approved }
+      { orderId: order.id, rentalOrderId: order.id, approved: dto.approved, isSeller: false }
     );
 
     // Emit Socket.IO event

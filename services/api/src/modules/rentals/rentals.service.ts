@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -15,7 +16,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ConversationsRepository } from '../chat/conversations.repository';
 import { MessagesRepository } from '../chat/messages.repository';
 import { RentalsRepository } from './rentals.repository';
-import type { CreateRentalOrderDto } from './dto/create-rental-order.dto';
+import { CreateRentalOrderDto, RentalPricingTier } from './dto/create-rental-order.dto';
 import type { UpdateRentalOrderDto } from './dto/update-rental-order.dto';
 import type { RentalQueryDto } from './dto/rental-query.dto';
 import type { CreateRentalExtensionDto } from './dto/create-rental-extension.dto';
@@ -25,6 +26,8 @@ import type { SuggestDatesDto } from './dto/suggest-dates.dto';
 import type { RespondDatesDto } from './dto/respond-dates.dto';
 import type { DeclineRentalDto } from './dto/decline-rental.dto';
 import type { CancelRentalDto } from './dto/cancel-rental.dto';
+import type { ConfirmReturnDto } from './dto/confirm-return.dto';
+import type { InitiateReturnDto } from './dto/initiate-return.dto';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { QUEUE_NAMES } from '../../infrastructure/queue/queue.constants';
 
@@ -83,6 +86,8 @@ function formatDateString(date: Date): string {
 
 @Injectable()
 export class RentalsService {
+  private readonly logger = new Logger(RentalsService.name);
+
   constructor(
     private readonly repository: RentalsRepository,
     private readonly prisma: PrismaService,
@@ -131,7 +136,9 @@ export class RentalsService {
       this.repository.count(where),
     ]);
 
-    return toPaginatedResponse({ items, total, page, limit });
+    const processedItems = await Promise.all(items.map((r) => this.processRentalOverdue(r)));
+
+    return toPaginatedResponse({ items: processedItems, total, page, limit });
   }
 
   async findOne(id: string, user?: AuthenticatedUser) {
@@ -146,9 +153,11 @@ export class RentalsService {
       }
     }
 
+    const processed = await this.processRentalOverdue(rental);
+
     return {
       success: true,
-      data: rental,
+      data: processed,
     };
   }
 
@@ -254,19 +263,34 @@ export class RentalsService {
     }
 
     let totalAmount = 0;
-    const pricingTierUsed = dto.pricingTier || 'DAILY';
+    let pricingTierUsed = dto.pricingTier;
 
-    switch (dto.pricingTier) {
+    // Auto-detect tier if not explicitly specified
+    if (!pricingTierUsed) {
+      if (days >= 7 && listing.rentalWeeklyRate) {
+        pricingTierUsed = RentalPricingTier.WEEKLY;
+      } else if (days >= 3 && listing.rentalThreeDayRate && days < 7) {
+        pricingTierUsed = RentalPricingTier.THREE_DAY_EVENT;
+      } else {
+        pricingTierUsed = RentalPricingTier.DAILY;
+      }
+    }
+
+    switch (pricingTierUsed) {
+      case RentalPricingTier.THREE_DAY_EVENT:
       case 'THREE_DAY_EVENT':
         if (listing.rentalThreeDayRate) {
-          totalAmount = Number(listing.rentalThreeDayRate);
+          const threeDayRate = Number(listing.rentalThreeDayRate);
+          totalAmount = days === 3 ? threeDayRate : threeDayRate + Math.max(0, days - 3) * dailyRate;
         } else {
           totalAmount = days * dailyRate;
         }
         break;
+      case RentalPricingTier.WEEKLY:
       case 'WEEKLY':
         if (listing.rentalWeeklyRate) {
-          totalAmount = Number(listing.rentalWeeklyRate);
+          const weeklyRate = Number(listing.rentalWeeklyRate);
+          totalAmount = days === 7 ? weeklyRate : weeklyRate + Math.max(0, days - 7) * dailyRate;
         } else {
           totalAmount = days * dailyRate;
         }
@@ -501,6 +525,27 @@ export class RentalsService {
             hoursUntil: 12,
           },
           { delay: preReturnDelay },
+        );
+      } catch {
+        // non-fatal
+      }
+    }
+
+    // Schedule overdue reminder (when end date is reached)
+    const overdueDelay = existing.endDate.getTime() - Date.now();
+    if (overdueDelay > 0) {
+      try {
+        await this.remindersQueue.add(
+          'rental-reminder',
+          {
+            type: 'overdue',
+            rentalOrderId: id,
+            renterId: existing.renterId,
+            sellerId: existing.sellerId,
+            endDate: existing.endDate.toISOString(),
+            daysOverdue: 1,
+          },
+          { delay: overdueDelay, jobId: `rental-overdue-${id}` },
         );
       } catch {
         // non-fatal
@@ -964,6 +1009,48 @@ export class RentalsService {
       // non-fatal
     }
 
+    // Schedule pre-return reminder (12 hours before end date)
+    const preReturnDelay = existing.endDate.getTime() - Date.now() - 12 * 60 * 60 * 1000;
+    if (preReturnDelay > 0) {
+      try {
+        await this.remindersQueue.add(
+          'rental-reminder',
+          {
+            type: 'pre_return',
+            rentalOrderId: id,
+            renterId: existing.renterId,
+            sellerId: existing.sellerId,
+            endDate: existing.endDate.toISOString(),
+            hoursUntil: 12,
+          },
+          { delay: preReturnDelay },
+        );
+      } catch {
+        // non-fatal
+      }
+    }
+
+    // Schedule overdue reminder (when end date is reached)
+    const overdueDelay = existing.endDate.getTime() - Date.now();
+    if (overdueDelay > 0) {
+      try {
+        await this.remindersQueue.add(
+          'rental-reminder',
+          {
+            type: 'overdue',
+            rentalOrderId: id,
+            renterId: existing.renterId,
+            sellerId: existing.sellerId,
+            endDate: existing.endDate.toISOString(),
+            daysOverdue: 1,
+          },
+          { delay: overdueDelay, jobId: `rental-overdue-${id}` },
+        );
+      } catch {
+        // non-fatal
+      }
+    }
+
     return {
       success: true,
       data: updated,
@@ -972,8 +1059,9 @@ export class RentalsService {
 
   /**
    * Initiate return (renter or seller) -> RETURN_PENDING.
+   * Calculates overdue penalty fee if returning past scheduled end date.
    */
-  async initiateReturn(id: string, user: AuthenticatedUser) {
+  async initiateReturn(id: string, user: AuthenticatedUser, dto?: InitiateReturnDto) {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundException('Rental order not found');
@@ -987,9 +1075,38 @@ export class RentalsService {
       throw new BadRequestException('Only active rentals can initiate return');
     }
 
-    const updated = await this.repository.update(id, {
+    const now = new Date();
+    const isOverdue = existing.endDate.getTime() < now.getTime();
+    const overdueDays = isOverdue
+      ? Math.max(1, Math.ceil((now.getTime() - existing.endDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    const dailyLateRate = Number(
+      (existing.listing as any)?.attributes?.lateFeePerDay ??
+      existing.dailyRate ??
+      (existing.listing?.rentalPricePerDay ? Number(existing.listing.rentalPricePerDay) : 0)
+    );
+    const calculatedPenalty = overdueDays * dailyLateRate;
+
+    const updatePayload: Prisma.RentalOrderUpdateInput = {
       status: 'RETURN_PENDING',
-    });
+    };
+
+    if (isOverdue && calculatedPenalty > 0) {
+      updatePayload.penaltyFee = calculatedPenalty;
+      updatePayload.penaltyDays = overdueDays;
+    }
+
+    if (dto?.notes) {
+      updatePayload.renterNotes = existing.renterNotes
+        ? `${existing.renterNotes}\n[Return]: ${dto.notes}`
+        : `[Return]: ${dto.notes}`;
+    }
+
+    if (dto?.returnCondition) {
+      updatePayload.postReturnCondition = dto.returnCondition;
+    }
+
+    const updated = await this.repository.update(id, updatePayload);
 
     try {
       await this.repository.createHistory({
@@ -998,22 +1115,49 @@ export class RentalsService {
         action: 'RETURN_INITIATED',
         fromStatus: existing.status,
         toStatus: 'RETURN_PENDING',
+        notes: dto?.notes || (isOverdue ? `Return initiated (${overdueDays}d overdue, penalty: ${calculatedPenalty} ETB)` : null),
+        metadata: {
+          isOverdue,
+          overdueDays,
+          penaltyFee: calculatedPenalty,
+          notes: dto?.notes || null,
+          returnCondition: dto?.returnCondition || null,
+        },
       });
     } catch {
       // non-fatal
     }
 
-    const targetUser = user.id === existing.renterId ? existing.sellerId : existing.renterId;
+    // Notify seller
     try {
+      const sellerMsg = isOverdue
+        ? `Renter marked "${existing.listing.title}" as returned (${overdueDays} day(s) overdue). Accrued penalty: ${calculatedPenalty.toLocaleString()} ETB. Please verify condition and collect penalty before confirming return.`
+        : `Return process initiated for "${existing.listing.title}". Please confirm item return upon inspection.`;
+
       await this.notificationsService.createCustomNotification(
-        targetUser,
+        existing.sellerId,
         'rental_status_changed',
-        'Rental Return Initiated',
-        `Return process initiated for "${existing.listing.title}". Please confirm item return upon inspection.`,
-        { rentalOrderId: id },
+        isOverdue ? 'Overdue Rental Return Initiated' : 'Rental Return Initiated',
+        sellerMsg,
+        { rentalOrderId: id, overdueDays, penaltyFee: calculatedPenalty },
       );
     } catch {
       // non-fatal
+    }
+
+    // If renter initiated return and item is overdue, notify renter about penalty settlement obligation
+    if (user.id === existing.renterId && isOverdue) {
+      try {
+        await this.notificationsService.createCustomNotification(
+          existing.renterId,
+          'rental_status_changed',
+          'Return Initiated — Penalty Settlement Required',
+          `You have marked "${existing.listing.title}" as returned (${overdueDays} day(s) overdue). Accrued penalty fee is ${calculatedPenalty.toLocaleString()} ETB. Please settle this directly with the seller.`,
+          { rentalOrderId: id, penaltyFee: calculatedPenalty, overdueDays },
+        );
+      } catch {
+        // non-fatal
+      }
     }
 
     return {
@@ -1026,7 +1170,7 @@ export class RentalsService {
    * Seller confirms item return -> COMPLETED.
    * Renter review becomes available.
    */
-  async confirmReturn(id: string, user: AuthenticatedUser) {
+  async confirmReturn(id: string, user: AuthenticatedUser, dto?: ConfirmReturnDto) {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new NotFoundException('Rental order not found');
@@ -1047,10 +1191,42 @@ export class RentalsService {
       throw new BadRequestException('Rental must be active or return pending to complete');
     }
 
+    const now = new Date();
+    const isOverdue = existing.endDate.getTime() < now.getTime();
+    const overdueDays = isOverdue
+      ? Math.max(1, Math.ceil((now.getTime() - existing.endDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    const dailyLateRate = Number(
+      (existing.listing as any)?.attributes?.lateFeePerDay ??
+      existing.dailyRate ??
+      (existing.listing?.rentalPricePerDay ? Number(existing.listing.rentalPricePerDay) : 0)
+    );
+    const calculatedPenalty = overdueDays * dailyLateRate;
+
+    // If rental is overdue with a penalty fee, seller must verify penalty payment
+    if (isOverdue && calculatedPenalty > 0) {
+      if (!dto?.penaltyPaid) {
+        throw new BadRequestException(
+          `This rental is overdue by ${overdueDays} day(s) with an accrued penalty fee of ${calculatedPenalty.toLocaleString()} ETB. You must verify that the tenant has paid or settled the penalty fee before confirming return.`
+        );
+      }
+    }
+
+    const finalPenaltyFee = isOverdue
+      ? (dto?.penaltyAmount !== undefined ? dto.penaltyAmount : calculatedPenalty)
+      : (existing.penaltyFee ?? 0);
+
     const updated = await this.repository.update(id, {
       status: 'COMPLETED',
-      returnedAt: new Date(),
-      actualReturnDate: new Date(),
+      returnedAt: now,
+      actualReturnDate: now,
+      penaltyFee: finalPenaltyFee,
+      penaltyDays: isOverdue ? overdueDays : (existing.penaltyDays ?? 0),
+      penaltyPaid: isOverdue ? Boolean(dto?.penaltyPaid) : Boolean(existing.penaltyPaid),
+      penaltyPaidAt: isOverdue && dto?.penaltyPaid ? now : existing.penaltyPaidAt,
+      penaltyNotes: isOverdue
+        ? (dto?.penaltyNotes ?? (dto?.settlementMethod ? `Settled via: ${dto.settlementMethod}` : 'Tenant penalty fee verified and collected'))
+        : existing.penaltyNotes,
     });
 
     try {
@@ -1060,19 +1236,32 @@ export class RentalsService {
         action: 'RETURN_CONFIRMED',
         fromStatus: existing.status,
         toStatus: 'COMPLETED',
+        notes: isOverdue
+          ? `Penalty fee of ${finalPenaltyFee} ETB (${overdueDays}d overdue) verified paid. Settlement: ${dto?.settlementMethod || 'Direct'}. ${dto?.penaltyNotes || ''}`.trim()
+          : null,
+        metadata: {
+          penaltyFee: finalPenaltyFee,
+          penaltyDays: isOverdue ? overdueDays : 0,
+          penaltyPaid: isOverdue ? Boolean(dto?.penaltyPaid) : false,
+          settlementMethod: dto?.settlementMethod ?? null,
+          penaltyNotes: dto?.penaltyNotes ?? null,
+        },
       });
     } catch {
       // non-fatal
     }
 
-    // Notify renter that rental is completed and review is now available
+    // Notify renter that rental is completed and penalty was settled if applicable
     try {
+      const penaltyNote = isOverdue && finalPenaltyFee > 0
+        ? ` Late penalty fee of ${finalPenaltyFee.toLocaleString()} ETB was verified as settled.`
+        : '';
       await this.notificationsService.createCustomNotification(
         existing.renterId,
         'rental_status_changed',
-        'Rental Completed',
-        `Your rental of "${existing.listing.title}" is complete. Leave a review to share your experience!`,
-        { rentalOrderId: id, listingId: existing.listingId },
+        'Rental Completed & Return Verified',
+        `Your return of "${existing.listing.title}" has been confirmed by the seller.${penaltyNote} Leave a review to share your experience!`,
+        { rentalOrderId: id, listingId: existing.listingId, penaltyFee: finalPenaltyFee },
       );
     } catch {
       // non-fatal
@@ -1101,14 +1290,33 @@ export class RentalsService {
       throw new BadRequestException('Extensions can only be requested for active rentals');
     }
 
-    const newEndDate = parseCalendarDate(dto.newEndDate, true);
+    const rawTargetDate = dto.newEndDate || dto.requestedEndDate;
+    if (!rawTargetDate) {
+      throw new BadRequestException('New requested return date is required');
+    }
+
+    const newEndDate = parseCalendarDate(rawTargetDate, true);
     if (newEndDate <= rental.endDate) {
-      throw new BadRequestException('New end date must be after current return date');
+      throw new BadRequestException('New return date must be after current return date');
+    }
+
+    const todayStart = parseCalendarDate(new Date(), false);
+    if (newEndDate < todayStart) {
+      throw new BadRequestException('New extension date cannot be in the past');
     }
 
     // Calculate additional days
-    const additionalDays = calculateDays(rental.endDate, newEndDate);
-    const additionalCost = additionalDays * Number(rental.dailyRate);
+    const additionalDays =
+      dto.additionalDays && dto.additionalDays >= 1
+        ? dto.additionalDays
+        : calculateDays(rental.endDate, newEndDate);
+
+    const dailyRate = Number(
+      rental.dailyRate ??
+      (rental.listing as any)?.rentalPricePerDay ??
+      0
+    );
+    const additionalCost = additionalDays * dailyRate;
 
     // Validate availability for the extension period
     const isAvailable = await this.repository.checkAvailability(
@@ -1203,7 +1411,7 @@ export class RentalsService {
       throw new BadRequestException('Dates for this extension are no longer available');
     }
 
-    // Update rental order end date & total amount
+    // Update rental order end date & total amount, reset any overdue penalty since extension was agreed
     const updatedTotal = Number(extension.rentalOrder.totalAmount) + Number(extension.additionalCost);
     const updatedDays =
       (extension.rentalOrder.rentalDurationDays || 0) + extension.additionalDays;
@@ -1212,6 +1420,11 @@ export class RentalsService {
       endDate: extension.newEndDate,
       totalAmount: updatedTotal,
       rentalDurationDays: updatedDays,
+      penaltyFee: 0,
+      penaltyDays: 0,
+      penaltyPaid: false,
+      penaltyPaidAt: null,
+      penaltyNotes: null,
     });
 
     // Update extension status
@@ -1356,9 +1569,10 @@ export class RentalsService {
 
   async getUserRentals(userId: string, role: 'renter' | 'seller', status?: string) {
     const rentals = await this.repository.findByUser(userId, role, status);
+    const processed = await Promise.all(rentals.map((r) => this.processRentalOverdue(r)));
     return {
       success: true,
-      data: rentals,
+      data: processed,
     };
   }
 
@@ -1509,5 +1723,132 @@ export class RentalsService {
       success: true,
       data: updated,
     };
+  }
+
+  /**
+   * Ensures that both the renter and seller are notified when a rental is overdue,
+   * tracking the days overdue and penalty fee without duplicate notifications for the same day.
+   */
+  private async ensureOverdueNotificationDispatched(
+    rental: any,
+    overdueDays: number,
+    penaltyFee: number,
+    dailyLateRate: number,
+  ): Promise<void> {
+    try {
+      // Find latest overdue notification sent to renter for this rental order
+      const existingNotif = await this.prisma.notification.findFirst({
+        where: {
+          userId: rental.renterId,
+          type: 'rental_status_changed',
+          title: { contains: 'Rental Overdue' },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // If notification was already sent with the same overdue days, skip sending duplicate
+      if (existingNotif && existingNotif.data && typeof existingNotif.data === 'object') {
+        const notifData = existingNotif.data as Record<string, any>;
+        if (notifData.rentalOrderId === rental.id && notifData.daysOverdue === overdueDays) {
+          return;
+        }
+      }
+
+      // Update DB record with latest penalty fee and days
+      await this.prisma.rentalOrder.update({
+        where: { id: rental.id },
+        data: {
+          penaltyFee,
+          penaltyDays: overdueDays,
+        },
+      });
+
+      // Dispatch to renter (lessee)
+      await this.notificationsService.createCustomNotification(
+        rental.renterId,
+        'rental_status_changed',
+        'Rental Overdue — Penalty Fee Accruing',
+        `Your rental #${rental.orderNumber} ("${rental.listing.title}") is overdue by ${overdueDays} day(s). Late penalty fee accrued: ${penaltyFee.toLocaleString()} ETB (${overdueDays}d × ${dailyLateRate.toLocaleString()} ETB/day). Please return the item immediately.`,
+        {
+          rentalOrderId: rental.id,
+          orderNumber: rental.orderNumber,
+          daysOverdue: overdueDays,
+          penaltyFee,
+          dailyLateRate,
+          listingId: rental.listingId,
+          isOverdue: true,
+        },
+      );
+
+      // Dispatch to seller (lender)
+      await this.notificationsService.createCustomNotification(
+        rental.sellerId,
+        'rental_status_changed',
+        'Rental Overdue Notice',
+        `Rental #${rental.orderNumber} ("${rental.listing.title}") is overdue by ${overdueDays} day(s). Accrued penalty fee: ${penaltyFee.toLocaleString()} ETB (${overdueDays}d × ${dailyLateRate.toLocaleString()} ETB/day). Contact renter to coordinate return.`,
+        {
+          rentalOrderId: rental.id,
+          orderNumber: rental.orderNumber,
+          daysOverdue: overdueDays,
+          penaltyFee,
+          dailyLateRate,
+          listingId: rental.listingId,
+          isOverdue: true,
+        },
+      );
+
+      this.logger.log(`Overdue notifications dispatched for rental ${rental.orderNumber}: ${overdueDays}d overdue, ${penaltyFee} ETB`);
+    } catch (err) {
+      this.logger.error(`Failed to ensure overdue notifications for rental ${rental.id}: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Calculates overdue days, penalty fee, and ensures notifications are dispatched.
+   */
+  private async processRentalOverdue(rental: any): Promise<any> {
+    if (!rental) return rental;
+
+    // Calculate rental duration if missing
+    if (!rental.rentalDurationDays && rental.startDate && rental.endDate) {
+      const s = new Date(rental.startDate).getTime();
+      const e = new Date(rental.endDate).getTime();
+      rental.rentalDurationDays = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)));
+    }
+
+    const isReturnableState =
+      rental.status === 'ACTIVE' ||
+      rental.status === 'RETURN_PENDING' ||
+      rental.status === 'RETURN_INITIATED';
+
+    const now = new Date();
+    const endDate = new Date(rental.endDate);
+    const isOverdue = isReturnableState && endDate.getTime() < now.getTime();
+
+    const dailyLateRate = Number(
+      (rental.listing as any)?.attributes?.lateFeePerDay ??
+      rental.dailyRate ??
+      (rental.listing?.rentalPricePerDay ? Number(rental.listing.rentalPricePerDay) : 0)
+    );
+
+    if (isOverdue) {
+      const overdueDays = Math.max(1, Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const penaltyFee = overdueDays * dailyLateRate;
+
+      rental.isOverdue = true;
+      rental.overdueDays = overdueDays;
+      rental.penaltyFee = penaltyFee;
+      rental.dailyLateRate = dailyLateRate;
+
+      // Ensure notifications are dispatched to both parties
+      await this.ensureOverdueNotificationDispatched(rental, overdueDays, penaltyFee, dailyLateRate);
+    } else {
+      rental.isOverdue = false;
+      rental.overdueDays = rental.penaltyDays ?? 0;
+      rental.penaltyFee = rental.penaltyFee ?? 0;
+      rental.dailyLateRate = dailyLateRate;
+    }
+
+    return rental;
   }
 }

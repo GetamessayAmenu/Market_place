@@ -22,6 +22,11 @@ export interface AuthUser {
   readonly avatarUrl: string | null;
   readonly emailVerified: boolean;
   readonly phoneVerified: boolean;
+  readonly phone?: string | null;
+  readonly bio?: string | null;
+  readonly location?: string | null;
+  readonly sellerType?: string | null;
+  readonly socialLinks?: Record<string, any> | null;
 }
 
 export interface AuthTokens {
