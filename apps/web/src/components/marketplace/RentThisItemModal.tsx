@@ -51,6 +51,10 @@ export default function RentThisItemModal({
   const pickupLocation = listing.rentalPickupLocation || listing.city || 'Direct pickup from seller';
   const imageUrl = listing.primaryImageUrl || listing.images?.[0]?.url || '/placeholder.png';
 
+  const isOwner = Boolean(
+    user && (user.id === listing.seller?.id || user.id === (listing as any).sellerId)
+  );
+
   // Dates state
   const tomorrow = useMemo(() => {
     const d = new Date();
@@ -182,6 +186,11 @@ export default function RentThisItemModal({
 
     if (!user) {
       router.push(`/login?redirect=/products/${listing.id}`);
+      return;
+    }
+
+    if (isOwner) {
+      setSubmitError('You cannot rent your own listing.');
       return;
     }
 
@@ -444,6 +453,12 @@ export default function RentThisItemModal({
             </p>
           </div>
 
+          {isOwner && (
+            <Alert variant="warning" className="py-2 text-xs">
+              You are the seller of this listing. You cannot submit a rental request for your own item.
+            </Alert>
+          )}
+
           {submitError && (
             <Alert variant="error" className="py-2 text-xs">
               {submitError}
@@ -458,9 +473,9 @@ export default function RentThisItemModal({
             <Button
               type="submit"
               size="sm"
-              disabled={isSubmitting || checkingAvailability || isAvailable === false || durationDays < minDays}
+              disabled={isSubmitting || checkingAvailability || isAvailable === false || durationDays < minDays || isOwner}
             >
-              {isSubmitting ? 'Submitting Request...' : user ? 'Request to Rent' : 'Sign In to Request'}
+              {isSubmitting ? 'Submitting Request...' : isOwner ? 'Your Item' : user ? 'Request to Rent' : 'Sign In to Request'}
             </Button>
           </div>
         </form>

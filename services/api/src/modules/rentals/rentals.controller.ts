@@ -16,18 +16,18 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
 import { RentalsService } from './rentals.service';
-import type { CreateRentalOrderDto } from './dto/create-rental-order.dto';
-import type { UpdateRentalOrderDto } from './dto/update-rental-order.dto';
-import type { RentalQueryDto } from './dto/rental-query.dto';
-import type { CreateRentalExtensionDto } from './dto/create-rental-extension.dto';
-import type { CreateConditionLogDto } from './dto/create-condition-log.dto';
-import type { CreateBlackoutDateDto } from './dto/create-blackout-date.dto';
-import type { SuggestDatesDto } from './dto/suggest-dates.dto';
-import type { RespondDatesDto } from './dto/respond-dates.dto';
-import type { DeclineRentalDto } from './dto/decline-rental.dto';
-import type { CancelRentalDto } from './dto/cancel-rental.dto';
-import type { ConfirmReturnDto } from './dto/confirm-return.dto';
-import type { InitiateReturnDto } from './dto/initiate-return.dto';
+import { CreateRentalOrderDto } from './dto/create-rental-order.dto';
+import { UpdateRentalOrderDto } from './dto/update-rental-order.dto';
+import { RentalQueryDto } from './dto/rental-query.dto';
+import { CreateRentalExtensionDto } from './dto/create-rental-extension.dto';
+import { CreateConditionLogDto } from './dto/create-condition-log.dto';
+import { CreateBlackoutDateDto } from './dto/create-blackout-date.dto';
+import { SuggestDatesDto } from './dto/suggest-dates.dto';
+import { RespondDatesDto } from './dto/respond-dates.dto';
+import { DeclineRentalDto } from './dto/decline-rental.dto';
+import { CancelRentalDto } from './dto/cancel-rental.dto';
+import { ConfirmReturnDto } from './dto/confirm-return.dto';
+import { InitiateReturnDto } from './dto/initiate-return.dto';
 
 @Controller('rentals')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,7 +75,7 @@ export class RentalsController {
   }
 
   @Post()
-  @Roles('buyer', 'seller')
+  @Roles('buyer', 'seller', 'admin', 'super_admin')
   create(@Body() dto: CreateRentalOrderDto, @CurrentUser() user: AuthenticatedUser) {
     return this.rentalsService.create(dto, user);
   }

@@ -61,7 +61,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  app.useGlobalFilters(new PrismaExceptionFilter(), new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(), new PrismaExceptionFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
   const port = config.port;

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@marketplace/ui';
+import { useAuth } from '../../hooks/useAuth';
 import RentThisItemModal, { type RentThisItemModalProps } from './RentThisItemModal';
 
 interface RentButtonProps {
@@ -10,8 +11,14 @@ interface RentButtonProps {
   className?: string;
 }
 
-export default function RentButton({ listing, isOwner, className }: RentButtonProps) {
+export default function RentButton({ listing, isOwner: initialIsOwner, className }: RentButtonProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const user = useAuth((s) => s.user);
+
+  const isOwner = Boolean(
+    initialIsOwner ||
+    (user && (user.id === listing.seller?.id || user.id === (listing as any).sellerId))
+  );
 
   if (isOwner) {
     return (
