@@ -1,6 +1,18 @@
-"use client"
+'use client';
 
-import { Alert, Button, Checkbox, FormInput, FormSelect, FormTextarea, Modal, Select, Spinner } from '@marketplace/ui';
+import {
+  Alert,
+  Button,
+  Checkbox,
+  FormInput,
+  FormSelect,
+  FormTextarea,
+  Modal,
+  Select,
+  Spinner,
+  cn,
+} from '@marketplace/ui';
+import { OCCASION_OPTIONS } from '@marketplace/types';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import useAuth from '../../hooks/useAuth';
@@ -38,35 +50,45 @@ export interface ListingFormData {
   };
   images: UploadedImage[];
   // Product details (dynamic based on category)
-  productDetails?: {
-    size?: string | undefined;
-    color?: string | undefined;
-    material?: string | undefined;
-    gender?: string | undefined;
-    style?: string | undefined;
-  } | null | undefined;
+  productDetails?:
+    | {
+        size?: string | undefined;
+        color?: string | undefined;
+        material?: string | undefined;
+        gender?: string | undefined;
+        style?: string | undefined;
+        occasions?: string[] | undefined;
+      }
+    | null
+    | undefined;
   // Rental information (conditional)
-  rentalInfo?: {
-    rentalPricePerDay: string;
-    rentalDeposit: string;
-    rentalThreeDayRate?: string | undefined;
-    rentalWeeklyRate?: string | undefined;
-    minRentalDays: string;
-    maxRentalDays?: string | undefined;
-    pickupLocation?: string | undefined;
-    rentalNotes?: string | undefined;
-    quantity?: number | undefined;
-  } | null | undefined;
+  rentalInfo?:
+    | {
+        rentalPricePerDay: string;
+        rentalDeposit: string;
+        rentalThreeDayRate?: string | undefined;
+        rentalWeeklyRate?: string | undefined;
+        minRentalDays: string;
+        maxRentalDays?: string | undefined;
+        pickupLocation?: string | undefined;
+        rentalNotes?: string | undefined;
+        quantity?: number | undefined;
+      }
+    | null
+    | undefined;
   // Custom-made option
   customOrderAvailable: boolean;
-  customDetails?: {
-    sizeAdjustments: boolean;
-    colorFabricChanges: boolean;
-    embroidery: boolean;
-    otherCustomization: string;
-    additionalCustomPrice: string;
-    productionDays?: string | undefined;
-  } | null | undefined;
+  customDetails?:
+    | {
+        sizeAdjustments: boolean;
+        colorFabricChanges: boolean;
+        embroidery: boolean;
+        otherCustomization: string;
+        additionalCustomPrice: string;
+        productionDays?: string | undefined;
+      }
+    | null
+    | undefined;
 }
 
 interface ListingFormProps {
@@ -89,16 +111,7 @@ const CONDITIONS = [
   { value: 'fair', label: 'Fair Condition (Visible wear)' },
 ];
 
-const ETHIOPIAN_SIZES = [
-  'Free Size',
-  'XS',
-  'S',
-  'M',
-  'L',
-  'XL',
-  'XXL',
-  'Custom Fit',
-];
+const ETHIOPIAN_SIZES = ['Free Size', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Custom Fit'];
 
 const ETHIOPIAN_FABRICS = [
   'Pure Ethiopian Cotton (Shemane)',
@@ -239,7 +252,9 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
   }
 
   function handleRemove(index: number) {
-    const updated = images.filter((_, i) => i !== index).map((img, i) => ({ ...img, sortOrder: i }));
+    const updated = images
+      .filter((_, i) => i !== index)
+      .map((img, i) => ({ ...img, sortOrder: i }));
     onImagesChange(updated);
   }
 
@@ -258,15 +273,23 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
 
   return (
     <div className="space-y-3">
-      {uploadError && <Alert variant="error" onDismiss={clearError}>{uploadError}</Alert>}
-      {notice && <Alert variant="warning" onDismiss={() => setNotice(null)}>{notice}</Alert>}
-      {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+      {uploadError && (
+        <Alert variant="error" onDismiss={clearError}>
+          {uploadError}
+        </Alert>
+      )}
+      {notice && (
+        <Alert variant="warning" onDismiss={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
+      {error && <p className="text-destructive text-sm font-medium">{error}</p>}
 
       {/* Drop area */}
       <div
         className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all ${
           isDragging
-            ? 'border-primary bg-primary/5 ring-4 ring-primary/10'
+            ? 'border-primary bg-primary/5 ring-primary/10 ring-4'
             : 'border-muted-foreground/20 hover:border-primary/50 bg-muted/20'
         }`}
         onDragEnter={handleDragEnter}
@@ -285,17 +308,22 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
         />
 
         <div className="flex flex-col items-center justify-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary flex h-12 w-12 items-center justify-center rounded-full">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.75}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-foreground text-sm font-semibold">
               Add photos of your Ethiopian fashion item
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               Select multiple photos at once or drag and drop (up to 8 photos)
             </p>
           </div>
@@ -320,7 +348,7 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
             )}
           </Button>
 
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-muted-foreground text-[11px]">
             {images.length}/8 photos • JPG, PNG, WebP up to 5MB • The 1st photo is your main cover
           </span>
         </div>
@@ -332,7 +360,7 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
           {images.map((img, index) => (
             <div
               key={img.cloudinaryPublicId || img.url}
-              className="group relative aspect-square overflow-hidden rounded-lg border bg-muted shadow-sm transition-all hover:shadow"
+              className="bg-muted group relative aspect-square overflow-hidden rounded-lg border shadow-sm transition-all hover:shadow"
             >
               <img
                 src={img.url}
@@ -341,7 +369,7 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
               />
 
               {index === 0 && (
-                <div className="absolute left-1.5 top-1.5 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow">
+                <div className="bg-primary text-primary-foreground absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow">
                   Main Photo
                 </div>
               )}
@@ -357,8 +385,18 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
                       title="Move left"
                       aria-label="Move photo left"
                     >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
                       </svg>
                     </button>
                   )}
@@ -370,8 +408,18 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
                       title="Move right"
                       aria-label="Move photo right"
                     >
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                     </button>
                   )}
@@ -384,8 +432,18 @@ function ImageUploadSection({ images, onImagesChange, error }: ImageUploadSectio
                   title="Remove photo"
                   aria-label="Remove photo"
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -474,8 +532,8 @@ function CategoryPicker({ value, onChange, error }: CategoryPickerProps) {
     return (
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Category</label>
-          <div className="flex h-10 items-center gap-2 rounded-lg border bg-muted/30 px-3 text-xs text-muted-foreground">
+          <label className="text-foreground mb-1 block text-xs font-medium">Category</label>
+          <div className="bg-muted/30 text-muted-foreground flex h-10 items-center gap-2 rounded-lg border px-3 text-xs">
             <Spinner size="sm" /> Loading fashion categories...
           </div>
         </div>
@@ -541,7 +599,10 @@ export default function ListingForm({
   const [categoryId, setCategoryId] = useState(initialData?.categoryId ?? '');
   const [categoryName, setCategoryName] = useState(initialData?.categoryName ?? '');
   const [city, setCity] = useState(
-    initialData?.city ?? sellerProfile?.location?.subCity ?? sellerProfile?.location?.regionalHub ?? 'Addis Ababa',
+    initialData?.city ??
+      sellerProfile?.location?.subCity ??
+      sellerProfile?.location?.regionalHub ??
+      'Addis Ababa',
   );
   const [condition, setCondition] = useState(initialData?.condition ?? 'new');
   const [images, setImages] = useState<UploadedImage[]>(initialData?.images ?? []);
@@ -556,6 +617,21 @@ export default function ListingForm({
     initialData?.productDetails?.style ?? 'Classic Traditional Habesha',
   );
   const [gender, setGender] = useState(initialData?.productDetails?.gender ?? 'Women');
+  const [selectedOccasions, setSelectedOccasions] = useState<string[]>(
+    initialData?.productDetails?.occasions ?? [],
+  );
+
+  const handleOccasionToggle = (occId: string) => {
+    setSelectedOccasions((prev) =>
+      prev.includes(occId) ? prev.filter((id) => id !== occId) : [...prev, occId],
+    );
+  };
+
+  useEffect(() => {
+    if (initialData?.productDetails?.occasions) {
+      setSelectedOccasions(initialData.productDetails.occasions);
+    }
+  }, [initialData?.productDetails?.occasions]);
 
   // Rental Settings
   const [rentalPricePerDay, setRentalPricePerDay] = useState(
@@ -596,9 +672,7 @@ export default function ListingForm({
   const [colorFabricChanges, setColorFabricChanges] = useState(
     initialData?.customDetails?.colorFabricChanges ?? true,
   );
-  const [embroidery, setEmbroidery] = useState(
-    initialData?.customDetails?.embroidery ?? true,
-  );
+  const [embroidery, setEmbroidery] = useState(initialData?.customDetails?.embroidery ?? true);
   const [otherCustomization, setOtherCustomization] = useState(
     initialData?.customDetails?.otherCustomization ?? '',
   );
@@ -619,9 +693,7 @@ export default function ListingForm({
   const [whatsapp, setWhatsapp] = useState(
     initialData?.contactOptions?.whatsapp ?? sellerProfile?.phone ?? user?.phone ?? '',
   );
-  const [telegram, setTelegram] = useState(
-    initialData?.contactOptions?.telegram ?? '',
-  );
+  const [telegram, setTelegram] = useState(initialData?.contactOptions?.telegram ?? '');
 
   // Validation & UI State
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -664,7 +736,7 @@ export default function ListingForm({
           city,
           condition,
           images,
-          productDetails: { size, color, material, style, gender },
+          productDetails: { size, color, material, style, gender, occasions: selectedOccasions },
           rentalInfo: {
             rentalPricePerDay,
             rentalDeposit,
@@ -677,7 +749,14 @@ export default function ListingForm({
             quantity: rentalQuantity,
           },
           customOrderAvailable,
-          customDetails: { sizeAdjustments, colorFabricChanges, embroidery, otherCustomization, additionalCustomPrice, productionDays },
+          customDetails: {
+            sizeAdjustments,
+            colorFabricChanges,
+            embroidery,
+            otherCustomization,
+            additionalCustomPrice,
+            productionDays,
+          },
           contactOptions: { inAppMessaging, showPhone, whatsapp, telegram },
           savedAt: new Date().toISOString(),
         };
@@ -705,6 +784,7 @@ export default function ListingForm({
     material,
     style,
     gender,
+    selectedOccasions,
     rentalPricePerDay,
     rentalDeposit,
     rentalThreeDayRate,
@@ -747,6 +827,8 @@ export default function ListingForm({
         if (d.productDetails.material) setMaterial(d.productDetails.material);
         if (d.productDetails.style) setStyle(d.productDetails.style);
         if (d.productDetails.gender) setGender(d.productDetails.gender);
+        if (Array.isArray(d.productDetails.occasions))
+          setSelectedOccasions(d.productDetails.occasions);
       }
       if (d.rentalInfo) {
         if (d.rentalInfo.rentalPricePerDay) setRentalPricePerDay(d.rentalInfo.rentalPricePerDay);
@@ -761,15 +843,20 @@ export default function ListingForm({
       }
       if (d.customOrderAvailable !== undefined) setCustomOrderAvailable(d.customOrderAvailable);
       if (d.customDetails) {
-        if (d.customDetails.sizeAdjustments !== undefined) setSizeAdjustments(d.customDetails.sizeAdjustments);
-        if (d.customDetails.colorFabricChanges !== undefined) setColorFabricChanges(d.customDetails.colorFabricChanges);
+        if (d.customDetails.sizeAdjustments !== undefined)
+          setSizeAdjustments(d.customDetails.sizeAdjustments);
+        if (d.customDetails.colorFabricChanges !== undefined)
+          setColorFabricChanges(d.customDetails.colorFabricChanges);
         if (d.customDetails.embroidery !== undefined) setEmbroidery(d.customDetails.embroidery);
-        if (d.customDetails.otherCustomization) setOtherCustomization(d.customDetails.otherCustomization);
-        if (d.customDetails.additionalCustomPrice) setAdditionalCustomPrice(d.customDetails.additionalCustomPrice);
+        if (d.customDetails.otherCustomization)
+          setOtherCustomization(d.customDetails.otherCustomization);
+        if (d.customDetails.additionalCustomPrice)
+          setAdditionalCustomPrice(d.customDetails.additionalCustomPrice);
         if (d.customDetails.productionDays) setProductionDays(d.customDetails.productionDays);
       }
       if (d.contactOptions) {
-        if (d.contactOptions.inAppMessaging !== undefined) setInAppMessaging(d.contactOptions.inAppMessaging);
+        if (d.contactOptions.inAppMessaging !== undefined)
+          setInAppMessaging(d.contactOptions.inAppMessaging);
         if (d.contactOptions.showPhone !== undefined) setShowPhone(d.contactOptions.showPhone);
         if (d.contactOptions.whatsapp) setWhatsapp(d.contactOptions.whatsapp);
         if (d.contactOptions.telegram) setTelegram(d.contactOptions.telegram);
@@ -815,7 +902,8 @@ export default function ListingForm({
     }
 
     if (!availableForPurchase && !availableForRent && !customOrderAvailable) {
-      errors.availableForPurchase = 'Please enable at least one option: For Sale, Available for Rent, or Custom Made.';
+      errors.availableForPurchase =
+        'Please enable at least one option: For Sale, Available for Rent, or Custom Made.';
     }
 
     if (availableForPurchase) {
@@ -835,7 +923,8 @@ export default function ListingForm({
         errors.minRentalDays = 'Minimum rental period must be at least 1 day.';
       }
       if (maxRentalDays && Number(maxRentalDays) < Number(minRentalDays)) {
-        errors.maxRentalDays = 'Maximum rental duration cannot be less than minimum rental duration.';
+        errors.maxRentalDays =
+          'Maximum rental duration cannot be less than minimum rental duration.';
       }
       if (!rentalPickupLocation.trim() && !city.trim()) {
         errors.rentalPickupLocation = 'Pickup location is required for rentals.';
@@ -877,11 +966,13 @@ export default function ListingForm({
       rentalWeeklyRate: availableForRent && rentalWeeklyRate ? rentalWeeklyRate : undefined,
       minRentalDurationDays: availableForRent ? minRentalDays : undefined,
       maxRentalDurationDays: availableForRent && maxRentalDays ? maxRentalDays : undefined,
-      rentalPickupLocation: availableForRent ? (rentalPickupLocation.trim() || city.trim()) : undefined,
+      rentalPickupLocation: availableForRent
+        ? rentalPickupLocation.trim() || city.trim()
+        : undefined,
       rentalNotes: availableForRent && rentalNotes.trim() ? rentalNotes.trim() : undefined,
       title: title.trim(),
       description: description.trim(),
-      price: availableForPurchase ? price : (rentalPricePerDay || '0'),
+      price: availableForPurchase ? price : rentalPricePerDay || '0',
       categoryId,
       categoryName,
       city: city.trim(),
@@ -893,6 +984,7 @@ export default function ListingForm({
         material,
         style,
         gender,
+        occasions: selectedOccasions,
       },
       rentalInfo: availableForRent
         ? {
@@ -930,8 +1022,8 @@ export default function ListingForm({
   // ─── Buyer Card Live Preview Component ───────────────────────────────────
 
   const BuyerPreviewCard = (
-    <div className="overflow-hidden rounded-xl border bg-card shadow-sm transition-all">
-      <div className="relative aspect-[4/3] bg-muted">
+    <div className="bg-card overflow-hidden rounded-xl border shadow-sm transition-all">
+      <div className="bg-muted relative aspect-[4/3]">
         {images.length > 0 && images[0]?.url ? (
           <img
             src={images[0].url}
@@ -939,9 +1031,19 @@ export default function ListingForm({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground">
-            <svg className="h-10 w-10 mb-1 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center">
+            <svg
+              className="mb-1 h-10 w-10 opacity-40"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
             <span className="text-xs">Photo will appear here</span>
           </div>
@@ -950,12 +1052,12 @@ export default function ListingForm({
         {/* Badges */}
         <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
           {availableForPurchase && (
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm bg-emerald-600">
+            <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm">
               For Sale
             </span>
           )}
           {availableForRent && (
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm bg-amber-600">
+            <span className="rounded-full bg-amber-600 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-sm">
               For Rent
             </span>
           )}
@@ -973,12 +1075,12 @@ export default function ListingForm({
         )}
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h4 className="font-semibold text-foreground text-sm line-clamp-1">
+          <h4 className="text-foreground line-clamp-1 text-sm font-semibold">
             {title || 'Your Ethiopian Fashion Title'}
           </h4>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
+          <span className="text-muted-foreground whitespace-nowrap text-xs">
             📍 {city || 'Addis Ababa'}
           </span>
         </div>
@@ -987,19 +1089,21 @@ export default function ListingForm({
         <div className="space-y-1">
           {availableForPurchase && (
             <div className="flex items-baseline gap-1.5">
-              <span className="text-base font-bold text-primary">
+              <span className="text-primary text-base font-bold">
                 {price ? `${Number(price).toLocaleString()} ETB` : 'Price in ETB'}
               </span>
-              <span className="text-[11px] text-muted-foreground">For Sale</span>
+              <span className="text-muted-foreground text-[11px]">For Sale</span>
             </div>
           )}
           {availableForRent && (
-            <div className="flex items-baseline gap-1.5 flex-wrap">
+            <div className="flex flex-wrap items-baseline gap-1.5">
               <span className="text-sm font-bold text-amber-700">
-                {rentalPricePerDay ? `${Number(rentalPricePerDay).toLocaleString()} ETB / day` : 'Rental rate in ETB'}
+                {rentalPricePerDay
+                  ? `${Number(rentalPricePerDay).toLocaleString()} ETB / day`
+                  : 'Rental rate in ETB'}
               </span>
               {rentalDeposit && (
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-muted-foreground text-[11px]">
                   (Deposit: {Number(rentalDeposit).toLocaleString()} ETB)
                 </span>
               )}
@@ -1008,12 +1112,12 @@ export default function ListingForm({
           {availableForRent && (rentalThreeDayRate || rentalWeeklyRate) && (
             <div className="flex flex-wrap gap-1.5 pt-0.5 text-[11px]">
               {rentalThreeDayRate && (
-                <span className="rounded bg-amber-500/10 text-amber-800 dark:text-amber-300 font-medium px-2 py-0.5 border border-amber-500/20">
+                <span className="rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-medium text-amber-800 dark:text-amber-300">
                   🎉 3-Day Event: {Number(rentalThreeDayRate).toLocaleString()} ETB
                 </span>
               )}
               {rentalWeeklyRate && (
-                <span className="rounded bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-medium px-2 py-0.5 border border-emerald-500/20">
+                <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-800 dark:text-emerald-300">
                   🌟 Weekly: {Number(rentalWeeklyRate).toLocaleString()} ETB
                 </span>
               )}
@@ -1024,25 +1128,25 @@ export default function ListingForm({
         {/* Fashion details tags */}
         <div className="flex flex-wrap gap-1 pt-1">
           {categoryName && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium">
+            <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium">
               {categoryName.split('>').pop()?.trim()}
             </span>
           )}
           {size && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium">
+            <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium">
               Size: {size}
             </span>
           )}
           {condition && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground font-medium capitalize">
+            <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-[11px] font-medium capitalize">
               {condition.replace('_', ' ')}
             </span>
           )}
         </div>
 
         {/* Contact preview pills */}
-        <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">
+        <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+          <span className="text-foreground font-medium">
             {sellerProfile?.displayName || user?.displayName || 'Your Seller Shop'}
           </span>
           <div className="flex items-center gap-1.5 text-[11px]">
@@ -1058,12 +1162,12 @@ export default function ListingForm({
     <form onSubmit={handleFormSubmit} className="space-y-8">
       {/* Draft restoration banner */}
       {hasDraftNotice && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+        <div className="border-primary/20 bg-primary/5 flex flex-col items-start justify-between gap-3 rounded-xl border p-3.5 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2.5">
             <span className="text-lg">📝</span>
             <div>
-              <p className="text-xs font-semibold text-foreground">Unsaved listing draft found</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-foreground text-xs font-semibold">Unsaved listing draft found</p>
+              <p className="text-muted-foreground text-[11px]">
                 You have work from a previous session. Would you like to restore it?
               </p>
             </div>
@@ -1080,23 +1184,23 @@ export default function ListingForm({
       )}
 
       {/* Main 2-column layout on desktop, single column on mobile */}
-      <div className="grid gap-8 lg:grid-cols-12 items-start">
+      <div className="grid items-start gap-8 lg:grid-cols-12">
         {/* Form Fields: 8 columns on large screens */}
         <div className="space-y-8 lg:col-span-8">
-
           {/* ════════ SECTION 1: PHOTOS ════════ */}
-          <section id="field-images" className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm">
+          <section id="field-images" className="bg-card rounded-2xl border p-5 shadow-sm sm:p-6">
             <div className="mb-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                   <span>📸</span> Photos
                 </h3>
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="text-muted-foreground text-xs font-medium">
                   {images.length}/8 uploaded
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Clear photos from different angles increase inquiries by 3×. The first photo is your main cover.
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Clear photos from different angles increase inquiries by 3×. The first photo is your
+                main cover.
               </p>
             </div>
 
@@ -1117,12 +1221,12 @@ export default function ListingForm({
           </section>
 
           {/* ════════ SECTION 2: BASIC INFORMATION ════════ */}
-          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+          <section className="bg-card space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6">
             <div>
-              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                 <span>ℹ️</span> Basic Information
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 Key details that help Ethiopian fashion buyers find your item.
               </p>
             </div>
@@ -1224,19 +1328,19 @@ export default function ListingForm({
           </section>
 
           {/* ════════ SECTION 3: FASHION & GARMENT DETAILS ════════ */}
-          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+          <section className="bg-card space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6">
             <div>
-              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                 <span>👗</span> Fashion & Garment Details
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 Attributes tailored to traditional and modern Ethiopian fashion.
               </p>
             </div>
 
             {/* Target Audience / Gender */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
+              <label className="text-foreground mb-1.5 block text-xs font-medium">
                 Category Group
               </label>
               <div className="flex flex-wrap gap-1.5">
@@ -1259,9 +1363,7 @@ export default function ListingForm({
 
             {/* Size */}
             <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Size
-              </label>
+              <label className="text-foreground mb-1.5 block text-xs font-medium">Size</label>
               <div className="flex flex-wrap gap-1.5">
                 {ETHIOPIAN_SIZES.map((s) => (
                   <button
@@ -1281,15 +1383,15 @@ export default function ListingForm({
             </div>
 
             {/* Cultural Style & Fabric */}
-            <div className="grid gap-4 sm:grid-cols-2 pt-1">
+            <div className="grid gap-4 pt-1 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
+                <label className="text-foreground mb-1 block text-xs font-medium">
                   Cultural Style / Design
                 </label>
                 <select
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="bg-background text-foreground focus:ring-primary/30 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2"
                 >
                   {ETHIOPIAN_STYLES.map((st) => (
                     <option key={st} value={st}>
@@ -1300,13 +1402,13 @@ export default function ListingForm({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
+                <label className="text-foreground mb-1 block text-xs font-medium">
                   Fabric / Material
                 </label>
                 <select
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="bg-background text-foreground focus:ring-primary/30 w-full rounded-lg border px-3 py-2 text-xs focus:outline-none focus:ring-2"
                 >
                   {ETHIOPIAN_FABRICS.map((fb) => (
                     <option key={fb} value={fb}>
@@ -1326,38 +1428,98 @@ export default function ListingForm({
                 onChange={(e) => setColor(e.target.value)}
               />
             </div>
+
+            {/* Suitable Occasions (Shop by Occasion) */}
+            <div className="pt-2">
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-foreground block text-xs font-semibold">
+                  Suitable Occasion(s) / የተመረጠበት አጋጣሚ
+                </label>
+                <span className="text-muted-foreground text-[11px] font-normal">
+                  Select all that apply
+                </span>
+              </div>
+              <p className="text-muted-foreground mb-3 text-[11px]">
+                Select which celebrations or events your piece is designed for to help buyers find
+                it in category & occasion searches.
+              </p>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {OCCASION_OPTIONS.map((occ) => {
+                  const isSelected = selectedOccasions.includes(occ.id);
+                  return (
+                    <button
+                      key={occ.id}
+                      type="button"
+                      onClick={() => handleOccasionToggle(occ.id)}
+                      className={cn(
+                        'flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 text-left transition-all',
+                        isSelected
+                          ? 'shadow-xs border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-1 ring-emerald-600'
+                          : 'border-border/60 bg-background/60 hover:bg-muted/50 text-foreground',
+                      )}
+                    >
+                      <span className="mt-0.5 shrink-0 text-xl">{occ.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="truncate text-xs font-bold">{occ.label}</span>
+                          <span className="text-muted-foreground shrink-0 text-[10px] font-medium">
+                            {occ.labelAm}
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-[10px]">
+                          {occ.description}
+                        </p>
+                      </div>
+                      <div
+                        className={cn(
+                          'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold transition-colors',
+                          isSelected
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
+                            : 'border-muted-foreground/30 bg-background',
+                        )}
+                      >
+                        {isSelected && '✓'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </section>
 
           {/* ════════ SECTION 4: PRICING & RENTAL AVAILABILITY ════════ */}
-          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-6">
+          <section className="bg-card space-y-6 rounded-2xl border p-5 shadow-sm sm:p-6">
             <div>
-              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                 <span>💰</span> Pricing & Availability
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Enable selling, renting, or custom ordering for this fashion piece. Listings can support multiple capabilities simultaneously.
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Enable selling, renting, or custom ordering for this fashion piece. Listings can
+                support multiple capabilities simultaneously.
               </p>
               {validationErrors.availableForPurchase && (
-                <p className="text-destructive text-xs mt-1 font-medium">{validationErrors.availableForPurchase}</p>
+                <p className="text-destructive mt-1 text-xs font-medium">
+                  {validationErrors.availableForPurchase}
+                </p>
               )}
             </div>
 
             {/* Sale Capability */}
-            <div className="rounded-xl border p-4 bg-muted/20 space-y-4">
+            <div className="bg-muted/20 space-y-4 rounded-xl border p-4">
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex cursor-pointer select-none items-center gap-2">
                   <input
                     type="checkbox"
                     checked={availableForPurchase}
                     onChange={(e) => setAvailableForPurchase(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
                   />
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-foreground text-sm font-semibold">
                     🏷️ Available for Sale
                   </span>
                 </label>
                 {availableForPurchase && (
-                  <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                     Active
                   </span>
                 )}
@@ -1383,7 +1545,7 @@ export default function ListingForm({
                     required
                     {...(validationErrors.price ? { error: validationErrors.price } : {})}
                   />
-                  <span className="text-[11px] text-muted-foreground block mt-1">
+                  <span className="text-muted-foreground mt-1 block text-[11px]">
                     Buyers can arrange purchase with you directly.
                   </span>
                 </div>
@@ -1391,31 +1553,32 @@ export default function ListingForm({
             </div>
 
             {/* Rental Capability (Progressive Disclosure) */}
-            <div className="rounded-xl border p-4 bg-muted/20 space-y-4">
+            <div className="bg-muted/20 space-y-4 rounded-xl border p-4">
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex cursor-pointer select-none items-center gap-2">
                   <input
                     id="field-availableForRent"
                     type="checkbox"
                     checked={availableForRent}
                     onChange={(e) => setAvailableForRent(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    className="text-primary focus:ring-primary h-4 w-4 rounded border-gray-300"
                   />
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-foreground text-sm font-semibold">
                     📅 Available for Rent
                   </span>
                 </label>
                 {availableForRent && (
-                  <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                     Active
                   </span>
                 )}
               </div>
 
               {availableForRent && (
-                <div className="space-y-4 pt-2 border-t">
-                  <p className="text-xs text-muted-foreground">
-                    Rent out this fashion piece for ceremonies, weddings, and celebrations. Renters arrange payment, security deposit, and pickup directly with you.
+                <div className="space-y-4 border-t pt-2">
+                  <p className="text-muted-foreground text-xs">
+                    Rent out this fashion piece for ceremonies, weddings, and celebrations. Renters
+                    arrange payment, security deposit, and pickup directly with you.
                   </p>
 
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -1516,16 +1679,18 @@ export default function ListingForm({
                   </div>
 
                   {/* Multi-Day Package Deals (Ethiopian Ceremony & Wedding Best Practices) */}
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 space-y-3">
+                  <div className="border-primary/20 bg-primary/5 space-y-3 rounded-lg border p-3.5">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">✨</span>
-                        <h4 className="text-xs font-semibold text-foreground">
+                        <h4 className="text-foreground text-xs font-semibold">
                           Special Multi-Day Package Rates (Optional & Recommended)
                         </h4>
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Traditional Habesha attire (Kemis, Kabas) has a natural 3-day rhythm (Pickup/Fitting, Event day, Return). Offering bundled package rates attracts wedding guests and reduces turnover stress.
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
+                        Traditional Habesha attire (Kemis, Kabas) has a natural 3-day rhythm
+                        (Pickup/Fitting, Event day, Return). Offering bundled package rates attracts
+                        wedding guests and reduces turnover stress.
                       </p>
                     </div>
 
@@ -1533,7 +1698,11 @@ export default function ListingForm({
                       <div id="field-rentalThreeDayRate">
                         <FormInput
                           label="3-Day Event / Weekend Package (ETB)"
-                          placeholder={rentalPricePerDay ? String(Math.round(Number(rentalPricePerDay) * 2.5)) : 'e.g. 2200'}
+                          placeholder={
+                            rentalPricePerDay
+                              ? String(Math.round(Number(rentalPricePerDay) * 2.5))
+                              : 'e.g. 2200'
+                          }
                           type="number"
                           value={rentalThreeDayRate}
                           onChange={(e) => setRentalThreeDayRate(e.target.value)}
@@ -1544,7 +1713,11 @@ export default function ListingForm({
                       <div id="field-rentalWeeklyRate">
                         <FormInput
                           label="7-Day Weekly / Holiday Package (ETB)"
-                          placeholder={rentalPricePerDay ? String(Math.round(Number(rentalPricePerDay) * 5)) : 'e.g. 4500'}
+                          placeholder={
+                            rentalPricePerDay
+                              ? String(Math.round(Number(rentalPricePerDay) * 5))
+                              : 'e.g. 4500'
+                          }
                           type="number"
                           value={rentalWeeklyRate}
                           onChange={(e) => setRentalWeeklyRate(e.target.value)}
@@ -1592,19 +1765,20 @@ export default function ListingForm({
           </section>
 
           {/* ════════ SECTION 5: CUSTOM-MADE OPTION ════════ */}
-          <section className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+          <section className="bg-card space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+                <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                   <span>✨</span> Custom-Made Option
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Can this dress or outfit be tailored to a buyer&apos;s specific measurements or color request?
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Can this dress or outfit be tailored to a buyer&apos;s specific measurements or
+                  color request?
                 </p>
               </div>
 
               {/* Yes / No Toggle */}
-              <div className="flex rounded-lg border bg-muted/40 p-0.5">
+              <div className="bg-muted/40 flex rounded-lg border p-0.5">
                 <button
                   type="button"
                   onClick={() => setCustomOrderAvailable(false)}
@@ -1632,13 +1806,13 @@ export default function ListingForm({
 
             {/* Custom details (Progressive disclosure) */}
             {customOrderAvailable && (
-              <div className="space-y-4 pt-3 border-t">
-                <p className="text-xs text-muted-foreground">
+              <div className="space-y-4 border-t pt-3">
+                <p className="text-muted-foreground text-xs">
                   Select what customization options you offer for this listing:
                 </p>
 
                 <div className="grid gap-2.5 sm:grid-cols-3">
-                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                  <label className="hover:bg-muted/30 flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5">
                     <Checkbox
                       checked={sizeAdjustments}
                       onChange={(e) => setSizeAdjustments(e.target.checked)}
@@ -1646,7 +1820,7 @@ export default function ListingForm({
                     <span className="text-xs font-medium">Bespoke Measurements</span>
                   </label>
 
-                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                  <label className="hover:bg-muted/30 flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5">
                     <Checkbox
                       checked={colorFabricChanges}
                       onChange={(e) => setColorFabricChanges(e.target.checked)}
@@ -1654,7 +1828,7 @@ export default function ListingForm({
                     <span className="text-xs font-medium">Color & Fabric Variations</span>
                   </label>
 
-                  <label className="flex items-center gap-2.5 rounded-lg border p-2.5 cursor-pointer hover:bg-muted/30">
+                  <label className="hover:bg-muted/30 flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5">
                     <Checkbox
                       checked={embroidery}
                       onChange={(e) => setEmbroidery(e.target.checked)}
@@ -1663,7 +1837,7 @@ export default function ListingForm({
                   </label>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 pt-1">
+                <div className="grid gap-4 pt-1 sm:grid-cols-2">
                   <div>
                     <FormInput
                       label="Tailoring / Production Time (Days)"
@@ -1672,7 +1846,7 @@ export default function ListingForm({
                       value={productionDays}
                       onChange={(e) => setProductionDays(e.target.value)}
                     />
-                    <span className="text-[11px] text-muted-foreground block mt-1">
+                    <span className="text-muted-foreground mt-1 block text-[11px]">
                       Estimated days needed to tailor and prepare the custom order.
                     </span>
                   </div>
@@ -1685,7 +1859,7 @@ export default function ListingForm({
                       value={additionalCustomPrice}
                       onChange={(e) => setAdditionalCustomPrice(e.target.value)}
                     />
-                    <span className="text-[11px] text-muted-foreground block mt-1">
+                    <span className="text-muted-foreground mt-1 block text-[11px]">
                       Starting custom price or base customization surcharge.
                     </span>
                   </div>
@@ -1704,51 +1878,55 @@ export default function ListingForm({
           </section>
 
           {/* ════════ SECTION 6: CONTACT PREFERENCES ════════ */}
-          <section id="field-contact" className="rounded-2xl border bg-card p-5 sm:p-6 shadow-sm space-y-4">
+          <section
+            id="field-contact"
+            className="bg-card space-y-4 rounded-2xl border p-5 shadow-sm sm:p-6"
+          >
             <div>
-              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <h3 className="text-foreground flex items-center gap-2 text-base font-semibold">
                 <span>📞</span> Contact Preferences
               </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                How should interested buyers reach you? Reused automatically from your seller profile.
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                How should interested buyers reach you? Reused automatically from your seller
+                profile.
               </p>
             </div>
 
             {validationErrors.contact && (
-              <p className="text-xs font-medium text-destructive">{validationErrors.contact}</p>
+              <p className="text-destructive text-xs font-medium">{validationErrors.contact}</p>
             )}
 
             <div className="space-y-3">
-              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-muted/30">
+              <label className="hover:bg-muted/30 flex cursor-pointer items-start gap-3 rounded-xl border p-3">
                 <Checkbox
                   checked={inAppMessaging}
                   onChange={(e) => setInAppMessaging(e.target.checked)}
                 />
                 <div>
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    Platform Chat <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] text-primary">Recommended</span>
+                  <span className="text-foreground flex items-center gap-1.5 text-xs font-semibold">
+                    Platform Chat{' '}
+                    <span className="bg-primary/10 py-0.2 text-primary rounded px-1.5 text-[10px]">
+                      Recommended
+                    </span>
                   </span>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <p className="text-muted-foreground mt-0.5 text-[11px]">
                     Receive instant messages securely within Habesha Market.
                   </p>
                 </div>
               </label>
 
-              <label className="flex items-start gap-3 rounded-xl border p-3 cursor-pointer hover:bg-muted/30">
-                <Checkbox
-                  checked={showPhone}
-                  onChange={(e) => setShowPhone(e.target.checked)}
-                />
+              <label className="hover:bg-muted/30 flex cursor-pointer items-start gap-3 rounded-xl border p-3">
+                <Checkbox checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} />
                 <div>
-                  <span className="text-xs font-semibold text-foreground">Phone Call</span>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <span className="text-foreground text-xs font-semibold">Phone Call</span>
+                  <p className="text-muted-foreground mt-0.5 text-[11px]">
                     Display your verified phone number to buyers on the listing page.
                   </p>
                 </div>
               </label>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 pt-1">
+            <div className="grid gap-4 pt-1 sm:grid-cols-2">
               <div>
                 <FormInput
                   label="WhatsApp Number (Optional)"
@@ -1756,7 +1934,7 @@ export default function ListingForm({
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
                 />
-                <span className="text-[11px] text-muted-foreground block mt-1">
+                <span className="text-muted-foreground mt-1 block text-[11px]">
                   Enables a 1-click &quot;Chat on WhatsApp&quot; button for buyers.
                 </span>
               </div>
@@ -1773,26 +1951,29 @@ export default function ListingForm({
           </section>
 
           {/* ════════ SUBMIT ACTION & ERROR REPORTING ════════ */}
-          <div className="pt-2 space-y-4">
+          <div className="space-y-4 pt-2">
             {/* Single clean error location right above the primary submit button */}
             {error && (
               <Alert variant="error" {...(onClearError ? { onDismiss: onClearError } : {})}>
                 <div className="space-y-1">
-                  <p className="font-semibold text-xs">Submission Error</p>
-                  <p className="text-xs">{typeof error === 'string' ? error : getApiErrorMessage(error)}</p>
+                  <p className="text-xs font-semibold">Submission Error</p>
+                  <p className="text-xs">
+                    {typeof error === 'string' ? error : getApiErrorMessage(error)}
+                  </p>
                 </div>
               </Alert>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border bg-muted/30 p-4">
-              <div className="text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Listing Approval Process</p>
-                <p className="text-[11px] mt-0.5">
-                  Your listing will be submitted to our admin team for quality review before publishing.
+            <div className="bg-muted/30 flex flex-col items-center justify-between gap-4 rounded-2xl border p-4 sm:flex-row">
+              <div className="text-muted-foreground text-xs">
+                <p className="text-foreground font-medium">Listing Approval Process</p>
+                <p className="mt-0.5 text-[11px]">
+                  Your listing will be submitted to our admin team for quality review before
+                  publishing.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex w-full items-center gap-3 sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -1805,7 +1986,7 @@ export default function ListingForm({
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 sm:flex-initial min-w-[160px]"
+                  className="min-w-[160px] flex-1 sm:flex-initial"
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
@@ -1821,20 +2002,21 @@ export default function ListingForm({
         </div>
 
         {/* Right Sticky Sidebar (Desktop): Live Buyer Card Preview */}
-        <div className="hidden lg:block lg:col-span-4 sticky top-24 space-y-4">
+        <div className="sticky top-24 hidden space-y-4 lg:col-span-4 lg:block">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <h4 className="text-muted-foreground text-xs font-bold uppercase tracking-wider">
               Live Buyer Preview
             </h4>
-            <span className="text-[11px] text-primary font-medium">Updates live</span>
+            <span className="text-primary text-[11px] font-medium">Updates live</span>
           </div>
 
           {BuyerPreviewCard}
 
-          <div className="rounded-xl border bg-card p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-semibold text-foreground text-[11px]">💡 Seller Tip</p>
+          <div className="bg-card text-muted-foreground space-y-1 rounded-xl border p-3 text-xs">
+            <p className="text-foreground text-[11px] font-semibold">💡 Seller Tip</p>
             <p className="text-[11px] leading-relaxed">
-              Listings with detailed cultural fabric info and clear Habesha Kemis photos receive 3× more calls and inquiries.
+              Listings with detailed cultural fabric info and clear Habesha Kemis photos receive 3×
+              more calls and inquiries.
             </p>
           </div>
         </div>
@@ -1846,7 +2028,7 @@ export default function ListingForm({
         onClose={() => setIsPreviewOpen(false)}
         title="Buyer Listing Preview"
       >
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 p-4">
           {BuyerPreviewCard}
           <div className="flex justify-end">
             <Button type="button" onClick={() => setIsPreviewOpen(false)}>

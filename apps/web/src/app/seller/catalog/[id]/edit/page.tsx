@@ -44,12 +44,17 @@ export default function EditListingPage() {
           listingType: listing.availableForRent ? 'rent' : 'sale',
           availableForPurchase: listing.availableForPurchase ?? true,
           availableForRent: Boolean(listing.availableForRent),
-          rentalPricePerDay: listing.rentalPricePerDay != null ? String(listing.rentalPricePerDay) : '',
+          rentalPricePerDay:
+            listing.rentalPricePerDay != null ? String(listing.rentalPricePerDay) : '',
           rentalDeposit: listing.rentalDeposit != null ? String(listing.rentalDeposit) : '',
-          rentalThreeDayRate: listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
-          rentalWeeklyRate: listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
-          minRentalDurationDays: listing.minRentalDurationDays != null ? String(listing.minRentalDurationDays) : '3',
-          maxRentalDurationDays: listing.maxRentalDurationDays != null ? String(listing.maxRentalDurationDays) : '',
+          rentalThreeDayRate:
+            listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
+          rentalWeeklyRate:
+            listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
+          minRentalDurationDays:
+            listing.minRentalDurationDays != null ? String(listing.minRentalDurationDays) : '3',
+          maxRentalDurationDays:
+            listing.maxRentalDurationDays != null ? String(listing.maxRentalDurationDays) : '',
           rentalPickupLocation: listing.rentalPickupLocation ?? '',
           rentalNotes: listing.rentalNotes ?? '',
           title: listing.title ?? '',
@@ -79,14 +84,21 @@ export default function EditListingPage() {
                 material: listing.attributes.material ?? '',
                 gender: listing.attributes.gender ?? '',
                 style: listing.attributes.style ?? '',
+                occasions: Array.isArray(listing.attributes.occasions)
+                  ? listing.attributes.occasions
+                  : listing.attributes.occasion
+                    ? [listing.attributes.occasion]
+                    : [],
               }
             : null,
           rentalInfo: listing.availableForRent
             ? {
                 rentalPricePerDay: String(listing.rentalPricePerDay ?? ''),
                 rentalDeposit: String(listing.rentalDeposit ?? ''),
-                rentalThreeDayRate: listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
-                rentalWeeklyRate: listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
+                rentalThreeDayRate:
+                  listing.rentalThreeDayRate != null ? String(listing.rentalThreeDayRate) : '',
+                rentalWeeklyRate:
+                  listing.rentalWeeklyRate != null ? String(listing.rentalWeeklyRate) : '',
                 minRentalDays: String(listing.minRentalDurationDays ?? '3'),
                 maxRentalDays: String(listing.maxRentalDurationDays ?? '30'),
               }
@@ -172,7 +184,9 @@ export default function EditListingPage() {
       const apiData: Record<string, unknown> = {
         title: data.title,
         description: data.description,
-        price: isSale ? (parseFloat(data.price) || 0) : (parseFloat(data.rentalPricePerDay || data.price) || 0),
+        price: isSale
+          ? parseFloat(data.price) || 0
+          : parseFloat(data.rentalPricePerDay || data.price) || 0,
         categoryId: data.categoryId,
         condition: data.condition,
         city: data.city,
@@ -185,14 +199,19 @@ export default function EditListingPage() {
 
       // Add rental pricing if applicable
       if (isRent) {
-        apiData.rentalPricePerDay = parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
-        apiData.rentalDeposit = parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
+        apiData.rentalPricePerDay =
+          parseFloat(data.rentalPricePerDay || data.rentalInfo?.rentalPricePerDay || '0') || 0;
+        apiData.rentalDeposit =
+          parseFloat(data.rentalDeposit || data.rentalInfo?.rentalDeposit || '0') || 0;
         const threeDayVal = data.rentalThreeDayRate || data.rentalInfo?.rentalThreeDayRate;
-        apiData.rentalThreeDayRate = threeDayVal ? (parseFloat(threeDayVal) || null) : null;
+        apiData.rentalThreeDayRate = threeDayVal ? parseFloat(threeDayVal) || null : null;
         const weeklyVal = data.rentalWeeklyRate || data.rentalInfo?.rentalWeeklyRate;
-        apiData.rentalWeeklyRate = weeklyVal ? (parseFloat(weeklyVal) || null) : null;
-        apiData.minRentalDurationDays = parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
-        apiData.maxRentalDurationDays = data.maxRentalDurationDays ? parseInt(data.maxRentalDurationDays, 10) : null;
+        apiData.rentalWeeklyRate = weeklyVal ? parseFloat(weeklyVal) || null : null;
+        apiData.minRentalDurationDays =
+          parseInt(data.minRentalDurationDays || data.rentalInfo?.minRentalDays || '1', 10) || 1;
+        apiData.maxRentalDurationDays = data.maxRentalDurationDays
+          ? parseInt(data.maxRentalDurationDays, 10)
+          : null;
         apiData.rentalPickupLocation = data.rentalPickupLocation || null;
         apiData.rentalNotes = data.rentalNotes || null;
       } else {
@@ -239,10 +258,7 @@ export default function EditListingPage() {
       await apiPatch(`/listings/${id}`, apiData);
       setSuccess(true);
     } catch (err: unknown) {
-      const errorMessage = getApiErrorMessage(
-        err,
-        'Failed to update listing. Please try again.',
-      );
+      const errorMessage = getApiErrorMessage(err, 'Failed to update listing. Please try again.');
       setError(errorMessage);
       console.error('Listing update error:', err);
     } finally {
@@ -252,12 +268,10 @@ export default function EditListingPage() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full">
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground mb-4">
-              Please log in to edit your listing
-            </p>
+            <p className="text-muted-foreground mb-4">Please log in to edit your listing</p>
             <Button onClick={() => router.push('/login')}>Go to Login</Button>
           </CardContent>
         </Card>
@@ -267,10 +281,10 @@ export default function EditListingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-3">
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-3 text-center">
           <Spinner size="lg" />
-          <p className="text-sm text-muted-foreground">Loading listing details...</p>
+          <p className="text-muted-foreground text-sm">Loading listing details...</p>
         </div>
       </div>
     );
@@ -278,25 +292,23 @@ export default function EditListingPage() {
 
   if (error && !initialData) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="mx-auto max-w-4xl py-8">
         <Alert variant="error" className="mb-4">
           {error}
         </Alert>
-        <Button onClick={() => router.push('/seller/catalog')}>
-          Return to My Catalog
-        </Button>
+        <Button onClick={() => router.push('/seller/catalog')}>Return to My Catalog</Button>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <Card className="border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-800">
+      <div className="mx-auto max-w-4xl py-8">
+        <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10">
           <CardContent className="p-8 text-center">
             <div className="mb-4 text-green-600 dark:text-green-400">
               <svg
-                className="w-16 h-16 mx-auto"
+                className="mx-auto h-16 w-16"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -309,16 +321,15 @@ export default function EditListingPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-green-900 dark:text-green-100 mb-2">
+            <h2 className="mb-2 text-2xl font-bold text-green-900 dark:text-green-100">
               Listing Updated Successfully!
             </h2>
-            <p className="text-green-700 dark:text-green-300 mb-6">
-              Your changes have been saved. Low-risk edits apply live immediately, while high-risk changes or resubmissions have been queued for admin re-approval.
+            <p className="mb-6 text-green-700 dark:text-green-300">
+              Your changes have been saved. Low-risk edits apply live immediately, while high-risk
+              changes or resubmissions have been queued for admin re-approval.
             </p>
             <div className="flex justify-center gap-4">
-              <Button onClick={() => router.push('/seller/catalog')}>
-                Go to My Catalog
-              </Button>
+              <Button onClick={() => router.push('/seller/catalog')}>Go to My Catalog</Button>
               <Button variant="outline" onClick={() => router.push(`/products/${id}`)}>
                 View Listing
               </Button>
@@ -330,13 +341,13 @@ export default function EditListingPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">
+          <h1 className="font-display text-foreground text-2xl font-bold tracking-tight">
             Edit Listing
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-muted-foreground mt-0.5 text-xs">
             Update your fashion item details or fix feedback from moderation.
           </p>
         </div>
@@ -347,9 +358,9 @@ export default function EditListingPage() {
 
       {rejectedReason && (
         <Alert variant="warning">
-          <p className="font-semibold text-xs">Moderator Feedback / Reason:</p>
+          <p className="text-xs font-semibold">Moderator Feedback / Reason:</p>
           <p className="mt-1 text-xs">{rejectedReason}</p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
+          <p className="text-muted-foreground mt-1.5 text-[11px]">
             Making changes and submitting will resubmit your listing for admin review.
           </p>
         </Alert>

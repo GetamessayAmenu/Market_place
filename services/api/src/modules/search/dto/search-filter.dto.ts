@@ -98,26 +98,91 @@ export class SearchFilterDto extends PaginationQueryDto {
 
   // Cultural Facet Filters
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.includes(',')
+        ? value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [value.trim()];
+    }
+    return [String(value)];
+  })
   @IsArray()
   @IsString({ each: true })
   weavingPatterns?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.includes(',')
+        ? value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [value.trim()];
+    }
+    return [String(value)];
+  })
   @IsArray()
   @IsString({ each: true })
   fabricTypes?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.includes(',')
+        ? value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [value.trim()];
+    }
+    return [String(value)];
+  })
   @IsArray()
   @IsString({ each: true })
   embroideryStyles?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.includes(',')
+        ? value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [value.trim()];
+    }
+    return [String(value)];
+  })
   @IsArray()
   @IsString({ each: true })
   occasionTypes?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.includes(',')
+        ? value
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [value.trim()];
+    }
+    return [String(value)];
+  })
   @IsArray()
   @IsString({ each: true })
   culturalRegions?: string[];

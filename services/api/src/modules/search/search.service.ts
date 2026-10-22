@@ -89,10 +89,7 @@ export class SearchService {
           where: {
             isActive: true,
             deletedAt: null,
-            OR: [
-              { id: catQuery },
-              { slug: catQuery },
-            ],
+            OR: [{ id: catQuery }, { slug: catQuery }],
           },
           include: {
             children: {
@@ -163,7 +160,10 @@ export class SearchService {
           if (catClauses.length > 0) {
             filter = `${baseFilter} AND (${catClauses.join(' OR ')})`;
           }
-          const keywords = q.replace(/Cultural\s*Dresses/gi, '').replace(/[()]/g, '').trim();
+          const keywords = q
+            .replace(/Cultural\s*Dresses/gi, '')
+            .replace(/[()]/g, '')
+            .trim();
           meiliQ = keywords.length >= 2 ? keywords : '';
         }
       } catch {
@@ -212,7 +212,11 @@ export class SearchService {
 
     // Tier 3: Term relaxation for multi-word phrases if 0 hits
     if (result.hits.length === 0 && q && q.trim().includes(' ')) {
-      const words = q.trim().replace(/[()]/g, '').split(/\s+/).filter((w) => w.length > 2);
+      const words = q
+        .trim()
+        .replace(/[()]/g, '')
+        .split(/\s+/)
+        .filter((w) => w.length > 2);
       if (words.length > 0) {
         const relaxedQ = words.slice(-2).join(' ');
         try {
@@ -251,6 +255,88 @@ export class SearchService {
         if (dto.city) {
           whereClause.city = { contains: dto.city, mode: 'insensitive' };
         }
+        if (dto.condition) {
+          whereClause.condition = dto.condition;
+        }
+        if (dto.minPrice !== undefined || dto.maxPrice !== undefined) {
+          whereClause.price = {
+            ...(dto.minPrice !== undefined ? { gte: dto.minPrice } : {}),
+            ...(dto.maxPrice !== undefined ? { lte: dto.maxPrice } : {}),
+          };
+        }
+        if (dto.verified === true) {
+          whereClause.seller = {
+            OR: [{ emailVerifiedAt: { not: null } }, { phoneVerifiedAt: { not: null } }],
+          };
+        }
+
+        const facetConditions: any[] = [];
+
+        // Occasion filter matching
+        if (dto.occasionTypes && dto.occasionTypes.length > 0) {
+          const OCCASION_KEYWORD_MAP: Record<string, string[]> = {
+            wedding: ['wedding', 'melse', 'bride', 'bridal', 'groom', 'ሙሽት', 'ሰርግ', 'መልስ'],
+            holiday: [
+              'holiday',
+              'festival',
+              'timket',
+              'meskel',
+              'enkutatash',
+              'genna',
+              'fasika',
+              'በዓል',
+              'ጥምቀት',
+              'መስቀል',
+              'ገና',
+              'ፋሲካ',
+            ],
+            church: ['church', 'netela', 'gabi', 'spiritual', 'white', 'ማህበር', 'ሰንበት', 'ቤተ ክርስቲያን'],
+            graduation: ['graduation', 'prom', 'celebration', 'ምረቃ', 'ድግስ'],
+            casual: ['casual', 'everyday', 'modern', 'shirt', 'የቀን', 'ዘመናዊ'],
+          };
+          const occTerms = dto.occasionTypes.flatMap(
+            (occ) => OCCASION_KEYWORD_MAP[occ.toLowerCase()] ?? [occ],
+          );
+          if (occTerms.length > 0) {
+            const occasionClauses: any[] = occTerms.flatMap((term) => [
+              { title: { contains: term, mode: 'insensitive' as const } },
+              { description: { contains: term, mode: 'insensitive' as const } },
+              { category: { name: { contains: term, mode: 'insensitive' as const } } },
+            ]);
+            dto.occasionTypes.forEach((occ) => {
+              occasionClauses.push(
+                { attributes: { path: ['occasions'], array_contains: [occ] } },
+                { attributes: { path: ['occasions'], array_contains: occ } },
+                { attributes: { path: ['occasion'], equals: occ } },
+              );
+            });
+            facetConditions.push({
+              OR: occasionClauses,
+            });
+          }
+        }
+
+        // Fabric filter matching
+        if (dto.fabricTypes && dto.fabricTypes.length > 0) {
+          const FABRIC_KEYWORD_MAP: Record<string, string[]> = {
+            cotton: ['cotton', 'shemma', 'handwoven', 'ጥጥ', 'ሸማ'],
+            menen: ['menen', 'መነን'],
+            saba: ['saba', 'ሳባ', 'kutna', 'ኩትና'],
+            silk: ['silk', 'chiffon', 'ሲልክ', 'ሺፎን'],
+            tilf: ['tilf', 'embroid', 'ጥልፍ'],
+          };
+          const fabricTerms = dto.fabricTypes.flatMap(
+            (fab) => FABRIC_KEYWORD_MAP[fab.toLowerCase()] ?? [fab],
+          );
+          if (fabricTerms.length > 0) {
+            facetConditions.push({
+              OR: fabricTerms.flatMap((term) => [
+                { title: { contains: term, mode: 'insensitive' as const } },
+                { description: { contains: term, mode: 'insensitive' as const } },
+              ]),
+            });
+          }
+        }
 
         if (targetCatIDs.length > 0) {
           whereClause.OR = [
@@ -275,17 +361,25 @@ export class SearchService {
             { category: { name: { contains: cleanQ, mode: 'insensitive' } } },
             ...words.map((w) => ({ title: { contains: w, mode: 'insensitive' as const } })),
             ...words.map((w) => ({ description: { contains: w, mode: 'insensitive' as const } })),
-            ...words.map((w) => ({ category: { name: { contains: w, mode: 'insensitive' as const } } })),
+            ...words.map((w) => ({
+              category: { name: { contains: w, mode: 'insensitive' as const } },
+            })),
           );
         }
 
+        const allAndConditions: any[] = [];
+        if (whereClause.OR) {
+          allAndConditions.push({ OR: whereClause.OR });
+          delete whereClause.OR;
+        }
         if (textConditions.length > 0) {
-          if (whereClause.OR) {
-            whereClause.AND = [{ OR: whereClause.OR }, { OR: textConditions }];
-            delete whereClause.OR;
-          } else {
-            whereClause.OR = textConditions;
-          }
+          allAndConditions.push({ OR: textConditions });
+        }
+        if (facetConditions.length > 0) {
+          allAndConditions.push(...facetConditions);
+        }
+        if (allAndConditions.length > 0) {
+          whereClause.AND = allAndConditions;
         }
 
         const dbListings = await (this.prisma.listing as any).findMany({
@@ -293,7 +387,9 @@ export class SearchService {
           include: {
             images: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
             category: { select: { id: true, name: true, slug: true, parentId: true } },
-            seller: { select: { id: true, displayName: true, emailVerifiedAt: true, phoneVerifiedAt: true } },
+            seller: {
+              select: { id: true, displayName: true, emailVerifiedAt: true, phoneVerifiedAt: true },
+            },
           },
           take: limit,
         });
@@ -309,7 +405,10 @@ export class SearchService {
             status: l.status,
             city: l.city ?? null,
             location: l.city,
-            primaryImageUrl: (l.images || []).find((i: any) => i.isPrimary)?.url || (l.images || [])[0]?.url || null,
+            primaryImageUrl:
+              (l.images || []).find((i: any) => i.isPrimary)?.url ||
+              (l.images || [])[0]?.url ||
+              null,
             categoryId: l.category?.parentId ?? l.categoryId,
             categoryName: l.category?.name ?? 'Fashion',
             categorySlug: l.category?.slug ?? 'fashion',
@@ -348,19 +447,35 @@ export class SearchService {
 
     // Compute real database mode counts and real category counts
     const [buyCount, rentCount, customCount, activeListingsWithCat] = await Promise.all([
-      this.prisma.listing.count({
-        where: { status: 'active', deletedAt: null, OR: [{ availableForPurchase: true }, { supportsReadyMade: true }] },
-      }).catch(() => 18),
-      this.prisma.listing.count({
-        where: { status: 'active', deletedAt: null, availableForRent: true },
-      }).catch(() => 8),
-      this.prisma.listing.count({
-        where: { status: 'active', deletedAt: null, OR: [{ customOrderAvailable: true }, { supportsCustomDesign: true }] },
-      }).catch(() => 11),
-      this.prisma.listing.findMany({
-        where: { status: 'active', deletedAt: null },
-        select: { categoryId: true, category: { select: { id: true, parentId: true } } },
-      }).catch(() => []),
+      this.prisma.listing
+        .count({
+          where: {
+            status: 'active',
+            deletedAt: null,
+            OR: [{ availableForPurchase: true }, { supportsReadyMade: true }],
+          },
+        })
+        .catch(() => 18),
+      this.prisma.listing
+        .count({
+          where: { status: 'active', deletedAt: null, availableForRent: true },
+        })
+        .catch(() => 8),
+      this.prisma.listing
+        .count({
+          where: {
+            status: 'active',
+            deletedAt: null,
+            OR: [{ customOrderAvailable: true }, { supportsCustomDesign: true }],
+          },
+        })
+        .catch(() => 11),
+      this.prisma.listing
+        .findMany({
+          where: { status: 'active', deletedAt: null },
+          select: { categoryId: true, category: { select: { id: true, parentId: true } } },
+        })
+        .catch(() => []),
     ]);
 
     const categoryCounts: Record<string, number> = {};
@@ -398,10 +513,7 @@ export class SearchService {
   }
 
   async getSuggestions(dto: SearchSuggestionsDto & { limit?: number }) {
-    const limit = Math.min(
-      dto.limit ?? 5,
-      SEARCH_SUGGESTIONS_MAX_LIMIT,
-    );
+    const limit = Math.min(dto.limit ?? 5, SEARCH_SUGGESTIONS_MAX_LIMIT);
 
     const q = sanitizeSearchQuery(dto.q);
     if (!q) {
@@ -517,7 +629,7 @@ export class SearchService {
     const primaryTerm = searchSuggestions[0] || q;
     const categorySuggestions = activeCategories.slice(0, 3).map((cat, idx) => {
       const isDirectMatch = cat.name.toLowerCase().includes(lowerQ);
-      const text = isDirectMatch ? cat.name : (searchSuggestions[idx] || primaryTerm);
+      const text = isDirectMatch ? cat.name : searchSuggestions[idx] || primaryTerm;
       return {
         text,
         categoryName: cat.name,

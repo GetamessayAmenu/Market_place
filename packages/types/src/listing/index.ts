@@ -1,5 +1,5 @@
-export { LISTING_CONDITIONS, LISTING_STATUSES } from './listing.js';
-export type { ListingStatus, ListingCondition } from './listing.js';
+export { LISTING_CONDITIONS, LISTING_STATUSES, OCCASION_OPTIONS } from './listing.js';
+export type { ListingStatus, ListingCondition, OccasionOption } from './listing.js';
 export type { ListingContactOptions } from './contact-options.js';
 
 /** API-facing status labels mapped to Prisma ListingStatus values. */
